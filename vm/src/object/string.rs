@@ -11,10 +11,19 @@ impl Object for PtyStr {
     }
 }
 
-fn trim(args: FnArgs) -> PettyObject {
-    args.assert_len(1..=2);
-    let PettyObject::Str(self_) = &args.slice[0] else {
-        todo!()
-    };
-    PtyStr::from(self_.trim()).into()
+#[pettyfunc]
+fn trim(self_: PtyStr, pat: PtyStr) -> PtyStr {
+    let pat = pat.as_str();
+    let trimmed = self_.trim_start_matches(pat).trim_end_matches(pat);
+    trimmed.into()
+}
+
+#[pettyfunc]
+fn trim_start(self_: PtyStr, pat: PtyStr) -> PtyStr {
+    self_.trim_start_matches(pat.as_str()).into()
+}
+
+#[pettyfunc]
+fn trim_end(self_: PtyStr, pat: PtyStr) -> PtyStr {
+    self_.trim_end_matches(pat.as_str()).into()
 }

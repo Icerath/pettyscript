@@ -7,6 +7,11 @@ pub mod null;
 pub mod string;
 
 pub use custom::CustomObject;
+pub use float::Float;
+pub use int::Int;
+pub use list::List;
+pub use null::Null;
+pub use string::PtyStr;
 
 use crate::prelude::*;
 use enum_dispatch::enum_dispatch;
@@ -31,18 +36,18 @@ pub trait Object: Clone + 'static {
     }
 }
 
-#[derive(Debug, Clone)]
 #[enum_dispatch(Object)]
+#[derive(Debug, Clone)]
 pub enum PettyObject {
-    Int(int::Int),
-    Float(float::Float),
-    Str(string::PtyStr),
-    List(list::List),
+    Int,
+    Float,
+    PtyStr,
+    List,
 
-    RawFunc(func::RawFunc),
+    RawFunc,
 
-    Null(Null),
+    Null,
 
-    Std(StdObject),
-    Custom(CustomObject),
+    StdObject,
+    CustomObject,
 }

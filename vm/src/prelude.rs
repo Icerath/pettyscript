@@ -13,4 +13,5 @@ pub use arcstr::literal as ptystr;
 pub const NULL: &PettyObject = &PettyObject::Null(Null);
 
 // Convenience
+pub use macros::pettyfunc;
 pub use std::fmt::Debug;
