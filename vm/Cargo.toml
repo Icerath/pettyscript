@@ -1,0 +1,8 @@
+[package]
+name = "vm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arcstr = "1.1.5"
+enum_dispatch = "0.3.12"
