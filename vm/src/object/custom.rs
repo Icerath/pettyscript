@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct CustomObject {
-    inner: Rc<Mutex<HashMap<PtyStr, PettyObject>>>,
+    inner: Arc<Mutex<HashMap<PtyStr, PettyObject>>>,
 }
 
 impl Object for CustomObject {

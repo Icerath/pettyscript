@@ -4,10 +4,8 @@ pub use crate::object::{CustomObject, Object, PettyObject};
 pub use crate::object::{Float, Int, Null, PtyStr, RawFunc};
 pub use crate::stdlib::StdObject;
 
-// Allow me to change the type globally
 pub use std::any::TypeId;
-pub use std::rc::Rc;
-pub use std::sync::Mutex;
+pub use std::sync::{Arc, Mutex};
 
 pub use arcstr::literal as ptystr;
 
