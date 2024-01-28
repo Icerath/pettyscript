@@ -1,4 +1,6 @@
 [workspace]
 members = ["cli", "macros", "vm"]
+#cleans up tests for now
+default-members = ["vm"]
 
 resolver = "2"

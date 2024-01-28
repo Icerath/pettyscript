@@ -1,6 +1,7 @@
 pub use crate::fn_args::FnArgs;
-pub use crate::object::{float::Float, func::RawFunc, int::Int, null::Null, string::PtyStr};
+pub use crate::object::ObjectExt;
 pub use crate::object::{CustomObject, Object, PettyObject};
+pub use crate::object::{Float, Int, Null, PtyStr, RawFunc};
 pub use crate::stdlib::StdObject;
 
 // Allow me to change the type globally

@@ -4,13 +4,16 @@ pub mod func;
 pub mod int;
 pub mod list;
 pub mod null;
+pub mod object_ext;
 pub mod string;
 
 pub use custom::CustomObject;
 pub use float::Float;
+pub use func::RawFunc;
 pub use int::Int;
 pub use list::List;
 pub use null::Null;
+pub use object_ext::ObjectExt;
 pub use string::PtyStr;
 
 use crate::prelude::*;
