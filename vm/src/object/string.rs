@@ -1,6 +1,6 @@
-use crate::prelude::*;
-
 pub use arcstr::ArcStr as PtyStr;
+
+use crate::prelude::*;
 
 impl Object for PtyStr {
     fn get(&self, key: &str) -> PettyObject {

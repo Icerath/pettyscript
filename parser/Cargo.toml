@@ -1,12 +1,11 @@
 [package]
-name = "vm"
+name = "parser"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-arcstr = "1.1.5"
-enum_dispatch = "0.3.12"
-macros = { path = "../macros" }
+vm = { path = "../vm" }
+winnow = "0.6.2"
 
 [lints]
 workspace = true

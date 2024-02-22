@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod fn_args;
 pub mod object;
 pub mod prelude;

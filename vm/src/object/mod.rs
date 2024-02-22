@@ -8,6 +8,7 @@ pub mod object_ext;
 pub mod string;
 
 pub use custom::CustomObject;
+use enum_dispatch::enum_dispatch;
 pub use float::Float;
 pub use func::RawFunc;
 pub use int::Int;
@@ -17,7 +18,6 @@ pub use object_ext::ObjectExt;
 pub use string::PtyStr;
 
 use crate::prelude::*;
-use enum_dispatch::enum_dispatch;
 
 #[enum_dispatch]
 pub trait Object: Clone + 'static {
