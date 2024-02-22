@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::Attribute;
 
+#[allow(clippy::missing_panics_doc)]
 #[proc_macro_attribute]
 pub fn pettyfunc(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::ItemFn);
