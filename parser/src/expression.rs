@@ -1,3 +1,5 @@
+use statement::{block, sep_params};
+
 use crate::*;
 
 pub fn expression(input: &mut &str) -> Result<Expression> {
@@ -63,12 +65,24 @@ pub fn ident(input: &mut &str) -> Result<PtyStr> {
 
 pub fn literal(input: &mut &str) -> Result<Literal> {
     alt((
+        closure,
         bool.map(Literal::Bool),
         float.map(Literal::Float),
         int.map(Literal::Int),
         string.map(Literal::String),
         list.map(Literal::List),
     ))
+    .parse_next(input)
+}
+
+pub fn closure(input: &mut &str) -> Result<Literal> {
+    use Literal::Closure;
+    seq!(Closure {
+        _: ('|', ws),
+        params: sep_params,
+        _: (ws, '|', ws),
+        block: block,
+    })
     .parse_next(input)
 }
 

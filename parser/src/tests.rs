@@ -66,6 +66,11 @@ fn bin_expr() {
     test_expected!("1..=2", "(1 ..= 2)");
 }
 
+#[test]
+fn closures() {
+    test_expected!("|i|: i*i", "|i| {(i * i)}");
+}
+
 mod examples {
     macro_rules! test_example {
         ($name:ident) => {

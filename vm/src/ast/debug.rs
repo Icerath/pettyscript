@@ -51,7 +51,9 @@ impl fmt::Debug for Literal {
             Self::Map(map) => {
                 f.debug_map().entries(map.iter().map(|(lhs, rhs)| (lhs, rhs))).finish()
             }
-            Self::Function { params, block } => write!(f, "fn({params:?}) {block:?}"),
+            Self::Closure { params, block } => {
+                write!(f, "|{:?}| {:?}", DebugParams(params), DebugBlock(block))
+            }
         }
     }
 }

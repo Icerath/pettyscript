@@ -72,7 +72,6 @@ fn range(input: &mut &str) -> Result {
 
 fn binop_range(input: &mut &str) -> Result<BinOp> {
     ws.parse_next(input)?;
-    println!("{input:?}");
     alt(("..=".value(BinOp::RangeInclusive), "..".value(BinOp::RangeExclusive))).parse_next(input)
 }
 

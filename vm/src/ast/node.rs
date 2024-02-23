@@ -104,7 +104,7 @@ pub enum Literal {
     List(Box<[Expression]>),
     Tuple(Box<[Expression]>),
     Map(Box<[(Expression, Expression)]>),
-    Function { params: Box<[Node]>, block: Box<[Node]> },
+    Closure { params: Box<[PtyStr]>, block: Box<[Node]> },
 }
 
 #[derive(Debug, PartialEq)]
