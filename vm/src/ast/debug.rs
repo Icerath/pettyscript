@@ -1,6 +1,6 @@
 use core::fmt;
 
-use super::*;
+use super::{BinOp, Expression, IfStatement, Literal, Node, Statement};
 use crate::prelude::PtyStr;
 
 impl fmt::Debug for Expression {

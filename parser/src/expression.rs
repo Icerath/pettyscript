@@ -1,6 +1,20 @@
-use statement::{block, sep_params};
+use vm::{
+    ast::{Expression, Keyword, Literal, UnaryOp},
+    object::PtyStr,
+};
+use winnow::{
+    ascii,
+    combinator::{alt, delimited, opt, repeat, separated, seq},
+    error::StrContext,
+    token::{one_of, take_while},
+    Parser,
+};
 
-use crate::*;
+use crate::{
+    binop::bin_expr,
+    statement::{block, sep_params},
+    ws, Result,
+};
 
 pub fn expression(input: &mut &str) -> Result<Expression> {
     alt((line_comment.map(|s| Expression::LineComment(s.into())), bin_expr)).parse_next(input)

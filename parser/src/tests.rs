@@ -1,4 +1,6 @@
-use super::*;
+use vm::ast::{Literal, Node};
+
+use crate::{parse, parse_many};
 
 macro_rules! test_expected {
     ($input:literal, $output:literal $(,)?) => {

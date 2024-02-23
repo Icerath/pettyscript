@@ -1,4 +1,17 @@
-use crate::*;
+use vm::{
+    ast::{BinOp, IfStatement, Node, Statement},
+    object::PtyStr,
+};
+use winnow::{
+    combinator::{alt, delimited, repeat, seq},
+    error::StrContext,
+    Parser,
+};
+
+use crate::{
+    expression::{expression, ident},
+    node, ws, Result,
+};
 
 pub fn statement(input: &mut &str) -> Result<Statement> {
     alt((
@@ -126,10 +139,10 @@ pub fn for_loop(input: &mut &str) -> Result<Statement> {
     seq!(ForLoop {
         _: ("for", ws),
         ident: ident,
-        _: cut_err((ws, "in", ws)),
-        iter: cut_err(expression),
+        _: (ws, "in", ws),
+        iter: expression,
         _: ws,
-        block: cut_err(block)
+        block: block
     })
     .context(StrContext::Label("for loop"))
     .parse_next(input)
@@ -139,9 +152,9 @@ pub fn while_loop(input: &mut &str) -> Result<Statement> {
     use Statement::WhileLoop;
     seq!(WhileLoop {
         _: ("while", ws),
-        expr: cut_err(expression),
+        expr: expression,
         _: ws,
-        block: cut_err(block),
+        block: block,
     })
     .context(StrContext::Label("while loop"))
     .parse_next(input)
@@ -150,11 +163,11 @@ pub fn while_loop(input: &mut &str) -> Result<Statement> {
 pub fn if_statement(input: &mut &str) -> Result<IfStatement> {
     seq!(IfStatement {
         _: ("if", ws),
-        condition: cut_err(expression),
+        condition: expression,
         _: ws,
-        block: cut_err(block),
+        block: block,
         _: ws,
-        or_else: cut_err(or_else)
+        or_else: or_else
     })
     .parse_next(input)
 }
