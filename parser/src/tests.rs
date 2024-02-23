@@ -62,6 +62,8 @@ fn bin_expr() {
     test_expected!("1 + 1", "(1 + 1)");
     test_expected!("1 + 1 * 1", "(1 + (1 * 1))");
     test_expected!("(1 + 1) * 1", "((1 + 1) * 1)");
+    test_expected!("1..2", "(1 .. 2)");
+    test_expected!("1..=2", "(1 ..= 2)");
 }
 
 mod examples {

@@ -13,7 +13,7 @@ use statement::{sep_node, statement};
 use vm::ast::{node::Literal, BinOp, Expression, IfStatement, Keyword, Node, Statement, UnaryOp};
 use vm::prelude::PtyStr;
 use winnow::{
-    ascii::{dec_int, float},
+    ascii,
     combinator::{alt, cut_err, delimited, opt, repeat, separated, seq, terminated},
     error::{ErrMode, ParseError, StrContext},
     token::{one_of, take_while},

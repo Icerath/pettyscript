@@ -65,14 +65,23 @@ pub fn literal(input: &mut &str) -> Result<Literal> {
     alt((
         bool.map(Literal::Bool),
         float.map(Literal::Float),
-        dec_int.map(Literal::Int),
+        int.map(Literal::Int),
         string.map(Literal::String),
         list.map(Literal::List),
     ))
     .parse_next(input)
 }
+
 pub fn bool(input: &mut &str) -> Result<bool> {
     alt(("true".value(true), "false".value(false))).parse_next(input)
+}
+
+pub fn float(input: &mut &str) -> Result<f64> {
+    (int, '.', int).recognize().map(|s: &str| s.parse().unwrap()).parse_next(input)
+}
+
+pub fn int(input: &mut &str) -> Result<i64> {
+    ascii::dec_int(input)
 }
 
 pub fn string(input: &mut &str) -> Result<PtyStr> {

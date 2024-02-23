@@ -59,13 +59,21 @@ fn binop_upper(input: &mut &str) -> Result<BinOp> {
 }
 
 fn get_item(input: &mut &str) -> Result {
-    let initial = factor(input)?;
-    let remainder = repeat(0.., ('.'.value(BinOp::Dot), get_item_suffix)).parse_next(input)?;
+    let initial = range(input)?;
+    let remainder = repeat(0.., ('.'.value(BinOp::Dot), range)).parse_next(input)?;
     Ok(fold_exprs(initial, remainder))
 }
 
-fn get_item_suffix(input: &mut &str) -> Result {
-    alt((fn_call, ident.map(Expression::Ident))).parse_next(input)
+fn range(input: &mut &str) -> Result {
+    let initial = factor(input)?;
+    let remainder = repeat(0.., (binop_range, factor)).parse_next(input)?;
+    Ok(fold_exprs(initial, remainder))
+}
+
+fn binop_range(input: &mut &str) -> Result<BinOp> {
+    ws.parse_next(input)?;
+    println!("{input:?}");
+    alt(("..=".value(BinOp::RangeInclusive), "..".value(BinOp::RangeExclusive))).parse_next(input)
 }
 
 fn factor(input: &mut &str) -> Result {

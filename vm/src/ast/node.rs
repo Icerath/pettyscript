@@ -83,6 +83,9 @@ pub enum BinOp {
     Mod,
 
     Dot,
+
+    RangeInclusive,
+    RangeExclusive,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

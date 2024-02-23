@@ -115,6 +115,9 @@ impl fmt::Display for BinOp {
             Self::Mod => "%",
 
             Self::Dot => ".",
+
+            Self::RangeInclusive => "..=",
+            Self::RangeExclusive => "..",
         };
         write!(f, "{symbol}")
     }
