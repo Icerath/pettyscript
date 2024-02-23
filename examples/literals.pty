@@ -1,8 +1,0 @@
-let bool = true;
-let int = 1;
-let float = 1.5;
-// let tuple = (int, float);
-let str = "Foo";
-let list = [int, float, str];
-// let map = map { int: str };
-// let set = set { int, float, str };

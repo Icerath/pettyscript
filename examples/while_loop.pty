@@ -1,6 +1,8 @@
-let i = 5
-while true {
-    if i <= 0: break
-    i -= 1
-    print(i)
+fn main() {
+    let i = 5
+    while true {
+        if i <= 0: break
+        i -= 1
+        print(i)
+    }
 }

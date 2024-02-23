@@ -1,3 +1,8 @@
 fn main() {
     print("Hello, World!");
 }
+
+
+if x % 10 == 0 {
+    print("Hello, World!");
+}

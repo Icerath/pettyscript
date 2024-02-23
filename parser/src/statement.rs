@@ -107,7 +107,6 @@ pub fn block(input: &mut &str) -> Result<Box<[Node]>> {
 pub fn single_block(input: &mut &str) -> Result<Box<[Node]>> {
     (':', ws, node).map(|(_, _, node)| [node].into()).parse_next(input)
 }
-
 pub fn many_block(input: &mut &str) -> Result<Box<[Node]>> {
     delimited('{', sep_node, '}').parse_next(input)
 }

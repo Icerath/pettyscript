@@ -57,20 +57,20 @@ fn test_single_block() {
     test_expected!(": 1", "{1}");
 }
 
-macro_rules! test_example {
-    ($fn_name:ident, $name:ident) => {
-        #[test]
-        fn $fn_name() {
-            let name = include_str!(concat!("../../examples/", stringify!($name), ".pty"));
-            if let Err(err) = parse_many(name) {
-                panic!("'{}' panicked with {err:#?}", stringify!($name));
+mod examples {
+    macro_rules! test_example {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                let name = include_str!(concat!("../../examples/", stringify!($name), ".pty"));
+                if let Err(err) = super::parse_many(name) {
+                    panic!("{err:#?}");
+                }
             }
-        }
-    };
+        };
+    }
+    test_example!(fizzbuzz);
+    test_example!(hello_world);
+    test_example!(sum_squares);
+    test_example!(while_loop);
 }
-
-test_example!(example_for_loop, for_loop);
-test_example!(example_if_statement, if_statement);
-test_example!(example_hello_world, hello_world);
-test_example!(example_literals, literals);
-test_example!(example_while_loop, while_loop);
