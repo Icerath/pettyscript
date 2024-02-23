@@ -58,27 +58,38 @@ pub enum Expression {
     Ident(PtyStr),
     Literal(Literal),
     FuncCall { name: PtyStr, args: Box<[Expression]> },
-    BinOp { op: BinOp, args: Box<(Expression, Expression)> },
-    UnaryOp { op: UnaryOp, expr: Box<Expression> },
+    BinExpr { op: BinOp, args: Box<(Expression, Expression)> },
+    UnaryExpr { op: UnaryOp, expr: Box<Expression> },
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BinOp {
+    Or,
+    And,
+    Xor,
+
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    Eq,
+    Ne,
+
     Add,
     Sub,
+
     Mul,
     Div,
     Mod,
 
-    Or,
-    And,
-    Xor,
+    Dot,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnaryOp {
     Not,
-    Splat,
+    Neg,
+    //Splat,
 }
 
 #[derive(PartialEq)]

@@ -1,12 +1,14 @@
 #![allow(unused_imports)]
 
+pub mod binop;
 mod expression;
 mod statement;
 
 #[cfg(test)]
 mod tests;
 
-use expression::{expression, ident};
+use binop::bin_expr;
+use expression::{expression, fn_call, ident, unary_expr, value_expr};
 use statement::{sep_node, statement};
 use vm::ast::{node::Literal, BinOp, Expression, IfStatement, Keyword, Node, Statement, UnaryOp};
 use vm::prelude::PtyStr;

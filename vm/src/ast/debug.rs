@@ -7,8 +7,8 @@ impl fmt::Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ident(ident) => write!(f, "{ident}"),
-            Self::UnaryOp { op, expr } => write!(f, "{op:?} {expr:?}"),
-            Self::BinOp { op, args } => write!(f, "{:?} {op:?} {:?}", &args.0, &args.1),
+            Self::UnaryExpr { op, expr } => write!(f, "{op:?}{expr:?}"),
+            Self::BinExpr { op, args } => write!(f, "({:?} {op} {:?})", &args.0, &args.1),
             Self::FuncCall { name, args } => write!(f, "{name}({args:?})"),
             Self::Literal(literal) => write!(f, "{literal:?}"),
             Self::Keyword(keyword) => write!(f, "{keyword:?}"),
@@ -96,14 +96,25 @@ impl fmt::Debug for IfStatement {
 impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let symbol = match self {
-            Self::Add => "+",
-            Self::Sub => "-",
-            Self::Mul => "*",
-            Self::Div => "/",
-            Self::Mod => "%",
             Self::And => "&&",
             Self::Or => "||",
             Self::Xor => "^",
+
+            Self::Lt => "<",
+            Self::LtEq => "<=",
+            Self::Gt => ">",
+            Self::GtEq => ">=",
+            Self::Eq => "==",
+            Self::Ne => "!=",
+
+            Self::Add => "+",
+            Self::Sub => "-",
+
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+
+            Self::Dot => ".",
         };
         write!(f, "{symbol}")
     }

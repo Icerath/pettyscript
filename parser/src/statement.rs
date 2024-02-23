@@ -89,13 +89,19 @@ pub fn op_assign(input: &mut &str) -> Result<Statement> {
 fn op_symbol(input: &mut &str) -> Result<BinOp> {
     use BinOp::*;
     alt((
+        "<=".value(LtEq),
+        ">=".value(GtEq),
+        "==".value(Eq),
+        "!=".value(Ne),
+        "&&".value(And),
+        "||".value(Or),
         '+'.value(Add),
         '-'.value(Sub),
         '*'.value(Mul),
         '/'.value(Div),
         '%'.value(Mod),
-        "&&".value(And),
-        "||".value(Or),
+        '<'.value(Lt),
+        '>'.value(Gt),
         "^".value(Xor),
     ))
     .parse_next(input)

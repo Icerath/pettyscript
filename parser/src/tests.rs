@@ -53,8 +53,15 @@ fn fn_decl() {
     test_expected!("fn print(s) { print(s) }", "fn print(s) {print([s])}");
 }
 #[test]
-fn test_single_block() {
+fn single_block() {
     test_expected!(": 1", "{1}");
+}
+
+#[test]
+fn bin_expr() {
+    test_expected!("1 + 1", "(1 + 1)");
+    test_expected!("1 + 1 * 1", "(1 + (1 * 1))");
+    test_expected!("(1 + 1) * 1", "((1 + 1) * 1)");
 }
 
 mod examples {

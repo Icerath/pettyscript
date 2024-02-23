@@ -1,15 +1,34 @@
 use crate::*;
 
 pub fn expression(input: &mut &str) -> Result<Expression> {
+    alt((line_comment.map(|s| Expression::LineComment(s.into())), bin_expr)).parse_next(input)
+}
+
+pub fn value_expr(input: &mut &str) -> Result<Expression> {
+    alt((unary_expr, value_expr_raw)).parse_next(input)
+}
+
+pub fn value_expr_raw(input: &mut &str) -> Result<Expression> {
     alt((
-        line_comment.map(|s| Expression::LineComment(s.into())),
-        fn_call,
         keyword.map(Expression::Keyword),
+        fn_call,
         literal.map(Expression::Literal),
         ident.map(Expression::Ident),
     ))
-    .context(StrContext::Label("expr"))
     .parse_next(input)
+}
+
+pub fn unary_expr(input: &mut &str) -> Result<Expression> {
+    let unary_op = alt((
+        '!'.value(UnaryOp::Not),
+        //'+'.value(UnaryOp::Plus),
+        '-'.value(UnaryOp::Neg),
+    ));
+
+    // FIXME: alt((value, expression))
+    (unary_op, expression.map(Box::new))
+        .map(|(op, expr)| Expression::UnaryExpr { op, expr })
+        .parse_next(input)
 }
 
 pub fn fn_call(input: &mut &str) -> Result<Expression> {
