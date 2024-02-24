@@ -5,7 +5,7 @@ pub use node::{BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement
 
 impl Statement {
     #[must_use]
-    pub fn node(self) -> Node {
+    pub const fn node(self) -> Node {
         Node::Statement(self)
     }
 }
@@ -41,7 +41,7 @@ impl From<IfStatement> for Node {
 }
 
 impl Node {
-    pub fn block(nodes: impl Into<Box<[Node]>>) -> Node {
+    pub fn block(nodes: impl Into<Box<[Self]>>) -> Self {
         Self::Statement(Statement::Block(nodes.into()))
     }
 }

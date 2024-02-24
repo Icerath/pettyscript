@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 pub mod binop;
 mod expression;
 mod statement;
@@ -9,7 +7,7 @@ mod tests;
 
 use expression::expression;
 use statement::{sep_node, statement};
-use vm::{ast::Node, prelude::PtyStr};
+use vm::ast::Node;
 use winnow::{
     combinator::{alt, delimited},
     error::{ErrMode, ParseError},

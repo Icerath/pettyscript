@@ -62,7 +62,7 @@ pub enum Expression {
     UnaryExpr { op: UnaryOp, expr: Box<Expression> },
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinOp {
     Or,
     And,
@@ -88,7 +88,7 @@ pub enum BinOp {
     RangeExclusive,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnaryOp {
     Not,
     Neg,

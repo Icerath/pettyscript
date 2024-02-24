@@ -8,7 +8,7 @@ pub trait ObjectExt: Object {
         Self: Into<PettyObject>,
     {
         let args: Box<[PettyObject]> =
-            [&self.clone().into()].into_iter().chain(args).cloned().collect();
+            std::iter::once(&self.clone().into()).chain(args).cloned().collect();
 
         self.get(key).call(FnArgs::new(&args))
     }

@@ -68,7 +68,7 @@ pub fn keyword(input: &mut &str) -> Result<Keyword> {
 }
 
 pub fn ident(input: &mut &str) -> Result<PtyStr> {
-    fn ident_char(c: char) -> bool {
+    const fn ident_char(c: char) -> bool {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_')
     }
     repeat(1.., one_of(ident_char))

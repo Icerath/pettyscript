@@ -9,7 +9,7 @@ pub struct FnArgs<'a> {
 
 impl<'a> FnArgs<'a> {
     #[must_use]
-    pub fn new(slice: &'a [PettyObject]) -> Self {
+    pub const fn new(slice: &'a [PettyObject]) -> Self {
         Self { slice }
     }
 
