@@ -1,6 +1,6 @@
 use vm::ast::{BinOp, Expression};
 use winnow::{
-    combinator::{alt, delimited, repeat},
+    combinator::{alt, delimited, preceded, repeat},
     Parser,
 };
 
@@ -12,16 +12,28 @@ use crate::{
 type Result<T = Expression> = crate::Result<T>;
 
 pub fn bin_expr(input: &mut &str) -> Result {
-    condition(input)
+    range(input)
 }
 
-fn condition(input: &mut &str) -> Result {
-    (comparison, repeat(0.., (binop_cond, comparison))).map(fold_exprs).parse_next(input)
+fn range(input: &mut &str) -> Result {
+    (logical_or, repeat(0.., (binop_range, logical_or))).map(fold_exprs).parse_next(input)
 }
 
-fn binop_cond(input: &mut &str) -> Result<BinOp> {
+fn binop_range(input: &mut &str) -> Result<BinOp> {
     ws.parse_next(input)?;
-    alt(("&&".value(BinOp::And), "||".value(BinOp::Or))).parse_next(input)
+    alt(("..=".value(BinOp::RangeInclusive), "..".value(BinOp::RangeExclusive))).parse_next(input)
+}
+
+fn logical_or(input: &mut &str) -> Result {
+    (logical_and, repeat(0.., (preceded(ws, "||".value(BinOp::Or)), logical_and)))
+        .map(fold_exprs)
+        .parse_next(input)
+}
+
+fn logical_and(input: &mut &str) -> Result {
+    (comparison, repeat(0.., (preceded(ws, "&&".value(BinOp::And)), comparison)))
+        .map(fold_exprs)
+        .parse_next(input)
 }
 
 fn comparison(input: &mut &str) -> Result {
@@ -60,16 +72,7 @@ fn binop_upper(input: &mut &str) -> Result<BinOp> {
 }
 
 fn get_item(input: &mut &str) -> Result {
-    (range, repeat(0.., ('.'.value(BinOp::Dot), range))).map(fold_exprs).parse_next(input)
-}
-
-fn range(input: &mut &str) -> Result {
-    (factor, repeat(0.., (binop_range, factor))).map(fold_exprs).parse_next(input)
-}
-
-fn binop_range(input: &mut &str) -> Result<BinOp> {
-    ws.parse_next(input)?;
-    alt(("..=".value(BinOp::RangeInclusive), "..".value(BinOp::RangeExclusive))).parse_next(input)
+    (factor, repeat(0.., ('.'.value(BinOp::Dot), factor))).map(fold_exprs).parse_next(input)
 }
 
 fn factor(input: &mut &str) -> Result {
