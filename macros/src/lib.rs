@@ -18,7 +18,7 @@ pub fn pettyfunc(_attr: TokenStream, input: TokenStream) -> TokenStream {
             args: FnArgs<'__a>
         ) -> PettyObject {
             #variables
-            #return_type::into(#body)
+            #return_type::into((|| #body) ())
         }
     )
     .into()
