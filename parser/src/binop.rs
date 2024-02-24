@@ -16,9 +16,7 @@ pub fn bin_expr(input: &mut &str) -> Result {
 }
 
 fn condition(input: &mut &str) -> Result {
-    let initial = comparison(input)?;
-    let remainder = repeat(0.., (binop_cond, comparison)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (comparison, repeat(0.., (binop_cond, comparison))).map(fold_exprs).parse_next(input)
 }
 
 fn binop_cond(input: &mut &str) -> Result<BinOp> {
@@ -27,9 +25,7 @@ fn binop_cond(input: &mut &str) -> Result<BinOp> {
 }
 
 fn comparison(input: &mut &str) -> Result {
-    let initial = lower(input)?;
-    let remainder = repeat(0.., (binop_comp, lower)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (lower, (repeat(0.., (binop_comp, lower)))).map(fold_exprs).parse_next(input)
 }
 
 fn binop_comp(input: &mut &str) -> Result<BinOp> {
@@ -46,9 +42,7 @@ fn binop_comp(input: &mut &str) -> Result<BinOp> {
 }
 
 fn lower(input: &mut &str) -> Result {
-    let initial = upper(input)?;
-    let remainder = repeat(0.., (binop_lower, upper)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (upper, repeat(0.., (binop_lower, upper))).map(fold_exprs).parse_next(input)
 }
 
 fn binop_lower(input: &mut &str) -> Result<BinOp> {
@@ -57,9 +51,7 @@ fn binop_lower(input: &mut &str) -> Result<BinOp> {
 }
 
 fn upper(input: &mut &str) -> Result {
-    let initial = get_item(input)?;
-    let remainder = repeat(0.., (binop_upper, get_item)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (get_item, repeat(0.., (binop_upper, get_item))).map(fold_exprs).parse_next(input)
 }
 
 fn binop_upper(input: &mut &str) -> Result<BinOp> {
@@ -68,15 +60,11 @@ fn binop_upper(input: &mut &str) -> Result<BinOp> {
 }
 
 fn get_item(input: &mut &str) -> Result {
-    let initial = range(input)?;
-    let remainder = repeat(0.., ('.'.value(BinOp::Dot), range)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (range, repeat(0.., ('.'.value(BinOp::Dot), range))).map(fold_exprs).parse_next(input)
 }
 
 fn range(input: &mut &str) -> Result {
-    let initial = factor(input)?;
-    let remainder = repeat(0.., (binop_range, factor)).parse_next(input)?;
-    Ok(fold_exprs(initial, remainder))
+    (factor, repeat(0.., (binop_range, factor))).map(fold_exprs).parse_next(input)
 }
 
 fn binop_range(input: &mut &str) -> Result<BinOp> {
@@ -93,7 +81,7 @@ fn paren_bin_expr(input: &mut &str) -> Result {
     delimited('(', bin_expr, ')').parse_next(input)
 }
 
-fn fold_exprs(initial: Expression, remainder: Vec<(BinOp, Expression)>) -> Expression {
+fn fold_exprs((initial, remainder): (Expression, Vec<(BinOp, Expression)>)) -> Expression {
     remainder
         .into_iter()
         .fold(initial, |acc, (op, expr)| Expression::BinExpr { op, args: Box::new((acc, expr)) })
