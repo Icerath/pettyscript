@@ -14,7 +14,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { indent_level: 4, replace_newline_with_space: true }
+        Self { indent_level: 4, replace_newline_with_space: false }
     }
 }
 
@@ -31,6 +31,7 @@ pub fn format_many(ast: &[Node], config: Config) -> String {
     }
     f.buf.truncate(f.buf.trim_end().len());
     f.buf.push('\n');
+    // FIXME: breaks comments
     if f.config.replace_newline_with_space {
         f.buf = f.buf.replace('\n', " ");
     }
