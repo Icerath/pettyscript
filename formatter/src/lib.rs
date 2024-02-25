@@ -170,7 +170,13 @@ impl NodeFmt for Expression {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::BinExpr { op, args } => BinExpr { lhs: &args.0, op: *op, rhs: &args.1 }.fmt(f),
-            Self::FuncCall { name, args } => (name, Paren(Sep(args))).fmt(f),
+            Self::FuncCall { name, args } => {
+                name.fmt(f);
+                let temp = f.inside_bin_expr;
+                f.inside_bin_expr = false;
+                Paren(Sep(args)).fmt(f);
+                f.inside_bin_expr = temp;
+            }
             Self::Ident(ident) => ident.fmt(f),
             Self::Keyword(keyword) => keyword.fmt(f),
             Self::LineComment(comment) => ("//", comment).fmt(f),
@@ -189,7 +195,7 @@ struct BinExpr<'a> {
 impl NodeFmt for BinExpr<'_> {
     fn fmt(&self, f: &mut Formatter) {
         let Self { lhs, op, rhs } = self;
-        if f.inside_bin_expr && !matches!(op, BinOp::Dot) {
+        if f.inside_bin_expr && !matches!(lhs, Expression::BinExpr { .. }) {
             match op {
                 BinOp::RangeInclusive | BinOp::RangeExclusive | BinOp::Dot => {
                     Paren((lhs, op, rhs)).fmt(f);

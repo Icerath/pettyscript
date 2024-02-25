@@ -5,7 +5,6 @@ fn fizzbuzz(n) {
         else if (i % 5) == 0: print("Buzz")
         else: print(i)
     }
-    if true: print("Hi")
 }
 
 fn main(): fizzbuzz(100)
