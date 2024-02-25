@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 vm = { path = "../vm" }
 parser = { path = "../parser" }
+formatter = { path = "../formatter" }
+
 clap = { version = "4.5.1", features = ["derive"] }
 
 [lints]

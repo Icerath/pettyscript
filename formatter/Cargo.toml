@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "formatter"
+version = "0.1.0"
+
+[dependencies]
+parser = { version = "0.1.0", path = "../parser" }
+vm = { version = "0.1.0", path = "../vm" }
+
+[lints]
+workspace = true

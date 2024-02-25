@@ -1,76 +1,73 @@
+use formatter::{format_one, Config};
 use vm::ast::{Literal, Node};
 
 use crate::{parse, parse_many};
 
 macro_rules! test_expected {
+    ($input:literal) => {
+        test_expected!($input, $input)
+    };
     ($input:literal, $output:literal $(,)?) => {
-        assert_eq!(format!("{:?}", parse($input).unwrap()), $output);
+        let config = Config { indent_level: 0, replace_newline_with_space: true };
+        assert_eq!(format_one(&parse($input).unwrap(), config).trim(), $output);
     };
 }
 
 #[test]
 fn literals() {
-    test_expected!(
-        r#"{true false 1 1.5 true "string" ident ["hello","world"]}"#,
-        r#"{true, false, 1, 1.5, true, "string", ident, ["hello", "world"]}"#,
-    );
+    test_expected!(r#"{ true false 1 1.5 true "string" ident ["hello", "world"] }"#);
     assert_eq!(parse("true"), Ok(Node::from(Literal::Bool(true))));
     assert_eq!(parse("false"), Ok(Node::from(Literal::Bool(false))));
 }
 #[test]
 fn for_loop() {
-    test_expected!(r#"for i in expr {"Hello" "World"}"#, r#"for i in expr {"Hello", "World"}"#,);
+    test_expected!(r#"for i in expr: print("Hello")"#);
 }
 #[test]
 fn while_loop() {
-    test_expected!(r#"while true {"Hello" "World"}"#, r#"while true {"Hello", "World"}"#);
+    test_expected!(r#"while true: print("Hello")"#);
 }
 #[test]
 fn test_if_statement() {
-    test_expected!("if a {}", "if a {}");
-    test_expected!(r#"if a {} else if b {} else {"hi"}"#, r#"if a {} else if b {} else {"hi"}"#);
+    test_expected!("if a {}");
+    test_expected!(r#"if a {} else if b {} else: "hi""#);
 }
 #[test]
 fn var_decl() {
-    test_expected!("let a = 2", "let a = 2");
+    test_expected!("let a = 2");
 }
 #[test]
 fn op_decl() {
-    test_expected!("let a += 2", "let a += 2");
-    test_expected!("let a -= 2", "let a -= 2");
-    test_expected!("let a *= 2", "let a *= 2");
-    test_expected!("let a /= 2", "let a /= 2");
-    test_expected!("let a %= 2", "let a %= 2");
-    test_expected!("let a &&= 2", "let a &&= 2");
-    test_expected!("let a ||= 2", "let a ||= 2");
-    test_expected!("let a ^= 2", "let a ^= 2");
+    test_expected!("let a += 2");
+    test_expected!("let a -= 2");
+    test_expected!("let a *= 2");
+    test_expected!("let a /= 2");
+    test_expected!("let a %= 2");
+    test_expected!("let a &&= 2");
+    test_expected!("let a ||= 2");
+    test_expected!("let a ^= 2");
 }
 #[test]
 fn fn_call() {
-    test_expected!("print(1, 2, 3)", "print([1, 2, 3])");
+    test_expected!("print(1, 2, 3)");
 }
 #[test]
 fn fn_decl() {
-    test_expected!("fn hi() {}", "fn hi() {}");
-    test_expected!("fn print(s) { print(s) }", "fn print(s) {print([s])}");
+    test_expected!("fn hi() {}");
+    test_expected!("fn print(s): print(s)");
 }
-#[test]
-fn single_block() {
-    test_expected!(": 1", "{1}");
-}
-
 #[test]
 fn bin_expr() {
-    test_expected!("1 + 1", "(1 + 1)");
-    test_expected!("1 + 1 * 1", "(1 + (1 * 1))");
-    test_expected!("(1 + 1) * 1", "((1 + 1) * 1)");
-    test_expected!("1..2", "(1 .. 2)");
-    test_expected!("1..=2", "(1 ..= 2)");
+    test_expected!("1 + 1");
+    test_expected!("1 + 1 * 1", "1 + (1 * 1)");
+    test_expected!("(1 + 1) * 1", "(1 + 1) * 1");
+    test_expected!("1..2", "1..2");
+    test_expected!("1..=2", "1..=2");
 }
 
 #[test]
 fn closures() {
-    test_expected!("|i|: i*i", "|i| {(i * i)}");
+    test_expected!("|i|: i*i", "|i|: i * i");
 }
 
 mod examples {

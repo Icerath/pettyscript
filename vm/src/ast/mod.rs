@@ -1,4 +1,3 @@
-pub mod debug;
 pub mod node;
 
 pub use node::{BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement, UnaryOp};

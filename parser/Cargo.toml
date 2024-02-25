@@ -1,11 +1,14 @@
 [package]
+edition = "2021"
 name = "parser"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
 vm = { path = "../vm" }
 winnow = "0.6.2"
+
+[dev-dependencies]
+formatter = { path = "../formatter" }
 
 [lints]
 workspace = true

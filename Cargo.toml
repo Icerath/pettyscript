@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "macros", "parser", "vm"]
+members = ["cli", "formatter", "macros", "parser", "vm"]
 resolver = "2"
 
 [workspace.lints.clippy]

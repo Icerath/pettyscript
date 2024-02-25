@@ -1,12 +1,12 @@
 use crate::prelude::*;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Node {
     Statement(Statement),
     Expression(Expression),
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     FuncDecl {
         name: PtyStr,
@@ -44,14 +44,14 @@ pub enum Statement {
     IfStatement(IfStatement),
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct IfStatement {
     pub condition: Expression,
     pub block: Box<[Node]>,
     pub or_else: Option<Box<Node>>,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Expression {
     LineComment(String),
     Keyword(Keyword),
@@ -95,7 +95,7 @@ pub enum UnaryOp {
     //Splat,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Literal {
     Bool(bool),
     Int(i64),
@@ -111,4 +111,34 @@ pub enum Literal {
 pub enum Keyword {
     Break,
     Return(Option<Box<Expression>>),
+}
+
+impl BinOp {
+    #[must_use]
+    pub const fn symbol(self) -> &'static str {
+        match self {
+            Self::And => "&&",
+            Self::Or => "||",
+            Self::Xor => "^",
+
+            Self::Lt => "<",
+            Self::LtEq => "<=",
+            Self::Gt => ">",
+            Self::GtEq => ">=",
+            Self::Eq => "==",
+            Self::Ne => "!=",
+
+            Self::Add => "+",
+            Self::Sub => "-",
+
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+
+            Self::Dot => ".",
+
+            Self::RangeInclusive => "..=",
+            Self::RangeExclusive => "..",
+        }
+    }
 }

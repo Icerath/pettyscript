@@ -1,10 +1,11 @@
 fn fizzbuzz(n) {
     for i in 0..=n {
-        if i % 15 == 0: print("FizzBuzz");
-        else if i % 3 == 0: print("Fizz");
-        else if i % 5 == 0: print("Buzz");
-        else: print(i);
+        if (i % 15) == 0: print("FizzBuzz")
+        else if (i % 3) == 0: print("Fizz")
+        else if (i % 5) == 0: print("Buzz")
+        else: print(i)
     }
+    if true: print("Hi")
 }
 
-fn main(): fizzbuzz(100);
+fn main(): fizzbuzz(100)
