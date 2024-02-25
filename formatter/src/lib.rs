@@ -6,6 +6,7 @@ use vm::{
     object::PtyStr,
 };
 
+#[non_exhaustive]
 pub struct Config {
     pub indent_level: usize,
     pub replace_newline_with_space: bool,

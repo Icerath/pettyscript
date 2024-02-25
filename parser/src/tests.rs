@@ -3,13 +3,19 @@ use vm::ast::{Literal, Node};
 
 use crate::{parse, parse_many};
 
+fn config() -> Config {
+    let mut config = Config::default();
+    config.indent_level = 0;
+    config.replace_newline_with_space = true;
+    config
+}
+
 macro_rules! test_expected {
     ($input:literal) => {
         test_expected!($input, $input)
     };
     ($input:literal, $output:literal $(,)?) => {
-        let config = Config { indent_level: 0, replace_newline_with_space: true };
-        assert_eq!(format_one(&parse($input).unwrap(), config).trim(), $output);
+        assert_eq!(format_one(&parse($input).unwrap(), config()).trim(), $output);
     };
 }
 
