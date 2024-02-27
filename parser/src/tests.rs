@@ -1,10 +1,9 @@
-use formatter::{format_one, Config};
 use vm::ast::{Literal, Node};
 
 use crate::{parse, parse_many};
 
-fn config() -> Config {
-    let mut config = Config::default();
+fn config() -> formatter::Config {
+    let mut config = formatter::Config::default();
     config.indent_level = 0;
     config.replace_newline_with_space = true;
     config
@@ -15,7 +14,7 @@ macro_rules! test_expected {
         test_expected!($input, $input)
     };
     ($input:literal, $output:literal $(,)?) => {
-        assert_eq!(format_one(&parse($input).unwrap(), config()).trim(), $output);
+        assert_eq!(formatter::format_one(&parse($input).unwrap(), config()).trim(), $output);
     };
 }
 
@@ -75,10 +74,11 @@ mod examples {
         ($name:ident) => {
             #[test]
             fn $name() {
-                let name = include_str!(concat!("../../examples/", stringify!($name), ".pty"));
-                if let Err(err) = super::parse_many(name) {
-                    panic!("{err:#?}");
-                }
+                let input = include_str!(concat!("../../examples/", stringify!($name), ".pty"));
+                let ast = super::parse_many(input).unwrap();
+
+                let output = formatter::format_many(&ast, formatter::Config::default());
+                assert_eq!(input, output);
             }
         };
     }
