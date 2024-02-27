@@ -245,7 +245,6 @@ impl NodeFmt for Statement {
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
-            Self::OpDecl { name, op, expr } => ("let ", name, " ", op, "= ", expr).fmt(f),
             Self::VarAssign { name, expr } => (name, " = ", expr).fmt(f),
             Self::VarDecl { name, expr } => ("let ", name, " = ", expr).fmt(f),
             Self::WhileLoop { expr, block } => ("while ", expr, Block(block)).fmt(f),

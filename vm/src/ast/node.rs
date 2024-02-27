@@ -21,11 +21,6 @@ pub enum Statement {
         name: PtyStr,
         expr: Expression,
     },
-    OpDecl {
-        name: PtyStr,
-        op: BinOp,
-        expr: Expression,
-    },
     OpAssign {
         name: PtyStr,
         op: BinOp,

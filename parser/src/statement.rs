@@ -49,11 +49,8 @@ pub fn sep_params(input: &mut &str) -> Result<Box<[PtyStr]>> {
 pub fn var_decl(input: &mut &str) -> Result<Statement> {
     ("let", ws).parse_next(input)?;
 
-    cut_err((ident, ws, opt(op_assign_symbol), '=', expression))
-        .map(|(name, _, op_symbol, _, expr)| match op_symbol {
-            Some(op) => Statement::OpDecl { name, op, expr },
-            None => Statement::VarDecl { name, expr },
-        })
+    cut_err((ident, (ws, '='), expression))
+        .map(|(name, _, expr)| Statement::VarDecl { name, expr })
         .context(StrContext::Label("let decl"))
         .parse_next(input)
 }
