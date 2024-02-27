@@ -1,11 +1,11 @@
 use vm::ast::{BinOp, Expression};
 use winnow::{
-    combinator::{alt, delimited, preceded, repeat},
+    combinator::{alt, delimited, opt, preceded, repeat},
     Parser,
 };
 
 use crate::{
-    expression::{unary_expr, value_expr},
+    expression::{sep_expr, unary_expr, value_expr},
     ws,
 };
 
@@ -72,7 +72,15 @@ fn binop_upper(input: &mut &str) -> Result<BinOp> {
 }
 
 fn get_item(input: &mut &str) -> Result {
-    (factor, repeat(0.., ('.'.value(BinOp::Dot), factor))).map(fold_exprs).parse_next(input)
+    (func_call, repeat(0.., ('.'.value(BinOp::Dot), func_call))).map(fold_exprs).parse_next(input)
+}
+fn func_call(input: &mut &str) -> Result {
+    let (expr, args) = (factor, opt(delimited('(', sep_expr, ')'))).parse_next(input)?;
+
+    Ok(match args {
+        Some(args) => Expression::FuncCall { expr: Box::new(expr), args },
+        None => expr,
+    })
 }
 
 fn factor(input: &mut &str) -> Result {

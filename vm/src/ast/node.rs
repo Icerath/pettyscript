@@ -57,7 +57,7 @@ pub enum Expression {
     Keyword(Keyword),
     Ident(PtyStr),
     Literal(Literal),
-    FuncCall { name: PtyStr, args: Box<[Expression]> },
+    FuncCall { expr: Box<Expression>, args: Box<[Expression]> },
     BinExpr { op: BinOp, args: Box<(Expression, Expression)> },
     UnaryExpr { op: UnaryOp, expr: Box<Expression> },
 }

@@ -170,19 +170,33 @@ impl NodeFmt for Expression {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::BinExpr { op, args } => BinExpr { lhs: &args.0, op: *op, rhs: &args.1 }.fmt(f),
-            Self::FuncCall { name, args } => {
-                name.fmt(f);
-                let temp = f.inside_bin_expr;
-                f.inside_bin_expr = false;
-                Paren(Sep(args)).fmt(f);
-                f.inside_bin_expr = temp;
-            }
+            Self::FuncCall { expr, args } => FuncCall { expr, args }.fmt(f),
             Self::Ident(ident) => ident.fmt(f),
             Self::Keyword(keyword) => keyword.fmt(f),
             Self::LineComment(comment) => ("//", comment).fmt(f),
             Self::Literal(literal) => literal.fmt(f),
             Self::UnaryExpr { op, expr } => (op, expr).fmt(f),
         }
+    }
+}
+
+struct FuncCall<'a> {
+    expr: &'a Expression,
+    args: &'a [Expression],
+}
+
+impl NodeFmt for FuncCall<'_> {
+    fn fmt(&self, f: &mut Formatter) {
+        match self.expr {
+            Expression::BinExpr { .. }
+            | Expression::UnaryExpr { .. }
+            | Expression::Literal(Literal::Closure { .. }) => Paren(self.expr).fmt(f),
+            _ => self.expr.fmt(f),
+        };
+        let temp = f.inside_bin_expr;
+        f.inside_bin_expr = false;
+        Paren(Sep(self.args)).fmt(f);
+        f.inside_bin_expr = temp;
     }
 }
 

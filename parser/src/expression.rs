@@ -27,7 +27,6 @@ pub fn value_expr(input: &mut &str) -> Result<Expression> {
 pub fn value_expr_raw(input: &mut &str) -> Result<Expression> {
     alt((
         keyword.map(Expression::Keyword),
-        fn_call,
         literal.map(Expression::Literal),
         ident.map(Expression::Ident),
     ))
@@ -45,17 +44,6 @@ pub fn unary_expr(input: &mut &str) -> Result<Expression> {
     (unary_op, expression.map(Box::new))
         .map(|(op, expr)| Expression::UnaryExpr { op, expr })
         .parse_next(input)
-}
-
-pub fn fn_call(input: &mut &str) -> Result<Expression> {
-    use Expression::FuncCall;
-    seq!(FuncCall {
-        name: ident,
-        _: ws,
-        args: delimited('(', sep_expr, ')')
-    })
-    .context(StrContext::Label("fn call"))
-    .parse_next(input)
 }
 
 pub fn keyword(input: &mut &str) -> Result<Keyword> {

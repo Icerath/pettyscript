@@ -56,6 +56,7 @@ fn op_decl() {
 #[test]
 fn fn_call() {
     test_expected!("print(1, 2, 3)");
+    test_expected!("(|x|: x * 2)(4)");
 }
 #[test]
 fn fn_decl() {
