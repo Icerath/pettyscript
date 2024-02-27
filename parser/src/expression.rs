@@ -4,7 +4,7 @@ use vm::{
 };
 use winnow::{
     ascii,
-    combinator::{alt, delimited, opt, repeat, separated, seq},
+    combinator::{alt, cut_err, delimited, opt, preceded, repeat, separated, seq},
     error::StrContext,
     token::{one_of, take_while},
     Parser,
@@ -34,35 +34,32 @@ pub fn value_expr_raw(input: &mut &str) -> Result<Expression> {
 }
 
 pub fn unary_expr(input: &mut &str) -> Result<Expression> {
-    let unary_op = alt((
-        '!'.value(UnaryOp::Not),
-        //'+'.value(UnaryOp::Plus),
-        '-'.value(UnaryOp::Neg),
-    ));
-
-    // FIXME: alt((value, expression))
-    (unary_op, expression.map(Box::new))
-        .map(|(op, expr)| Expression::UnaryExpr { op, expr })
+    use Expression::UnaryExpr;
+    seq!(UnaryExpr { op: unary_op, expr: cut_err(expression.map(Box::new)) })
+        .context(StrContext::Label("Unary"))
         .parse_next(input)
+}
+pub fn unary_op(input: &mut &str) -> Result<UnaryOp> {
+    alt(('!'.value(UnaryOp::Not), '-'.value(UnaryOp::Neg))).parse_next(input)
 }
 
 pub fn keyword(input: &mut &str) -> Result<Keyword> {
-    alt((
-        "break".map(|_| Keyword::Break),
-        ("return", opt(expression)).map(|(_, expr)| Keyword::Return(expr.map(Box::new))),
-    ))
-    .context(StrContext::Label("keyword"))
-    .parse_next(input)
+    alt(("break".map(|_| Keyword::Break), r#return))
+        .context(StrContext::Label("keyword"))
+        .parse_next(input)
+}
+pub fn r#return(input: &mut &str) -> Result<Keyword> {
+    preceded("return", opt(expression.map(Box::new))).map(Keyword::Return).parse_next(input)
 }
 
 pub fn ident(input: &mut &str) -> Result<PtyStr> {
-    const fn ident_char(c: char) -> bool {
-        matches!(c, 'a'..='z' | 'A'..='Z' | '_')
-    }
     repeat(1.., one_of(ident_char))
         .map(String::into)
         .context(StrContext::Label("ident"))
         .parse_next(input)
+}
+pub const fn ident_char(c: char) -> bool {
+    matches!(c, 'a'..='z' | 'A'..='Z' | '_')
 }
 
 pub fn literal(input: &mut &str) -> Result<Literal> {
@@ -93,7 +90,7 @@ pub fn bool(input: &mut &str) -> Result<bool> {
 }
 
 pub fn float(input: &mut &str) -> Result<f64> {
-    (int, '.', int).recognize().map(|s: &str| s.parse().unwrap()).parse_next(input)
+    (int, '.', int).recognize().map(|s| s.parse().unwrap()).parse_next(input)
 }
 
 pub fn int(input: &mut &str) -> Result<i64> {

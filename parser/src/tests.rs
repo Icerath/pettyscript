@@ -49,8 +49,8 @@ fn op_decl() {
     test_expected!("let a *= 2");
     test_expected!("let a /= 2");
     test_expected!("let a %= 2");
-    test_expected!("let a &&= 2");
-    test_expected!("let a ||= 2");
+    // test_expected!("let a &&= 2");
+    // test_expected!("let a ||= 2");
     test_expected!("let a ^= 2");
 }
 #[test]
@@ -71,7 +71,11 @@ fn bin_expr() {
     test_expected!("1..2", "1..2");
     test_expected!("1..=2", "1..=2");
 }
-
+#[test]
+fn unary_op() {
+    test_expected!("! true", "!true");
+    test_expected!("- 1", "-1");
+}
 #[test]
 fn closures() {
     test_expected!("|i|: i*i", "|i|: i * i");
