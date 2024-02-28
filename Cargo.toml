@@ -2,6 +2,11 @@
 members = ["cli", "formatter", "macros", "parser", "vm"]
 resolver = "2"
 
+[profile.ci-rust]
+inherits = "dev"
+debug = false
+incremental = false
+
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
