@@ -1,17 +1,18 @@
 use vm::{
     ast::{Expression, Keyword, Literal, UnaryOp},
-    object::PtyStr,
+    prelude::PtyStr,
 };
 use winnow::{
     ascii,
-    combinator::{alt, cut_err, delimited, opt, preceded, repeat, separated, seq},
+    combinator::{alt, cut_err, delimited, opt, preceded, separated, seq},
     error::StrContext,
-    token::{one_of, take_while},
+    token::take_while,
     Parser,
 };
 
 use crate::{
     binop::bin_expr,
+    new_str,
     statement::{block, sep_params},
     ws, Result,
 };
@@ -53,8 +54,9 @@ pub fn r#return(input: &mut &str) -> Result<Keyword> {
 }
 
 pub fn ident(input: &mut &str) -> Result<PtyStr> {
-    repeat(1.., one_of(ident_char))
-        .map(String::into)
+    take_while(1.., ident_char)
+        .recognize()
+        .map(new_str)
         .context(StrContext::Label("ident"))
         .parse_next(input)
 }
@@ -98,7 +100,7 @@ pub fn int(input: &mut &str) -> Result<i64> {
 }
 
 pub fn string(input: &mut &str) -> Result<PtyStr> {
-    delimited('"', repeat(0.., one_of(|c| c != '"')), '"').map(String::into).parse_next(input)
+    delimited('"', take_while(0.., |c| c != '"').recognize(), '"').map(new_str).parse_next(input)
 }
 
 pub fn list(input: &mut &str) -> Result<Box<[Expression]>> {

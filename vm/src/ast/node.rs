@@ -11,7 +11,8 @@ pub enum Statement {
     FuncDecl {
         name: PtyStr,
         params: Box<[PtyStr]>,
-        /* ret_type: PtyStr , */ block: Box<[Node]>,
+        /* ret_type: PtyStr , */
+        block: Box<[Node]>,
     },
     VarDecl {
         name: PtyStr,
