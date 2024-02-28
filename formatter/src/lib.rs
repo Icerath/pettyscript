@@ -27,7 +27,7 @@ pub fn format_one(ast: &Node, config: Config) -> String {
 pub fn format_many(ast: &[Node], config: Config) -> String {
     let mut f = Formatter::new(config);
     for node in ast {
-        node.fmt(&mut f);
+        (node, "\n").fmt(&mut f);
     }
     f.buf.truncate(f.buf.trim_end().len());
     f.buf.push('\n');
@@ -241,7 +241,7 @@ impl NodeFmt for Statement {
                 ("for ", ident, " in ", iter, Block(block)).fmt(f);
             }
             Self::FuncDecl { name, params, block } => {
-                ("fn ", name, Paren(Sep(params)), Block(block), "\n\n").fmt(f);
+                ("fn ", name, Paren(Sep(params)), Block(block), "\n", Indent).fmt(f);
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),

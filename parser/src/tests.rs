@@ -86,4 +86,5 @@ mod examples {
     test_example!(hello_world);
     test_example!(sum_squares);
     test_example!(while_loop);
+    test_example!(literals);
 }
