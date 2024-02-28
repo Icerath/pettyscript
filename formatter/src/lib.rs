@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use vm::{
-    ast::{BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement, UnaryOp},
+    ast::{
+        node::{Param, Type},
+        BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement, UnaryOp,
+    },
     object::PtyStr,
 };
 
@@ -259,7 +262,7 @@ impl NodeFmt for Statement {
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
             Self::VarAssign { name, expr } => (name, " = ", expr).fmt(f),
-            Self::VarDecl { name, expr } => ("let ", name, " = ", expr).fmt(f),
+            Self::VarDecl { param, expr } => ("let ", param, " = ", expr).fmt(f),
             Self::WhileLoop { expr, block } => ("while ", expr, block.block()).fmt(f),
         }
     }
@@ -310,6 +313,24 @@ impl NodeFmt for IfStatement {
         match or_else.as_ref() {
             Node::Statement(Statement::Block(block)) => (Align, "else", block.block()).fmt(f),
             or_else => (Align, "else ", or_else).fmt(f),
+        }
+    }
+}
+
+impl NodeFmt for Param {
+    fn fmt(&self, f: &mut Formatter) {
+        (self.ident).fmt(f);
+        if let Some(ty) = &self.ty {
+            (": ", ty).fmt(f);
+        }
+    }
+}
+
+impl NodeFmt for Type {
+    fn fmt(&self, f: &mut Formatter) {
+        for (index, seg) in self.segments.iter().enumerate() {
+            let sep = (index != 0).then_some(":");
+            (sep, seg).fmt(f);
         }
     }
 }

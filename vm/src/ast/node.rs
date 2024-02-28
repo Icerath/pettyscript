@@ -10,12 +10,12 @@ pub enum Node {
 pub enum Statement {
     FuncDecl {
         name: PtyStr,
-        params: Box<[PtyStr]>,
+        params: Box<[Param]>,
         /* ret_type: PtyStr , */
         block: Box<[Node]>,
     },
     VarDecl {
-        name: PtyStr,
+        param: Param,
         expr: Expression,
     },
     VarAssign {
@@ -38,6 +38,17 @@ pub enum Statement {
         block: Box<[Node]>,
     },
     IfStatement(IfStatement),
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Param {
+    pub ident: PtyStr,
+    pub ty: Option<Type>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Type {
+    pub segments: Box<[PtyStr]>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -100,7 +111,7 @@ pub enum Literal {
     List(Box<[Expression]>),
     Tuple(Box<[Expression]>),
     Map(Box<[(Expression, Expression)]>),
-    Closure { params: Box<[PtyStr]>, block: Box<[Node]> },
+    Closure { params: Box<[Param]>, block: Box<[Node]> },
 }
 
 #[derive(Debug, PartialEq)]

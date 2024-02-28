@@ -39,12 +39,12 @@ fn test_if_statement() {
 }
 #[test]
 fn var_decl() {
-    test_expected!("let a = 2");
+    test_expected!("let a: int = 2");
 }
 #[test]
 fn fn_call() {
     test_expected!("print(1, 2, 3)");
-    test_expected!("(|x|: x * 2)(4)");
+    test_expected!("(|x: int|: x * 2)(4)");
 }
 #[test]
 fn fn_decl() {

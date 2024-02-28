@@ -1,9 +1,9 @@
-use vm::{
-    ast::{BinOp, IfStatement, Node, Statement},
-    object::PtyStr,
+use vm::ast::{
+    node::{Param, Type},
+    BinOp, IfStatement, Node, Statement,
 };
 use winnow::{
-    combinator::{alt, cut_err, delimited, opt, repeat, seq},
+    combinator::{alt, cut_err, delimited, opt, preceded, repeat, separated, seq},
     error::StrContext,
     Parser,
 };
@@ -38,19 +38,31 @@ pub fn fn_decl(input: &mut &str) -> Result<Statement> {
     .parse_next(input)
 }
 
-pub fn func_params(input: &mut &str) -> Result<Box<[PtyStr]>> {
+pub fn func_params(input: &mut &str) -> Result<Box<[Param]>> {
     delimited('(', sep_params, ')').parse_next(input)
 }
 
-pub fn sep_params(input: &mut &str) -> Result<Box<[PtyStr]>> {
-    repeat(0.., delimited(ws, ident, ws)).map(Vec::into_boxed_slice).parse_next(input)
+pub fn sep_params(input: &mut &str) -> Result<Box<[Param]>> {
+    repeat(0.., delimited(ws, param, ws)).map(Vec::into_boxed_slice).parse_next(input)
+}
+
+pub fn param(input: &mut &str) -> Result<Param> {
+    (ident, opt(preceded((':', ws), type_path)))
+        .map(|(ident, ty)| Param { ident, ty })
+        .parse_next(input)
+}
+
+pub fn type_path(input: &mut &str) -> Result<Type> {
+    separated(1.., ident, "::")
+        .map(|values| Type { segments: Vec::into_boxed_slice(values) })
+        .parse_next(input)
 }
 
 pub fn var_decl(input: &mut &str) -> Result<Statement> {
     ("let", ws).parse_next(input)?;
 
-    cut_err((ident, (ws, '='), expression))
-        .map(|(name, _, expr)| Statement::VarDecl { name, expr })
+    cut_err((param, (ws, '='), expression))
+        .map(|(param, _, expr)| Statement::VarDecl { param, expr })
         .context(StrContext::Label("let decl"))
         .parse_next(input)
 }
