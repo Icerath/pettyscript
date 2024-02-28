@@ -1,4 +1,3 @@
-use core::fmt;
 use std::rc::Rc;
 
 use vm::{
@@ -27,14 +26,10 @@ pub fn format_one(ast: &Node, config: Config) -> String {
 pub fn format_many(ast: &[Node], config: Config) -> String {
     let mut f = Formatter::new(config);
     for node in ast {
-        (node, "\n").fmt(&mut f);
+        (node, NewLine).fmt(&mut f);
     }
     f.buf.truncate(f.buf.trim_end().len());
     f.buf.push('\n');
-    // FIXME: breaks comments
-    if f.config.replace_newline_with_space {
-        f.buf = f.buf.replace('\n', " ");
-    }
     f.buf
 }
 
@@ -64,8 +59,8 @@ impl Formatter {
         }
     }
 
-    fn write<T: fmt::Display>(&mut self, val: T) {
-        use fmt::Write;
+    fn write<T: std::fmt::Display>(&mut self, val: T) {
+        use std::fmt::Write;
         let _ = write!(&mut self.buf, "{val}");
     }
 
@@ -75,42 +70,84 @@ impl Formatter {
     }
 }
 
-trait NodeFmt {
+trait NodeFmt: Sized {
     fn fmt(&self, f: &mut Formatter);
+    fn paren(self) -> impl NodeFmt {
+        Fmt(move |f: &mut Formatter| ('(', &self, ')').fmt(f))
+    }
+}
+
+trait NodeExt {
+    fn block(self) -> impl NodeFmt;
+    fn sep(self) -> impl NodeFmt;
+}
+
+impl<'a, T: NodeFmt> NodeExt for &'a [T] {
+    fn sep(self) -> impl NodeFmt {
+        Fmt(move |f: &mut Formatter| {
+            for (index, node) in self.iter().enumerate() {
+                if index != 0 {
+                    ", ".fmt(f);
+                }
+                node.fmt(f);
+            }
+        })
+    }
+
+    fn block(self) -> impl NodeFmt {
+        Fmt(move |f: &mut Formatter| {
+            if self.is_empty() {
+                return " {}".fmt(f);
+            }
+            if self.len() == 1 {
+                let mut sub_fmt = f.sub_fmt();
+                self[0].fmt(&mut sub_fmt);
+                if f.line().len() + sub_fmt.buf.len() < 80 {
+                    return (": ", &sub_fmt.buf).fmt(f);
+                }
+            }
+            (" {", RawNewLine).fmt(f);
+            f.current_indent += 1;
+            for node in self {
+                (Indent, node, RawNewLine).fmt(f);
+            }
+            f.current_indent -= 1;
+            (Indent, "}").fmt(f);
+        })
+    }
 }
 
 struct Debug<T>(T);
-impl<T: fmt::Debug> NodeFmt for Debug<T> {
+impl<T: std::fmt::Debug> NodeFmt for Debug<T> {
     fn fmt(&self, f: &mut Formatter) {
         use std::fmt::Write;
         let _ = write!(&mut f.buf, "{:?}", self.0);
     }
 }
 
-struct Sep<'a, T>(&'a [T]);
-impl<T: NodeFmt> NodeFmt for Sep<'_, T> {
-    fn fmt(&self, f: &mut Formatter) {
-        for (index, node) in self.0.iter().enumerate() {
-            if index != 0 {
-                ", ".fmt(f);
-            }
-            node.fmt(f);
-        }
-    }
-}
-
-struct Paren<T>(T);
-impl<T: NodeFmt> NodeFmt for Paren<T> {
-    fn fmt(&self, f: &mut Formatter) {
-        ("(", &self.0, ")").fmt(f);
-    }
-}
 struct Indent;
 impl NodeFmt for Indent {
     fn fmt(&self, f: &mut Formatter) {
         for _ in 0..f.current_indent * f.config.indent_level {
             " ".fmt(f);
         }
+    }
+}
+struct RawNewLine;
+impl NodeFmt for RawNewLine {
+    fn fmt(&self, f: &mut Formatter) {
+        if f.config.replace_newline_with_space {
+            " ".fmt(f);
+        } else {
+            "\n".fmt(f);
+        }
+    }
+}
+
+struct NewLine;
+impl NodeFmt for NewLine {
+    fn fmt(&self, f: &mut Formatter) {
+        (RawNewLine, Indent).fmt(f);
     }
 }
 struct Align;
@@ -121,30 +158,6 @@ impl NodeFmt for Align {
         }
     }
 }
-struct Block<'a, T>(&'a [T]);
-
-impl<T: NodeFmt> NodeFmt for Block<'_, T> {
-    fn fmt(&self, f: &mut Formatter) {
-        if self.0.len() == 1 {
-            let mut sub_fmt = f.sub_fmt();
-            (": ", &self.0[0]).fmt(&mut sub_fmt);
-            if f.line().len() + sub_fmt.buf.len() < 80 {
-                return f.buf.push_str(&sub_fmt.buf);
-            }
-        }
-        if self.0.is_empty() {
-            return " {}".fmt(f);
-        }
-        " {\n".fmt(f);
-        f.current_indent += 1;
-        for node in self.0 {
-            (Indent, node, "\n").fmt(f);
-        }
-        f.current_indent -= 1;
-        (Indent, "}").fmt(f);
-    }
-}
-
 impl NodeFmt for Node {
     fn fmt(&self, f: &mut Formatter) {
         match self {
@@ -190,12 +203,12 @@ impl NodeFmt for FuncCall<'_> {
         match self.expr {
             Expression::BinExpr { .. }
             | Expression::UnaryExpr { .. }
-            | Expression::Literal(Literal::Closure { .. }) => Paren(self.expr).fmt(f),
+            | Expression::Literal(Literal::Closure { .. }) => self.expr.paren().fmt(f),
             _ => self.expr.fmt(f),
         };
         let temp = f.inside_bin_expr;
         f.inside_bin_expr = false;
-        Paren(Sep(self.args)).fmt(f);
+        self.args.sep().paren().fmt(f);
         f.inside_bin_expr = temp;
     }
 }
@@ -212,9 +225,9 @@ impl NodeFmt for BinExpr<'_> {
         if f.inside_bin_expr && !matches!(lhs, Expression::BinExpr { .. }) {
             match op {
                 BinOp::RangeInclusive | BinOp::RangeExclusive | BinOp::Dot => {
-                    Paren((lhs, op, rhs)).fmt(f);
+                    (lhs, op, rhs).paren().fmt(f);
                 }
-                _ => Paren((lhs, " ", op, " ", rhs)).fmt(f),
+                _ => (lhs, " ", op, " ", rhs).paren().fmt(f),
             }
         } else {
             f.inside_bin_expr = true;
@@ -236,18 +249,18 @@ impl NodeFmt for BinOp {
 impl NodeFmt for Statement {
     fn fmt(&self, f: &mut Formatter) {
         match self {
-            Self::Block(block) => Block(block).fmt(f),
+            Self::Block(block) => block.block().fmt(f),
             Self::ForLoop { ident, iter, block } => {
-                ("for ", ident, " in ", iter, Block(block)).fmt(f);
+                ("for ", ident, " in ", iter, block.block()).fmt(f);
             }
             Self::FuncDecl { name, params, block } => {
-                ("fn ", name, Paren(Sep(params)), Block(block), "\n", Indent).fmt(f);
+                ("fn ", name, params.sep().paren(), block.block(), NewLine).fmt(f);
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
             Self::VarAssign { name, expr } => (name, " = ", expr).fmt(f),
             Self::VarDecl { name, expr } => ("let ", name, " = ", expr).fmt(f),
-            Self::WhileLoop { expr, block } => ("while ", expr, Block(block)).fmt(f),
+            Self::WhileLoop { expr, block } => ("while ", expr, block.block()).fmt(f),
         }
     }
 }
@@ -267,13 +280,13 @@ impl NodeFmt for Literal {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::Bool(bool) => f.write(bool),
-            Self::Closure { params, block } => ("|", Sep(params), "|", Block(block)).fmt(f),
+            Self::Closure { params, block } => ("|", params.sep(), "|", block.block()).fmt(f),
             Self::Float(float) => f.write(float),
             Self::Int(int) => f.write(int),
-            Self::List(list) => ("[", Sep(list), "]").fmt(f),
+            Self::List(list) => ("[", list.sep(), "]").fmt(f),
             Self::Map(map) => todo!("{map:?}"),
             Self::String(str) => Debug(str).fmt(f),
-            Self::Tuple(tuple) => Paren(Sep(tuple)).fmt(f),
+            Self::Tuple(tuple) => tuple.sep().paren().fmt(f),
         }
     }
 }
@@ -289,13 +302,13 @@ impl NodeFmt for UnaryOp {
 
 impl NodeFmt for IfStatement {
     fn fmt(&self, f: &mut Formatter) {
-        ("if ", &self.condition, Block(&self.block)).fmt(f);
+        ("if ", &self.condition, self.block.block()).fmt(f);
         let Some(or_else) = &self.or_else else { return };
         if self.block.len() <= 1 {
-            ("\n", Indent).fmt(f);
+            NewLine.fmt(f);
         }
         match or_else.as_ref() {
-            Node::Statement(Statement::Block(block)) => (Align, "else", Block(block)).fmt(f),
+            Node::Statement(Statement::Block(block)) => (Align, "else", block.block()).fmt(f),
             or_else => (Align, "else ", or_else).fmt(f),
         }
     }
@@ -330,6 +343,13 @@ impl NodeFmt for PtyStr {
 impl NodeFmt for String {
     fn fmt(&self, f: &mut Formatter) {
         f.buf.push_str(self);
+    }
+}
+
+struct Fmt<F>(F);
+impl<F: Fn(&mut Formatter)> NodeFmt for Fmt<F> {
+    fn fmt(&self, f: &mut Formatter) {
+        (self.0)(f);
     }
 }
 
