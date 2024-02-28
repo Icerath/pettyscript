@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use vm::{
     ast::{
-        node::{Param, Type},
+        node::{Block, OrElse, Param, Type},
         BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement, UnaryOp,
     },
     object::PtyStr,
@@ -53,23 +53,9 @@ impl Formatter {
         }
     }
 
-    fn sub_fmt(&self) -> Self {
-        Self {
-            buf: String::new(),
-            current_indent: self.current_indent,
-            inside_bin_expr: self.inside_bin_expr,
-            config: self.config.clone(),
-        }
-    }
-
     fn write<T: std::fmt::Display>(&mut self, val: T) {
         use std::fmt::Write;
         let _ = write!(&mut self.buf, "{val}");
-    }
-
-    /// The current line
-    fn line(&self) -> &str {
-        self.buf.lines().last().unwrap_or("")
     }
 }
 
@@ -81,7 +67,6 @@ trait NodeFmt: Sized {
 }
 
 trait NodeExt {
-    fn block(self) -> impl NodeFmt;
     fn sep(self) -> impl NodeFmt;
 }
 
@@ -96,27 +81,18 @@ impl<'a, T: NodeFmt> NodeExt for &'a [T] {
             }
         })
     }
+}
 
-    fn block(self) -> impl NodeFmt {
-        Fmt(move |f: &mut Formatter| {
-            if self.is_empty() {
-                return " {}".fmt(f);
-            }
-            if self.len() == 1 {
-                let mut sub_fmt = f.sub_fmt();
-                self[0].fmt(&mut sub_fmt);
-                if f.line().len() + sub_fmt.buf.len() < 80 {
-                    return (": ", &sub_fmt.buf).fmt(f);
-                }
-            }
-            (" {", RawNewLine).fmt(f);
-            f.current_indent += 1;
-            for node in self {
-                (Indent, node, RawNewLine).fmt(f);
-            }
-            f.current_indent -= 1;
-            (Indent, "}").fmt(f);
-        })
+struct MultiBlock<'a, T>(&'a [T]);
+impl<T: NodeFmt> NodeFmt for MultiBlock<'_, T> {
+    fn fmt(&self, f: &mut Formatter) {
+        (" {", RawNewLine).fmt(f);
+        f.current_indent += 1;
+        for node in self.0 {
+            (Indent, node, RawNewLine).fmt(f);
+        }
+        f.current_indent -= 1;
+        (Indent, "}").fmt(f);
     }
 }
 
@@ -252,18 +228,18 @@ impl NodeFmt for BinOp {
 impl NodeFmt for Statement {
     fn fmt(&self, f: &mut Formatter) {
         match self {
-            Self::Block(block) => block.block().fmt(f),
+            Self::Block(block) => MultiBlock(block).fmt(f),
             Self::ForLoop { ident, iter, block } => {
-                ("for ", ident, " in ", iter, block.block()).fmt(f);
+                ("for ", ident, " in ", iter, block).fmt(f);
             }
             Self::FuncDecl { name, params, block } => {
-                ("fn ", name, params.sep().paren(), block.block(), NewLine).fmt(f);
+                ("fn ", name, params.sep().paren(), block, NewLine).fmt(f);
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
             Self::VarAssign { name, expr } => (name, " = ", expr).fmt(f),
             Self::VarDecl { param, expr } => ("let ", param, " = ", expr).fmt(f),
-            Self::WhileLoop { expr, block } => ("while ", expr, block.block()).fmt(f),
+            Self::WhileLoop { expr, block } => ("while ", expr, block).fmt(f),
         }
     }
 }
@@ -283,7 +259,7 @@ impl NodeFmt for Literal {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::Bool(bool) => f.write(bool),
-            Self::Closure { params, block } => ("|", params.sep(), "|", block.block()).fmt(f),
+            Self::Closure { params, block } => ("|", params.sep(), "|", block).fmt(f),
             Self::Float(float) => f.write(float),
             Self::Int(int) => f.write(int),
             Self::List(list) => ("[", list.sep(), "]").fmt(f),
@@ -305,14 +281,25 @@ impl NodeFmt for UnaryOp {
 
 impl NodeFmt for IfStatement {
     fn fmt(&self, f: &mut Formatter) {
-        ("if ", &self.condition, self.block.block()).fmt(f);
+        ("if ", &self.condition, &self.block).fmt(f);
         let Some(or_else) = &self.or_else else { return };
+
         if self.block.len() <= 1 {
             NewLine.fmt(f);
         }
-        match or_else.as_ref() {
-            Node::Statement(Statement::Block(block)) => (Align, "else", block.block()).fmt(f),
-            or_else => (Align, "else ", or_else).fmt(f),
+        match &or_else {
+            OrElse::Block(block) => (Align, "else", block).fmt(f),
+            OrElse::If(r#if) => (Align, "else ", r#if).fmt(f),
+        }
+    }
+}
+
+impl NodeFmt for Block {
+    fn fmt(&self, f: &mut Formatter) {
+        match self {
+            Self::Single(expr) => (": ", expr).fmt(f),
+            Self::Multi(nodes) if nodes.is_empty() => " {}".fmt(f),
+            Self::Multi(nodes) => MultiBlock(nodes).fmt(f),
         }
     }
 }

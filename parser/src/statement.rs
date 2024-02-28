@@ -1,6 +1,6 @@
 use vm::ast::{
-    node::{Param, Type},
-    BinOp, IfStatement, Node, Statement,
+    node::{Block, OrElse, Param, Type},
+    BinOp, Expression, IfStatement, Node, Statement,
 };
 use winnow::{
     combinator::{alt, cut_err, delimited, opt, preceded, repeat, separated, seq},
@@ -18,7 +18,7 @@ pub fn statement(input: &mut &str) -> Result<Statement> {
         fn_decl,
         var_decl,
         var_assign,
-        block.map(Statement::Block),
+        many_block.map(Statement::Block),
         for_loop,
         while_loop,
         if_statement.map(Into::into),
@@ -91,12 +91,12 @@ fn op_assign_symbol(input: &mut &str) -> Result<BinOp> {
     .parse_next(input)
 }
 
-pub fn block(input: &mut &str) -> Result<Box<[Node]>> {
-    alt((single_block, many_block)).parse_next(input)
+pub fn block(input: &mut &str) -> Result<Block> {
+    alt((single_block.map(Block::Single), many_block.map(Block::Multi))).parse_next(input)
 }
 
-pub fn single_block(input: &mut &str) -> Result<Box<[Node]>> {
-    ((':', ws), node).map(|(_, node)| [node].into()).parse_next(input)
+pub fn single_block(input: &mut &str) -> Result<Box<Expression>> {
+    preceded((':', ws), cut_err(expression)).map(Box::new).parse_next(input)
 }
 
 pub fn many_block(input: &mut &str) -> Result<Box<[Node]>> {
@@ -141,11 +141,13 @@ pub fn if_statement(input: &mut &str) -> Result<IfStatement> {
     .parse_next(input)
 }
 
-pub fn or_else(input: &mut &str) -> Result<Option<Box<Node>>> {
-    if ("else", ws).parse_next(input).is_err() {
-        return Ok(None);
-    }
-    alt((if_statement.map(Node::from), block.map(Node::block)))
-        .map(|node| Some(Box::new(node)))
-        .parse_next(input)
+pub fn or_else(input: &mut &str) -> Result<Option<OrElse>> {
+    opt(preceded(
+        ("else", ws),
+        cut_err(alt((
+            if_statement.map(|r#if| OrElse::If(Box::new(r#if))),
+            block.map(OrElse::Block),
+        ))),
+    ))
+    .parse_next(input)
 }

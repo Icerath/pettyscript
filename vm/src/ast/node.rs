@@ -8,35 +8,13 @@ pub enum Node {
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
-    FuncDecl {
-        name: PtyStr,
-        params: Box<[Param]>,
-        /* ret_type: PtyStr , */
-        block: Box<[Node]>,
-    },
-    VarDecl {
-        param: Param,
-        expr: Expression,
-    },
-    VarAssign {
-        name: PtyStr,
-        expr: Expression,
-    },
-    OpAssign {
-        name: PtyStr,
-        op: BinOp,
-        expr: Expression,
-    },
+    FuncDecl { name: PtyStr, params: Box<[Param]>, /* ret_type: PtyStr , */ block: Block },
+    VarDecl { param: Param, expr: Expression },
+    VarAssign { name: PtyStr, expr: Expression },
+    OpAssign { name: PtyStr, op: BinOp, expr: Expression },
     Block(Box<[Node]>),
-    ForLoop {
-        ident: PtyStr,
-        iter: Expression,
-        block: Box<[Node]>,
-    },
-    WhileLoop {
-        expr: Expression,
-        block: Box<[Node]>,
-    },
+    ForLoop { ident: PtyStr, iter: Expression, block: Block },
+    WhileLoop { expr: Expression, block: Block },
     IfStatement(IfStatement),
 }
 
@@ -44,6 +22,27 @@ pub enum Statement {
 pub struct Param {
     pub ident: PtyStr,
     pub ty: Option<Type>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Block {
+    Single(Box<Expression>),
+    Multi(Box<[Node]>),
+}
+
+impl Block {
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Multi(nodes) => nodes.len(),
+        }
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -54,8 +53,14 @@ pub struct Type {
 #[derive(Debug, PartialEq)]
 pub struct IfStatement {
     pub condition: Expression,
-    pub block: Box<[Node]>,
-    pub or_else: Option<Box<Node>>,
+    pub block: Block,
+    pub or_else: Option<OrElse>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum OrElse {
+    Block(Block),
+    If(Box<IfStatement>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -111,7 +116,7 @@ pub enum Literal {
     List(Box<[Expression]>),
     Tuple(Box<[Expression]>),
     Map(Box<[(Expression, Expression)]>),
-    Closure { params: Box<[Param]>, block: Box<[Node]> },
+    Closure { params: Box<[Param]>, block: Block },
 }
 
 #[derive(Debug, PartialEq)]
