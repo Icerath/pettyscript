@@ -39,6 +39,34 @@ impl From<IfStatement> for Node {
     }
 }
 
+impl TryFrom<&str> for BinOp {
+    type Error = ();
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        let op = match input {
+            "||" => Self::Or,
+            "&&" => Self::And,
+            "^" => Self::Xor,
+            "<" => Self::Lt,
+            "<=" => Self::LtEq,
+            ">" => Self::Gt,
+            ">=" => Self::GtEq,
+            "==" => Self::Eq,
+            "!=" => Self::Ne,
+            "+" => Self::Add,
+            "-" => Self::Sub,
+            "*" => Self::Mul,
+            "/" => Self::Div,
+            "%" => Self::Mod,
+            "." => Self::Dot,
+            ".." => Self::RangeExclusive,
+            "..=" => Self::RangeInclusive,
+            _ => return Err(()),
+        };
+        Ok(op)
+    }
+}
+
 impl Node {
     pub fn block(nodes: impl Into<Box<[Self]>>) -> Self {
         Self::Statement(Statement::Block(nodes.into()))

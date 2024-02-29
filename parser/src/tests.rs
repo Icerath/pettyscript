@@ -56,9 +56,12 @@ fn bin_expr() {
     test_expected!("1 + 1");
     test_expected!("1 + 1 * 1", "1 + (1 * 1)");
     test_expected!("(1 + 1) * 1", "(1 + 1) * 1");
-    test_expected!("1..2", "1..2");
-    test_expected!("1..=2", "1..=2");
+    test_expected!("(1..2)..=3", "(1..2)..=3");
+    test_expected!("(1 == 2) == 3", "(1 == 2) == 3");
+
+    assert!(parse("1 == 2 == 3").is_err());
 }
+
 #[test]
 fn unary_op() {
     test_expected!("! true", "!true");
