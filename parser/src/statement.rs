@@ -9,6 +9,7 @@ use winnow::{
 };
 
 use crate::{
+    binop::op,
     expression::{expression, ident},
     node, ws, Result,
 };
@@ -77,16 +78,18 @@ pub fn var_assign(input: &mut &str) -> Result<Statement> {
         .parse_next(input)
 }
 
-#[allow(clippy::enum_glob_use)]
 fn op_assign_symbol(input: &mut &str) -> Result<BinOp> {
-    use BinOp::*;
     alt((
-        '+'.value(Add),
-        '-'.value(Sub),
-        '*'.value(Mul),
-        '/'.value(Div),
-        '%'.value(Mod),
-        '^'.value(Xor),
+        op("+"),
+        op("-"),
+        op("*"),
+        op("/"),
+        op("%"),
+        op("&"),
+        op("|"),
+        op("^"),
+        op("<<"),
+        op(">>"),
     ))
     .parse_next(input)
 }

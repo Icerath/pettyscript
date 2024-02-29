@@ -77,8 +77,8 @@ pub enum Expression {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinOp {
     Or,
+
     And,
-    Xor,
 
     Lt,
     LtEq,
@@ -86,6 +86,12 @@ pub enum BinOp {
     GtEq,
     Eq,
     Ne,
+
+    BitOr,
+    Xor,
+    BitAnd,
+    Shl,
+    Shr,
 
     Add,
     Sub,
@@ -131,7 +137,6 @@ impl BinOp {
         match self {
             Self::And => "&&",
             Self::Or => "||",
-            Self::Xor => "^",
 
             Self::Lt => "<",
             Self::LtEq => "<=",
@@ -139,6 +144,12 @@ impl BinOp {
             Self::GtEq => ">=",
             Self::Eq => "==",
             Self::Ne => "!=",
+
+            Self::BitOr => "|",
+            Self::Xor => "^",
+            Self::BitAnd => "&",
+            Self::Shl => "<<",
+            Self::Shr => ">>",
 
             Self::Add => "+",
             Self::Sub => "-",

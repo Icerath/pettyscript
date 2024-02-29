@@ -28,8 +28,24 @@ fn logical_and(input: &mut &str) -> Result {
 }
 
 fn comparison(input: &mut &str) -> Result {
-    require_parens(lower, alt((op("<="), op(">="), op("=="), op("!="), op("<"), op(">"))), lower)
+    require_parens(bit_or, alt((op("<="), op(">="), op("=="), op("!="), op("<"), op(">"))), bit_or)
         .parse_next(input)
+}
+
+fn bit_or(input: &mut &str) -> Result {
+    left_to_right(xor, op("|"), xor).parse_next(input)
+}
+
+fn xor(input: &mut &str) -> Result {
+    left_to_right(bit_and, op("^"), bit_and).parse_next(input)
+}
+
+fn bit_and(input: &mut &str) -> Result {
+    left_to_right(shift, op("&"), shift).parse_next(input)
+}
+
+fn shift(input: &mut &str) -> Result {
+    left_to_right(lower, alt((op("<<"), op(">>"))), lower).parse_next(input)
 }
 
 fn lower(input: &mut &str) -> Result {
@@ -88,6 +104,8 @@ fn fold_exprs((initial, remainder): (Expression, Vec<(BinOp, Expression)>)) -> E
         .fold(initial, |acc, (op, expr)| Expression::BinExpr { op, args: Box::new((acc, expr)) })
 }
 
-fn op(op: &str) -> impl Parser<&str, BinOp, crate::Error> {
+/// # Panics
+/// Panics if op is not a valid binary operator.
+pub fn op(op: &str) -> impl Parser<&str, BinOp, crate::Error> {
     preceded(ws, op.value(BinOp::try_from(op).unwrap()))
 }
