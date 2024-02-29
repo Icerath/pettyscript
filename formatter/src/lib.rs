@@ -232,8 +232,16 @@ impl NodeFmt for Statement {
             Self::ForLoop { ident, iter, block } => {
                 ("for ", ident, " in ", iter, block).fmt(f);
             }
-            Self::FuncDecl { name, params, block } => {
-                ("fn ", name, params.sep().paren(), block, NewLine).fmt(f);
+            Self::FuncDecl { name, params, ret_type, block } => {
+                (
+                    "fn ",
+                    name,
+                    params.sep().paren(),
+                    ret_type.as_ref().map(|ty| (" -> ", ty)),
+                    block,
+                    NewLine,
+                )
+                    .fmt(f);
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),

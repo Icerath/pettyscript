@@ -35,6 +35,7 @@ pub fn fn_decl(input: &mut &str) -> Result<Statement> {
         _: ws,
         params: func_params,
         _: ws,
+        ret_type: opt(preceded(("->", ws), type_path)),
         block: block })
     .parse_next(input)
 }

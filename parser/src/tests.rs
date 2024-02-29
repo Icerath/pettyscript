@@ -50,6 +50,7 @@ fn fn_call() {
 fn fn_decl() {
     test_expected!("fn hi() {}");
     test_expected!("fn print(s): print(s)");
+    test_expected!("fn one() -> int: 1");
 }
 #[test]
 fn bin_expr() {
