@@ -31,7 +31,7 @@ pub fn format_one(ast: &Node, config: Config) -> String {
 pub fn format_many(ast: &[Node], config: Config) -> String {
     let mut f = Formatter::new(config);
     for node in ast {
-        (node, NewLine).fmt(&mut f);
+        (node, Newline).fmt(&mut f);
     }
     f.buf.truncate(f.buf.trim_end().len());
     f.buf.push('\n');
@@ -125,8 +125,8 @@ impl NodeFmt for RawNewLine {
     }
 }
 
-struct NewLine;
-impl NodeFmt for NewLine {
+struct Newline;
+impl NodeFmt for Newline {
     fn fmt(&self, f: &mut Formatter) {
         (RawNewLine, Indent).fmt(f);
     }
@@ -241,7 +241,7 @@ impl NodeFmt for Statement {
                     params.sep(", ").paren(),
                     ret_type.as_ref().map(|ty| (" -> ", ty)),
                     block,
-                    NewLine,
+                    Newline,
                 )
                     .fmt(f);
             }
@@ -251,9 +251,9 @@ impl NodeFmt for Statement {
                     '}'.fmt(f);
                 } else {
                     f.current_indent += 1;
-                    (NewLine, params.sep((',', NewLine))).fmt(f);
+                    (Newline, params.sep((',', Newline))).fmt(f);
                     f.current_indent -= 1;
-                    (NewLine, '}').fmt(f);
+                    (Newline, '}').fmt(f);
                 }
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
@@ -306,7 +306,7 @@ impl NodeFmt for IfStatement {
         let Some(or_else) = &self.or_else else { return };
 
         if self.block.len() <= 1 {
-            NewLine.fmt(f);
+            Newline.fmt(f);
         }
         match &or_else {
             OrElse::Block(block) => (Align, "else", block).fmt(f),
