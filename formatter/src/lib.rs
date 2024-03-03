@@ -1,3 +1,5 @@
+#![feature(box_patterns)]
+
 use std::rc::Rc;
 
 use vm::{
@@ -67,15 +69,15 @@ trait NodeFmt: Sized {
 }
 
 trait NodeExt {
-    fn sep(self) -> impl NodeFmt;
+    fn sep(self, fmt: impl NodeFmt) -> impl NodeFmt;
 }
 
 impl<'a, T: NodeFmt> NodeExt for &'a [T] {
-    fn sep(self) -> impl NodeFmt {
+    fn sep(self, fmt: impl NodeFmt) -> impl NodeFmt {
         Fmt(move |f: &mut Formatter| {
             for (index, node) in self.iter().enumerate() {
                 if index != 0 {
-                    ", ".fmt(f);
+                    fmt.fmt(f);
                 }
                 node.fmt(f);
             }
@@ -187,7 +189,7 @@ impl NodeFmt for FuncCall<'_> {
         };
         let temp = f.inside_bin_expr;
         f.inside_bin_expr = false;
-        self.args.sep().paren().fmt(f);
+        self.args.sep(", ").paren().fmt(f);
         f.inside_bin_expr = temp;
     }
 }
@@ -236,12 +238,23 @@ impl NodeFmt for Statement {
                 (
                     "fn ",
                     name,
-                    params.sep().paren(),
+                    params.sep(", ").paren(),
                     ret_type.as_ref().map(|ty| (" -> ", ty)),
                     block,
                     NewLine,
                 )
                     .fmt(f);
+            }
+            Self::ClassDecl { name, params } => {
+                ("class ", name, " {").fmt(f);
+                if params.is_empty() {
+                    '}'.fmt(f);
+                } else {
+                    f.current_indent += 1;
+                    (NewLine, params.sep((',', NewLine))).fmt(f);
+                    f.current_indent -= 1;
+                    (NewLine, '}').fmt(f);
+                }
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
@@ -267,13 +280,13 @@ impl NodeFmt for Literal {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::Bool(bool) => f.write(bool),
-            Self::Closure { params, block } => ("|", params.sep(), "|", block).fmt(f),
+            Self::Closure { params, block } => ("|", params.sep(", "), "|", block).fmt(f),
             Self::Float(float) => f.write(float),
             Self::Int(int) => f.write(int),
-            Self::List(list) => ("[", list.sep(), "]").fmt(f),
+            Self::List(list) => ("[", list.sep(", "), "]").fmt(f),
             Self::Map(map) => todo!("{map:?}"),
             Self::String(str) => Debug(str).fmt(f),
-            Self::Tuple(tuple) => tuple.sep().paren().fmt(f),
+            Self::Tuple(tuple) => tuple.sep(", ").paren().fmt(f),
         }
     }
 }

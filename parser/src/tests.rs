@@ -50,7 +50,13 @@ fn fn_call() {
 fn fn_decl() {
     test_expected!("fn hi() {}");
     test_expected!("fn print(s): print(s)");
-    test_expected!("fn one() -> int: 1");
+    test_expected!("fn add(x, y): x + y");
+}
+#[test]
+fn class_decl() {
+    test_expected!("class Unit {}");
+    test_expected!("class Point { x, y }");
+    test_expected!("class Point { x: float, y: float }");
 }
 #[test]
 fn bin_expr() {
@@ -91,4 +97,5 @@ mod examples {
     test_example!(sum_squares);
     test_example!(while_loop);
     test_example!(literals);
+    test_example!(classes);
 }

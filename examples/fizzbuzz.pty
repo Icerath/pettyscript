@@ -7,4 +7,6 @@ fn fizzbuzz(n: int) {
     }
 }
 
-fn main(): fizzbuzz(100)
+fn main() {
+    fizzbuzz(100)
+}

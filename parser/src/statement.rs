@@ -17,6 +17,7 @@ use crate::{
 pub fn statement(input: &mut &str) -> Result<Statement> {
     alt((
         fn_decl,
+        class_decl,
         var_decl,
         var_assign,
         many_block.map(Statement::Block),
@@ -29,23 +30,32 @@ pub fn statement(input: &mut &str) -> Result<Statement> {
 
 pub fn fn_decl(input: &mut &str) -> Result<Statement> {
     use Statement::FuncDecl;
-    seq!(FuncDecl {
-        _: ("fn", ws),
+    let _ = ("fn", ws).parse_next(input)?;
+    cut_err(seq!(FuncDecl {
         name: ident,
         _: ws,
         params: func_params,
         _: ws,
         ret_type: opt(preceded(("->", ws), type_path)),
-        block: block })
+        block: block }))
     .parse_next(input)
 }
 
+pub fn class_decl(input: &mut &str) -> Result<Statement> {
+    use Statement::ClassDecl;
+
+    let _ = ("class", ws).parse_next(input)?;
+    cut_err(seq!(ClassDecl { name: ident, params: delimited((ws, '{'), sep_params, (ws, '}')) }))
+        .context(StrContext::Label("class decl"))
+        .parse_next(input)
+}
 pub fn func_params(input: &mut &str) -> Result<Box<[Param]>> {
     delimited('(', sep_params, ')').parse_next(input)
 }
 
 pub fn sep_params(input: &mut &str) -> Result<Box<[Param]>> {
-    repeat(0.., delimited(ws, param, ws)).map(Vec::into_boxed_slice).parse_next(input)
+    let _ = ws.parse_next(input)?;
+    separated(0.., param, (ws, ',', ws)).map(Vec::into_boxed_slice).parse_next(input)
 }
 
 pub fn param(input: &mut &str) -> Result<Param> {

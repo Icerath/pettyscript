@@ -9,6 +9,7 @@ pub enum Node {
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     FuncDecl { name: PtyStr, params: Box<[Param]>, ret_type: Option<Type>, block: Block },
+    ClassDecl { name: PtyStr, params: Box<[Param]> },
     VarDecl { param: Param, expr: Expression },
     VarAssign { name: PtyStr, expr: Expression },
     OpAssign { name: PtyStr, op: BinOp, expr: Expression },
