@@ -54,8 +54,9 @@ pub fn func_params(input: &mut &str) -> Result<Box<[Param]>> {
 }
 
 pub fn sep_params(input: &mut &str) -> Result<Box<[Param]>> {
-    let _ = ws.parse_next(input)?;
-    separated(0.., param, (ws, ',', ws)).map(Vec::into_boxed_slice).parse_next(input)
+    delimited(ws, separated(0.., param, (ws, ',', ws)), opt(','))
+        .map(Vec::into_boxed_slice)
+        .parse_next(input)
 }
 
 pub fn param(input: &mut &str) -> Result<Param> {

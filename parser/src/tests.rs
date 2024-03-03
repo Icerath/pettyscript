@@ -55,8 +55,8 @@ fn fn_decl() {
 #[test]
 fn class_decl() {
     test_expected!("class Unit {}");
-    test_expected!("class Point { x, y }");
-    test_expected!("class Point { x: float, y: float }");
+    test_expected!("class Point { x, y, }");
+    test_expected!("class Point { x: float, y: float, }");
 }
 #[test]
 fn bin_expr() {

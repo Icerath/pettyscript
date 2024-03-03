@@ -251,7 +251,7 @@ impl NodeFmt for Statement {
                     '}'.fmt(f);
                 } else {
                     f.current_indent += 1;
-                    (Newline, params.sep((',', Newline))).fmt(f);
+                    (Newline, params.sep((',', Newline)), ',').fmt(f);
                     f.current_indent -= 1;
                     (Newline, '}').fmt(f);
                 }
