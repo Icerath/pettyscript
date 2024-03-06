@@ -2,6 +2,7 @@ class Point {
     x: float,
     y: float,
 }
+
 fn Point::new(x: float, y: float) -> Self {
     // TODO - Syntax for class creation
 }

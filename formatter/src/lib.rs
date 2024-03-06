@@ -258,6 +258,7 @@ impl NodeFmt for Statement {
                     f.current_indent -= 1;
                     (Newline, '}').fmt(f);
                 }
+                Newline.fmt(f);
             }
             Self::IfStatement(if_statement) => if_statement.fmt(f),
             Self::OpAssign { name, op, expr } => (name, " ", op, "= ", expr).fmt(f),
