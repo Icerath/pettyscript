@@ -3,12 +3,17 @@ class Point {
     y: float,
 }
 
-fn Point::new(x: float, y: float) -> Self {
+fn Point::new(x: float, y: float) -> Point {
     // TODO - Syntax for class creation
 }
 
-fn Point::normalize(self) -> float {
+fn Point::magnitude(self) -> float {
     return self.x * self.x + self.y * self.y.sqrt()
+}
+
+fn Point::normalize(self) -> Point {
+    let mag = self.mag()
+    return Self::new(self.x / mag, self.y / mag)
 }
 
 fn Point::neg(self) {
