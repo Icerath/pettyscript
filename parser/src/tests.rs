@@ -87,7 +87,8 @@ mod examples {
             #[test]
             fn $name() {
                 let input = include_str!(concat!("../../examples/", stringify!($name), ".pty"));
-                let ast = super::parse_many(input).unwrap();
+                let input = input.replace("\r\n", "\n");
+                let ast = super::parse_many(&input).unwrap();
 
                 let output = formatter::format_many(&ast, formatter::Config::default());
                 assert_eq!(input, output);
