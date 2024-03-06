@@ -1,5 +1,3 @@
-#![feature(box_patterns)]
-
 use std::rc::Rc;
 
 use vm::{
