@@ -205,7 +205,8 @@ impl NodeFmt for BinExpr<'_> {
         let Self { lhs, op, rhs } = self;
         if f.inside_bin_expr && !matches!(lhs, Expression::BinExpr { .. }) {
             match op {
-                BinOp::RangeInclusive | BinOp::RangeExclusive | BinOp::Dot => {
+                BinOp::Dot | BinOp::PathSep => (lhs, op, rhs).fmt(f),
+                BinOp::RangeInclusive | BinOp::RangeExclusive => {
                     (lhs, op, rhs).paren().fmt(f);
                 }
                 _ => (lhs, " ", op, " ", rhs).paren().fmt(f),
@@ -213,7 +214,9 @@ impl NodeFmt for BinExpr<'_> {
         } else {
             f.inside_bin_expr = true;
             match op {
-                BinOp::RangeInclusive | BinOp::RangeExclusive | BinOp::Dot => (lhs, op, rhs).fmt(f),
+                BinOp::RangeInclusive | BinOp::RangeExclusive | BinOp::Dot | BinOp::PathSep => {
+                    (lhs, op, rhs).fmt(f);
+                }
                 _ => (lhs, " ", op, " ", rhs).fmt(f),
             }
             f.inside_bin_expr = false;
@@ -234,10 +237,10 @@ impl NodeFmt for Statement {
             Self::ForLoop { ident, iter, block } => {
                 ("for ", ident, " in ", iter, block).fmt(f);
             }
-            Self::FuncDecl { name, params, ret_type, block } => {
+            Self::FuncDecl { path, params, ret_type, block } => {
                 (
                     "fn ",
-                    name,
+                    path,
                     params.sep(", ").paren(),
                     ret_type.as_ref().map(|ty| (" -> ", ty)),
                     block,
@@ -337,7 +340,7 @@ impl NodeFmt for Param {
 impl NodeFmt for Type {
     fn fmt(&self, f: &mut Formatter) {
         for (index, seg) in self.segments.iter().enumerate() {
-            let sep = (index != 0).then_some(":");
+            let sep = (index != 0).then_some("::");
             (sep, seg).fmt(f);
         }
     }

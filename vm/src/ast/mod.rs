@@ -63,6 +63,7 @@ impl TryFrom<&str> for BinOp {
             "/" => Self::Div,
             "%" => Self::Mod,
             "." => Self::Dot,
+            "::" => Self::PathSep,
             ".." => Self::RangeExclusive,
             "..=" => Self::RangeInclusive,
             _ => return Err(()),

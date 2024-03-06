@@ -51,6 +51,7 @@ fn fn_decl() {
     test_expected!("fn hi() {}");
     test_expected!("fn print(s): print(s)");
     test_expected!("fn add(x, y): x + y");
+    test_expected!("fn add(x: int, y: int) -> int: x + y");
 }
 #[test]
 fn class_decl() {
@@ -67,6 +68,7 @@ fn bin_expr() {
     test_expected!("(1 == 2) == 3", "(1 == 2) == 3");
     test_expected!("1 | 2 ^ 3 & 4 >> 5 << 6", "1 | (2 ^ (3 & (4 >> 5) << 6))");
 
+    assert!(parse("1..2..=3").is_err());
     assert!(parse("1 == 2 == 3").is_err());
 }
 #[test]

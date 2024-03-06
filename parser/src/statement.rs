@@ -32,11 +32,11 @@ pub fn fn_decl(input: &mut &str) -> Result<Statement> {
     use Statement::FuncDecl;
     let _ = ("fn", ws).parse_next(input)?;
     cut_err(seq!(FuncDecl {
-        name: ident,
+        path: type_path,
         _: ws,
         params: func_params,
+        ret_type: opt(preceded((ws, "->", ws), type_path)),
         _: ws,
-        ret_type: opt(preceded(("->", ws), type_path)),
         block: block }))
     .parse_next(input)
 }

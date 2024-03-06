@@ -59,7 +59,9 @@ fn upper(input: &mut &str) -> Result {
 }
 
 fn get_item(input: &mut &str) -> Result {
-    (func_call, repeat(0.., (op("."), func_call))).map(fold_exprs).parse_next(input)
+    (func_call, repeat(0.., (alt((op("."), op("::"))), func_call)))
+        .map(fold_exprs)
+        .parse_next(input)
 }
 
 fn func_call(input: &mut &str) -> Result {

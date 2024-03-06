@@ -2,12 +2,14 @@ class Point {
     x: float,
     y: float,
 }
-// fn Point::new(x: float, y: float) -> Self {
-//     // TODO - Syntax for class creation
-// }
-// fn Point::normalize(self) -> float {
-//     return (self.x * self.x + self.y * self.y).sqrt()
-// }
-// fn Point::__neg__(self) {
-//     Self::new(-self.x, -self.y)
-// }
+fn Point::new(x: float, y: float) -> Self {
+    // TODO - Syntax for class creation
+}
+
+fn Point::normalize(self) -> float {
+    return self.x * self.x + self.y * self.y.sqrt()
+}
+
+fn Point::neg(self) {
+    Self::new(-self.x, -self.y)
+}

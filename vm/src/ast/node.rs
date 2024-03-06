@@ -8,7 +8,7 @@ pub enum Node {
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
-    FuncDecl { name: PtyStr, params: Box<[Param]>, ret_type: Option<Type>, block: Block },
+    FuncDecl { path: Type, params: Box<[Param]>, ret_type: Option<Type>, block: Block },
     ClassDecl { name: PtyStr, params: Box<[Param]> },
     VarDecl { param: Param, expr: Expression },
     VarAssign { name: PtyStr, expr: Expression },
@@ -102,6 +102,7 @@ pub enum BinOp {
     Mod,
 
     Dot,
+    PathSep,
 
     RangeInclusive,
     RangeExclusive,
@@ -160,6 +161,7 @@ impl BinOp {
             Self::Mod => "%",
 
             Self::Dot => ".",
+            Self::PathSep => "::",
 
             Self::RangeInclusive => "..=",
             Self::RangeExclusive => "..",
