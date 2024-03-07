@@ -1,12 +1,12 @@
 use crate::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Statement(Statement),
     Expression(Expression),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     FuncDecl { path: Type, params: Box<[Param]>, ret_type: Option<Type>, block: Block },
     ClassDecl { name: PtyStr, params: Box<[Param]> },
@@ -19,13 +19,13 @@ pub enum Statement {
     IfStatement(IfStatement),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Param {
     pub ident: PtyStr,
     pub ty: Option<Type>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Block {
     Single(Box<Expression>),
     Multi(Box<[Node]>),
@@ -46,25 +46,25 @@ impl Block {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Type {
     pub segments: Box<[PtyStr]>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfStatement {
     pub condition: Expression,
     pub block: Block,
     pub or_else: Option<OrElse>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum OrElse {
     Block(Block),
     If(Box<IfStatement>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     LineComment(String),
     Keyword(Keyword),
@@ -115,7 +115,7 @@ pub enum UnaryOp {
     //Splat,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Bool(bool),
     Int(i64),
@@ -127,7 +127,7 @@ pub enum Literal {
     Closure { params: Box<[Param]>, block: Block },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
     Break,
     Return(Option<Box<Expression>>),

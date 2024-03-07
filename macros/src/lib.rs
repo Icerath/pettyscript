@@ -15,6 +15,7 @@ pub fn pettyfunc(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
     quote!(
         #vis fn #name <'__a> (
+            vm: &Vm,
             args: FnArgs<'__a>
         ) -> PettyObject {
             #variables

@@ -4,7 +4,7 @@ pub use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct CustomObject {
-    inner: Arc<Mutex<HashMap<PtyStr, PettyObject>>>,
+    inner: Rc<RefCell<HashMap<PtyStr, PettyObject>>>,
 }
 
 impl Object for CustomObject {
@@ -12,13 +12,11 @@ impl Object for CustomObject {
         todo!("custom objects need to have unique type ids")
     }
 
-    fn get(&self, key: &str) -> PettyObject {
-        let lock = self.inner.lock().unwrap();
-        lock.get(key).unwrap_or(NULL).clone()
+    fn get(&self, _vm: &Vm, key: &str) -> PettyObject {
+        self.inner.borrow().get(key).unwrap_or(&NULL).clone()
     }
 
-    fn set(&self, key: PtyStr, val: PettyObject) {
-        let mut lock = self.inner.lock().unwrap();
-        lock.insert(key, val);
+    fn set(&self, _vm: &Vm, key: PtyStr, val: PettyObject) {
+        self.inner.borrow_mut().insert(key, val);
     }
 }

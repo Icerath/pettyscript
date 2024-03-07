@@ -2,4 +2,5 @@ let bool = true
 let int = 1
 let float = 2.5
 let str = "Hello, World!"
-let list = [int, float, string]
+let list = [bool, int, float, str]
+print(list)
