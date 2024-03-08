@@ -28,8 +28,7 @@ fn logical_and(input: &mut &str) -> Result {
 }
 
 fn comparison(input: &mut &str) -> Result {
-    require_parens(bit_or, alt((op("<="), op(">="), op("=="), op("!="), op("<"), op(">"))), bit_or)
-        .parse_next(input)
+    require_parens(bit_or, alt((op("<="), op(">="), op("=="), op("!="), op("<"), op(">"))), bit_or).parse_next(input)
 }
 
 fn bit_or(input: &mut &str) -> Result {
@@ -53,15 +52,11 @@ fn lower(input: &mut &str) -> Result {
 }
 
 fn upper(input: &mut &str) -> Result {
-    (get_item, repeat(0.., (alt((op("*"), op("/"), op("%"))), get_item)))
-        .map(fold_exprs)
-        .parse_next(input)
+    (get_item, repeat(0.., (alt((op("*"), op("/"), op("%"))), get_item))).map(fold_exprs).parse_next(input)
 }
 
 fn get_item(input: &mut &str) -> Result {
-    (func_call, repeat(0.., (alt((op("."), op("::"))), func_call)))
-        .map(fold_exprs)
-        .parse_next(input)
+    (func_call, repeat(0.., (alt((op("."), op("::"))), func_call))).map(fold_exprs).parse_next(input)
 }
 
 fn func_call(input: &mut &str) -> Result {
@@ -101,9 +96,7 @@ fn require_parens<'a>(
 }
 
 fn fold_exprs((initial, remainder): (Expression, Vec<(BinOp, Expression)>)) -> Expression {
-    remainder
-        .into_iter()
-        .fold(initial, |acc, (op, expr)| Expression::BinExpr { op, args: Box::new((acc, expr)) })
+    remainder.into_iter().fold(initial, |acc, (op, expr)| Expression::BinExpr { op, args: Box::new((acc, expr)) })
 }
 
 /// # Panics

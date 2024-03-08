@@ -15,10 +15,6 @@ impl<'a> FnArgs<'a> {
 
     /// # Panics
     pub fn assert_len(self, range: RangeInclusive<usize>) {
-        assert!(
-            range.contains(&self.slice.len()),
-            "Expected {range:?} arguments got {}",
-            self.slice.len()
-        );
+        assert!(range.contains(&self.slice.len()), "Expected {range:?} arguments got {}", self.slice.len());
     }
 }

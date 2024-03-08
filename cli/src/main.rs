@@ -29,14 +29,11 @@ fn main() -> io::Result<()> {
             vm.run_main();
         }
         Command::Fmt { path } => {
-            let files =
-                if path.is_file() {
-                    vec![path]
-                } else {
-                    fs::read_dir(&path)?
-                        .map(|entry| entry.map(|entry| entry.path()))
-                        .collect::<Result<_, io::Error>>()?
-                };
+            let files = if path.is_file() {
+                vec![path]
+            } else {
+                fs::read_dir(&path)?.map(|entry| entry.map(|entry| entry.path())).collect::<Result<_, io::Error>>()?
+            };
             for path in files {
                 let input = fs::read_to_string(&path)?;
                 let ast = parse_many(&input).unwrap();

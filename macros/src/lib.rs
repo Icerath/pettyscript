@@ -51,8 +51,5 @@ fn downcast_args(sig: &syn::Signature) -> proc_macro2::TokenStream {
 }
 
 fn is_option(attrs: &[Attribute]) -> bool {
-    attrs
-        .iter()
-        .filter_map(|attr| attr.meta.require_path_only().ok()?.get_ident())
-        .any(|attr| attr == "option")
+    attrs.iter().filter_map(|attr| attr.meta.require_path_only().ok()?.get_ident()).any(|attr| attr == "option")
 }

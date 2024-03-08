@@ -48,12 +48,7 @@ struct Formatter {
 
 impl Formatter {
     fn new(config: Config) -> Self {
-        Self {
-            buf: String::new(),
-            current_indent: 0,
-            inside_bin_expr: false,
-            config: Rc::new(config),
-        }
+        Self { buf: String::new(), current_indent: 0, inside_bin_expr: false, config: Rc::new(config) }
     }
 
     fn write<T: std::fmt::Display>(&mut self, val: T) {
@@ -239,14 +234,7 @@ impl NodeFmt for Statement {
                 ("for ", ident, " in ", iter, block).fmt(f);
             }
             Self::FuncDecl { path, params, ret_type, block } => {
-                (
-                    "fn ",
-                    path,
-                    params.sep(", ").paren(),
-                    ret_type.as_ref().map(|ty| (" -> ", ty)),
-                    block,
-                    Newline,
-                )
+                ("fn ", path, params.sep(", ").paren(), ret_type.as_ref().map(|ty| (" -> ", ty)), block, Newline)
                     .fmt(f);
             }
             Self::ClassDecl { name, params } => {

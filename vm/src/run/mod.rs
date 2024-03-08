@@ -100,14 +100,12 @@ impl Vm {
                 Statement::OpAssign { name, op, expr } => {
                     // TODO: Inplace operator assignment
                     let rhs = self.eval(expr);
-                    let var = self.variables.borrow().get(name).unwrap().clone();
-                    let new = var.get(self, op.method()).call(self, FnArgs::new(&[var, rhs]));
+                    let new = self.variables.borrow().get(name).unwrap().call_method(self, op.method(), &[rhs]);
                     self.variables.borrow_mut().insert(name.clone(), new);
                 }
                 Statement::WhileLoop { expr, block } => loop {
                     let condition = self.eval(expr);
-                    let condition =
-                        condition.get(self, "__bool__").call(self, FnArgs::new(&[condition]));
+                    let condition = condition.call_method(self, "__bool__", &[]);
                     match condition {
                         PettyObject::Bool(true) => self.exec_block(block),
                         PettyObject::Bool(false) => break,
@@ -127,7 +125,7 @@ impl Vm {
     pub fn exec_if(&self, node: &IfStatement) {
         let IfStatement { condition, block, or_else } = node;
         let condition = self.eval(condition);
-        let condition = condition.get(self, "__bool__").call(self, FnArgs::new(&[condition]));
+        let condition = condition.call_method(self, "__bool__", &[]);
         match condition {
             PettyObject::Bool(true) => {
                 self.exec_block(block);
@@ -149,9 +147,7 @@ impl Vm {
                 Literal::Int(int) => PettyObject::Int(*int),
                 Literal::Float(float) => PettyObject::Float(*float),
                 Literal::String(str) => PettyObject::PtyStr(str.clone()),
-                Literal::List(list) => {
-                    PettyObject::List(List::new(list.iter().map(|expr| self.eval(expr)).collect()))
-                }
+                Literal::List(list) => PettyObject::List(List::new(list.iter().map(|expr| self.eval(expr)).collect())),
                 Literal::Map(_) => todo!(),
                 Literal::Tuple(_) => todo!(),
                 Literal::Closure { params: _, block: _ } => todo!(),
@@ -160,9 +156,7 @@ impl Vm {
                 .variables
                 .borrow()
                 .get(ident)
-                .unwrap_or_else(|| {
-                    panic!("Tried to get '{ident}' from {:#?}", self.variables.borrow().keys())
-                })
+                .unwrap_or_else(|| panic!("Tried to get '{ident}' from {:#?}", self.variables.borrow().keys()))
                 .clone(),
             Expression::Keyword(Keyword::Break) => {
                 *self.control_flow.borrow_mut() = Some(ControlFlow::Break);
@@ -177,9 +171,7 @@ impl Vm {
                 *self.control_flow.borrow_mut() = Some(ControlFlow::Continue);
                 PettyObject::NULL
             }
-            Expression::UnaryExpr { op, expr } => {
-                self.eval(expr).get(self, op.method()).call(self, FnArgs::new(&[]))
-            }
+            Expression::UnaryExpr { op, expr } => self.eval(expr).call_method(self, op.method(), &[]),
             Expression::FuncCall { expr, args } => {
                 let expr = self.eval(expr);
                 let args = args.iter().map(|arg| self.eval(arg)).collect::<Vec<_>>();
@@ -192,28 +184,22 @@ impl Vm {
 
                 match op {
                     BinOp::RangeInclusive | BinOp::RangeExclusive => match (op, lhs, rhs) {
-                        (BinOp::RangeExclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
-                            (lhs..rhs).into()
-                        }
-                        (BinOp::RangeInclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
-                            (lhs..=rhs).into()
-                        }
+                        (BinOp::RangeExclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => (lhs..rhs).into(),
+                        (BinOp::RangeInclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => (lhs..=rhs).into(),
                         _ => panic!("Incorrect args {args:?}"),
                     },
-                    BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => {
-                        match lhs.call_method(self, "__cmp__", &[rhs]) {
-                            PettyObject::Int(0) => [BinOp::GtEq, BinOp::LtEq].contains(op),
-                            PettyObject::Int(1) => [BinOp::Gt, BinOp::GtEq].contains(op),
-                            PettyObject::Int(-1) => [BinOp::Lt, BinOp::LtEq].contains(op),
-                            _ => unimplemented!(),
-                        }
-                        .into()
+                    BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => match lhs.call_method(self, "__cmp__", &[rhs])
+                    {
+                        PettyObject::Int(0) => [BinOp::GtEq, BinOp::LtEq].contains(op),
+                        PettyObject::Int(1) => [BinOp::Gt, BinOp::GtEq].contains(op),
+                        PettyObject::Int(-1) => [BinOp::Lt, BinOp::LtEq].contains(op),
+                        _ => unimplemented!(),
                     }
+                    .into(),
                     _ => {
                         let lhs = self.eval(&args.0);
                         let rhs = self.eval(&args.1);
-                        let function = lhs.get(self, op.method());
-                        function.call(self, FnArgs::new(&[lhs, rhs]))
+                        lhs.call_method(self, op.method(), &[rhs])
                     }
                 }
             }

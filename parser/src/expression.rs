@@ -26,12 +26,8 @@ pub fn value_expr(input: &mut &str) -> Result<Expression> {
 }
 
 pub fn value_expr_raw(input: &mut &str) -> Result<Expression> {
-    alt((
-        keyword.map(Expression::Keyword),
-        literal.map(Expression::Literal),
-        ident.map(Expression::Ident),
-    ))
-    .parse_next(input)
+    alt((keyword.map(Expression::Keyword), literal.map(Expression::Literal), ident.map(Expression::Ident)))
+        .parse_next(input)
 }
 
 pub fn unary_expr(input: &mut &str) -> Result<Expression> {
@@ -54,11 +50,7 @@ pub fn r#return(input: &mut &str) -> Result<Keyword> {
 }
 
 pub fn ident(input: &mut &str) -> Result<PtyStr> {
-    take_while(1.., ident_char)
-        .recognize()
-        .map(new_str)
-        .context(StrContext::Label("ident"))
-        .parse_next(input)
+    take_while(1.., ident_char).recognize().map(new_str).context(StrContext::Label("ident")).parse_next(input)
 }
 pub const fn ident_char(c: char) -> bool {
     matches!(c, 'a'..='z' | 'A'..='Z' | '_')

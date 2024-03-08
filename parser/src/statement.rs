@@ -54,21 +54,15 @@ pub fn func_params(input: &mut &str) -> Result<Box<[Param]>> {
 }
 
 pub fn sep_params(input: &mut &str) -> Result<Box<[Param]>> {
-    delimited(ws, separated(0.., param, (ws, ',', ws)), opt(','))
-        .map(Vec::into_boxed_slice)
-        .parse_next(input)
+    delimited(ws, separated(0.., param, (ws, ',', ws)), opt(',')).map(Vec::into_boxed_slice).parse_next(input)
 }
 
 pub fn param(input: &mut &str) -> Result<Param> {
-    (ident, opt(preceded((':', ws), type_path)))
-        .map(|(ident, ty)| Param { ident, ty })
-        .parse_next(input)
+    (ident, opt(preceded((':', ws), type_path))).map(|(ident, ty)| Param { ident, ty }).parse_next(input)
 }
 
 pub fn type_path(input: &mut &str) -> Result<Type> {
-    separated(1.., ident, "::")
-        .map(|values| Type { segments: Vec::into_boxed_slice(values) })
-        .parse_next(input)
+    separated(1.., ident, "::").map(|values| Type { segments: Vec::into_boxed_slice(values) }).parse_next(input)
 }
 
 pub fn var_decl(input: &mut &str) -> Result<Statement> {
@@ -91,19 +85,7 @@ pub fn var_assign(input: &mut &str) -> Result<Statement> {
 }
 
 fn op_assign_symbol(input: &mut &str) -> Result<BinOp> {
-    alt((
-        op("+"),
-        op("-"),
-        op("*"),
-        op("/"),
-        op("%"),
-        op("&"),
-        op("|"),
-        op("^"),
-        op("<<"),
-        op(">>"),
-    ))
-    .parse_next(input)
+    alt((op("+"), op("-"), op("*"), op("/"), op("%"), op("&"), op("|"), op("^"), op("<<"), op(">>"))).parse_next(input)
 }
 
 pub fn block(input: &mut &str) -> Result<Block> {
@@ -159,10 +141,7 @@ pub fn if_statement(input: &mut &str) -> Result<IfStatement> {
 pub fn or_else(input: &mut &str) -> Result<Option<OrElse>> {
     opt(preceded(
         ("else", ws),
-        cut_err(alt((
-            if_statement.map(|r#if| OrElse::If(Box::new(r#if))),
-            block.map(OrElse::Block),
-        ))),
+        cut_err(alt((if_statement.map(|r#if| OrElse::If(Box::new(r#if))), block.map(OrElse::Block)))),
     ))
     .parse_next(input)
 }

@@ -52,15 +52,9 @@ fn test_trim() {
     let object = PettyObject::from(input.clone());
     let vm = &Vm::new();
 
-    assert!(
-        matches!(object.call_method(vm, "trim", &[]), PettyObject::PtyStr(str) if str == input.trim())
-    );
-    assert!(
-        matches!(object.call_method(vm, "trim_start", &[]), PettyObject::PtyStr(str) if str == input.trim_start())
-    );
-    assert!(
-        matches!(object.call_method(vm, "trim_end", &[]), PettyObject::PtyStr(str) if str == input.trim_end())
-    );
+    assert!(matches!(object.call_method(vm, "trim", &[]), PettyObject::PtyStr(str) if str == input.trim()));
+    assert!(matches!(object.call_method(vm, "trim_start", &[]), PettyObject::PtyStr(str) if str == input.trim_start()));
+    assert!(matches!(object.call_method(vm, "trim_end", &[]), PettyObject::PtyStr(str) if str == input.trim_end()));
     assert!(
         matches!(object.call_method(vm, "trim", &[ptystr!(" ").into()]), PettyObject::PtyStr(str) if str == input.trim_matches(' '))
     );
