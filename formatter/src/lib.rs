@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::rc::Rc;
 
 use vm::{
@@ -308,7 +311,7 @@ impl NodeFmt for IfStatement {
         ("if ", &self.condition, &self.block).fmt(f);
         let Some(or_else) = &self.or_else else { return };
 
-        if self.block.len() <= 1 {
+        if self.block.is_empty() || matches!(self.block, Block::Single(_)) {
             Newline.fmt(f);
         }
         match &or_else {
