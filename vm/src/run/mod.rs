@@ -97,8 +97,12 @@ impl Vm {
                         .get_mut(name)
                         .expect("Value should already be declared for assignment") = value;
                 }
-                Statement::OpAssign { name: _, op: _, expr: _ } => {
-                    unimplemented!("Assignment Operators")
+                Statement::OpAssign { name, op, expr } => {
+                    // TODO: Inplace operator assignment
+                    let rhs = self.eval(expr);
+                    let var = self.variables.borrow().get(name).unwrap().clone();
+                    let new = var.get(self, op.method()).call(self, FnArgs::new(&[var, rhs]));
+                    self.variables.borrow_mut().insert(name.clone(), new);
                 }
                 Statement::WhileLoop { expr, block } => loop {
                     let condition = self.eval(expr);
@@ -181,29 +185,37 @@ impl Vm {
                 let args = args.iter().map(|arg| self.eval(arg)).collect::<Vec<_>>();
                 expr.call(self, FnArgs::new(&args))
             }
-            Expression::BinExpr {
-                op: op @ (BinOp::RangeInclusive | BinOp::RangeExclusive),
-                args,
-            } => {
-                let lhs = self.eval(&args.0);
-                let rhs = self.eval(&args.1);
-
-                match (op, lhs, rhs) {
-                    (BinOp::RangeExclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
-                        (lhs..rhs).into()
-                    }
-                    (BinOp::RangeInclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
-                        (lhs..=rhs).into()
-                    }
-                    _ => panic!("Incorrect args {args:?}"),
-                }
-            }
             Expression::BinExpr { op, args } => {
                 // TODO: Short circuting for conditionals
                 let lhs = self.eval(&args.0);
                 let rhs = self.eval(&args.1);
-                let function = lhs.get(self, op.method());
-                function.call(self, FnArgs::new(&[lhs, rhs]))
+
+                match op {
+                    BinOp::RangeInclusive | BinOp::RangeExclusive => match (op, lhs, rhs) {
+                        (BinOp::RangeExclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
+                            (lhs..rhs).into()
+                        }
+                        (BinOp::RangeInclusive, PettyObject::Int(lhs), PettyObject::Int(rhs)) => {
+                            (lhs..=rhs).into()
+                        }
+                        _ => panic!("Incorrect args {args:?}"),
+                    },
+                    BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => {
+                        match lhs.call_method(self, "__cmp__", &[rhs]) {
+                            PettyObject::Int(0) => [BinOp::GtEq, BinOp::LtEq].contains(op),
+                            PettyObject::Int(1) => [BinOp::Gt, BinOp::GtEq].contains(op),
+                            PettyObject::Int(-1) => [BinOp::Lt, BinOp::LtEq].contains(op),
+                            _ => unimplemented!(),
+                        }
+                        .into()
+                    }
+                    _ => {
+                        let lhs = self.eval(&args.0);
+                        let rhs = self.eval(&args.1);
+                        let function = lhs.get(self, op.method());
+                        function.call(self, FnArgs::new(&[lhs, rhs]))
+                    }
+                }
             }
             Expression::LineComment(_) => unreachable!(),
         }
