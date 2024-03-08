@@ -80,6 +80,10 @@ fn unary_op() {
 fn closures() {
     test_expected!("|i|: i*i", "|i|: i * i");
 }
+#[test]
+fn keywords() {
+    test_expected!(r#"{ break continue return "Hi" }"#);
+}
 
 mod examples {
     macro_rules! test_example {

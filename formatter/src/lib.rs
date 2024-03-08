@@ -271,6 +271,7 @@ impl NodeFmt for Keyword {
     fn fmt(&self, f: &mut Formatter) {
         match self {
             Self::Break => "break".fmt(f),
+            Self::Continue => "continue".fmt(f),
             Self::Return(expr) => {
                 ("return", expr.as_ref().map(|expr| (" ", expr))).fmt(f);
             }

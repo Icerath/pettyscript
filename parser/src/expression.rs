@@ -45,7 +45,7 @@ pub fn unary_op(input: &mut &str) -> Result<UnaryOp> {
 }
 
 pub fn keyword(input: &mut &str) -> Result<Keyword> {
-    alt(("break".map(|_| Keyword::Break), r#return))
+    alt(("break".map(|_| Keyword::Break), "continue".map(|_| Keyword::Continue), r#return))
         .context(StrContext::Label("keyword"))
         .parse_next(input)
 }

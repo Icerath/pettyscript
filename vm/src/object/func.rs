@@ -1,5 +1,6 @@
 use crate::ast::node::Block;
 use crate::prelude::*;
+use crate::run::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub struct Func {
@@ -16,6 +17,9 @@ impl Object for Rc<Func> {
             Block::Multi(nodes) => vm.exec_many(nodes),
             Block::Single(expr) => _ = vm.eval(expr),
         }
-        PettyObject::NULL
+        match vm.control_flow.borrow_mut().take() {
+            Some(ControlFlow::Return(obj)) => obj,
+            _ => PettyObject::NULL,
+        }
     }
 }

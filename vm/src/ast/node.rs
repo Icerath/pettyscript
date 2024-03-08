@@ -131,6 +131,7 @@ pub enum Literal {
 pub enum Keyword {
     Break,
     Return(Option<Box<Expression>>),
+    Continue,
 }
 
 impl BinOp {

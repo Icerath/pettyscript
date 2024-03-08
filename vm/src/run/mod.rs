@@ -1,29 +1,42 @@
 use std::collections::HashMap;
 
 use crate::ast::node::{Block, OrElse};
-use crate::ast::{BinOp, Expression, IfStatement, Literal, Node, Statement, UnaryOp};
+use crate::ast::{BinOp, Expression, IfStatement, Keyword, Literal, Node, Statement, UnaryOp};
 use crate::object::List;
 use crate::{prelude::*, stdlib};
 
+#[derive(Debug)]
+pub enum ControlFlow {
+    Break,
+    Return(PettyObject),
+    Continue,
+}
+
 pub struct Vm {
     pub variables: RefCell<HashMap<PtyStr, PettyObject>>,
+    pub control_flow: RefCell<Option<ControlFlow>>,
 }
 
 impl Vm {
     #[allow(clippy::new_without_default, clippy::must_use_candidate)]
     pub fn new() -> Self {
-        let vm = Self { variables: RefCell::default() };
+        let vm = Self { variables: RefCell::default(), control_flow: RefCell::new(None) };
         stdlib::init(&vm);
         vm
     }
 
     pub fn run_main(&self) {
-        let Some(main) = self.variables.borrow().get("main").cloned() else { return };
+        let Some(main) = self.variables.borrow().get("main").cloned() else {
+            return;
+        };
         main.call(self, FnArgs::new(&[]));
     }
 
     pub fn exec_many(&self, nodes: &[Node]) {
         for node in nodes {
+            if self.control_flow.borrow().is_some() {
+                return;
+            }
             self.exec(node);
         }
     }
@@ -55,6 +68,12 @@ impl Vm {
                         }
                         self.variables.borrow_mut().insert(ident.clone(), next);
                         self.exec_block(block);
+                        match &mut *self.control_flow.borrow_mut() {
+                            control_flow @ Some(ControlFlow::Break) => break *control_flow = None,
+                            Some(ControlFlow::Return(_)) => break,
+                            control_flow @ Some(ControlFlow::Continue) => *control_flow = None,
+                            _ => {}
+                        }
                     }
                 }
                 Statement::FuncDecl { path, params, ret_type: _, block } => {
@@ -89,6 +108,12 @@ impl Vm {
                         PettyObject::Bool(true) => self.exec_block(block),
                         PettyObject::Bool(false) => break,
                         _ => unreachable!("__bool__ should always return a bool"),
+                    }
+                    match &mut *self.control_flow.borrow_mut() {
+                        control_flow @ Some(ControlFlow::Break) => break *control_flow = None,
+                        Some(ControlFlow::Return(_)) => break,
+                        control_flow @ Some(ControlFlow::Continue) => *control_flow = None,
+                        _ => {}
                     }
                 },
             },
@@ -135,7 +160,19 @@ impl Vm {
                     panic!("Tried to get '{ident}' from {:#?}", self.variables.borrow().keys())
                 })
                 .clone(),
-            Expression::Keyword(_) => todo!(),
+            Expression::Keyword(Keyword::Break) => {
+                *self.control_flow.borrow_mut() = Some(ControlFlow::Break);
+                PettyObject::NULL
+            }
+            Expression::Keyword(Keyword::Return(ret)) => {
+                let ret = ret.as_ref().map_or(NULL, |ret| self.eval(ret));
+                *self.control_flow.borrow_mut() = Some(ControlFlow::Return(ret));
+                PettyObject::NULL
+            }
+            Expression::Keyword(Keyword::Continue) => {
+                *self.control_flow.borrow_mut() = Some(ControlFlow::Continue);
+                PettyObject::NULL
+            }
             Expression::UnaryExpr { op, expr } => {
                 self.eval(expr).get(self, op.method()).call(self, FnArgs::new(&[]))
             }
