@@ -250,16 +250,13 @@ impl<'a> Parser<'a> {
                 Token::Fn => Stmt::Function(self.parse_fn()?),
                 Token::For => Stmt::ForLoop(self.parse_for_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
-                got => {
-                    let span = self.peek_span()?;
+                _ => {
                     let expr = self.parse_expr(0)?;
+                    let span = self.lexer.span();
                     if self.expect_token(Token::Semicolon).is_err() {
-                        let span = LabeledSpan::at(span, "expected 'statement' here");
-                        return Err(miette::miette!(
-                            labels = vec![span],
-                            "Expected: 'statement', Got: '{got}'"
-                        )
-                        .with_source_code(self.src()));
+                        let span = LabeledSpan::at(span, "expected ';' here");
+                        return Err(miette::miette!(labels = vec![span], "Missing ';'")
+                            .with_source_code(self.src()));
                     }
                     Stmt::Expr(expr)
                 }
