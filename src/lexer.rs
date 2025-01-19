@@ -53,6 +53,8 @@ pub enum Token {
     #[token("in")] In,
     #[token("fn")] Fn,
     #[token("for")] For,
+    #[token("let")] Let,
+    #[token("const")] Const,
     #[token("return")] Return,
     #[token("struct")] Struct,
     #[token("enum")] Enum,
@@ -114,6 +116,8 @@ impl TokenKind {
             Self::String => "string",
             Self::Struct => "struct",
             Self::Enum => "enum",
+            Self::Let => "let",
+            Self::Const => "const",
         }
     }
 }

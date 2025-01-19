@@ -43,3 +43,8 @@ enum Token {
     String,
     Ident,
 }
+
+
+fn main() {
+    let lexer = Lexer;
+}

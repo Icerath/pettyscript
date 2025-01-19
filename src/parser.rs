@@ -13,11 +13,19 @@ pub enum Stmt {
     IfChain(IfChain),
     Expr(Expr),
     Block(Block),
+    Let(VarDecl),
+    Const(VarDecl),
 }
 
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Let(var) => {
+                f.debug_struct("let").field("ident", &var.ident).field("expr", &var.expr).finish()
+            }
+            Self::Const(var) => {
+                f.debug_struct("const").field("ident", &var.ident).field("expr", &var.expr).finish()
+            }
             Self::Struct(r#struct) => fmt::Debug::fmt(r#struct, f),
             Self::Enum(r#enum) => fmt::Debug::fmt(r#enum, f),
             Self::Block(block) => fmt::Debug::fmt(block, f),
@@ -27,6 +35,11 @@ impl fmt::Debug for Stmt {
             Self::ForLoop(for_loop) => fmt::Debug::fmt(for_loop, f),
         }
     }
+}
+
+pub struct VarDecl {
+    ident: &'static str,
+    expr: Option<Expr>,
 }
 
 pub struct Struct {
@@ -230,6 +243,8 @@ impl<'a> Parser<'a> {
         loop {
             break Ok(match self.peek()? {
                 Token::Semicolon => continue,
+                Token::Let => Stmt::Let(self.parse_let_decl()?),
+                Token::Const => Stmt::Const(self.parse_const_decl()?),
                 Token::Struct => Stmt::Struct(self.parse_struct()?),
                 Token::Enum => Stmt::Enum(self.parse_enum()?),
                 Token::Fn => Stmt::Function(self.parse_fn()?),
@@ -360,6 +375,29 @@ impl<'a> Parser<'a> {
         let condition = self.parse_expr(0)?;
         let body = self.parse_block()?;
         Ok(IfStmt { condition, body })
+    }
+
+    fn parse_let_decl(&mut self) -> Result<VarDecl> {
+        self.expect_token(Token::Let)?;
+        self.parse_var_decl()
+    }
+
+    fn parse_const_decl(&mut self) -> Result<VarDecl> {
+        self.expect_token(Token::Let)?;
+        self.parse_var_decl()
+    }
+
+    fn parse_var_decl(&mut self) -> Result<VarDecl> {
+        let ident = self.parse_ident()?;
+        let expr = match self.bump()? {
+            Token::Semicolon => return Ok(VarDecl { ident, expr: None }),
+            Token::Eq => self.parse_expr(0)?,
+            got => {
+                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]))
+            }
+        };
+        self.expect_token(Token::Semicolon)?;
+        Ok(VarDecl { ident, expr: Some(expr) })
     }
 
     fn parse_struct(&mut self) -> Result<Struct> {
