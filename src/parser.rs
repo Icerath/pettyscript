@@ -101,11 +101,17 @@ pub enum Expr {
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Expr]> },
+    InitStruct { r#struct: Box<Expr>, fields: Box<[StructInitField]> },
 }
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InitStruct { r#struct, fields } => f
+                .debug_struct("InitStruct")
+                .field("struct", r#struct)
+                .field("fields", fields)
+                .finish(),
             Self::Literal(literal) => fmt::Debug::fmt(literal, f),
             Self::Binary { op, exprs } => f
                 .debug_struct("BinaryExpr")
@@ -120,6 +126,20 @@ impl fmt::Debug for Expr {
                 f.debug_struct("FnCall").field("function", function).field("args", args).finish()
             }
         }
+    }
+}
+
+struct StructInitField {
+    ident: &'static str,
+    expr: Option<Expr>,
+}
+
+impl fmt::Debug for StructInitField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InitField")
+            .field("ident", &format_args!("{}", self.ident))
+            .field("expr", &self.expr)
+            .finish()
     }
 }
 
@@ -303,6 +323,31 @@ impl<'a> Parser<'a> {
             }
             let _ = self.bump();
             expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
+        }
+
+        if let Token::LBrace = self.peek()? {
+            let _ = self.bump()?;
+
+            let mut fields = vec![];
+            while self.peek()? != Token::RBrace {
+                let ident = self.parse_ident()?;
+                if self.peek()? == Token::RBrace {
+                    fields.push(StructInitField { ident, expr: None });
+                    break;
+                }
+                let expr = match self.bump()? {
+                    Token::Comma => None,
+                    Token::Colon => Some(self.parse_expr(0)?),
+                    got => {
+                        return Err(
+                            self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])
+                        )
+                    }
+                };
+                fields.push(StructInitField { ident, expr });
+            }
+            let _ = self.bump();
+            expr = Expr::InitStruct { r#struct: Box::new(expr), fields: fields.into() }
         }
 
         Ok(expr)
