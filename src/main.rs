@@ -1,5 +1,5 @@
 use parser::Parser;
-
+mod intern;
 mod lexer;
 mod parser;
 #[cfg(test)]

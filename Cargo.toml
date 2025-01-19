@@ -8,4 +8,7 @@ enum-kinds = "0.5.1"
 logos = "0.15.0"
 miette = { version = "7.4.0", features = ["fancy"] }
 thiserror = "2.0.11"
-ustr = "1.1.0"
+hashbrown = { version = "0.15.2", default-features = false, features = [
+    "inline-more",
+] }
+rustc-hash = "2.1.0"

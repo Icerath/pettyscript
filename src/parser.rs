@@ -2,7 +2,6 @@ use std::fmt;
 
 use logos::{Lexer, Logos};
 use miette::{Context, Error, IntoDiagnostic, LabeledSpan, Result};
-use ustr::Ustr;
 
 use crate::lexer::{Token, TokenKind};
 
@@ -27,7 +26,7 @@ impl fmt::Debug for Stmt {
 }
 
 pub struct Function {
-    ident: Ustr,
+    ident: &'static str,
     params: Box<[Param]>,
     block: Block,
 }
@@ -83,7 +82,7 @@ impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int(int) => write!(f, "Int({int})"),
-            Self::String(str) => write!(f, "String({:?})", str.as_str()),
+            Self::String(str) => write!(f, "String({:?})", str),
             Self::Ident(ident) => write!(f, "Ident({ident})"),
         }
     }
@@ -91,8 +90,8 @@ impl fmt::Debug for Literal {
 
 pub enum Literal {
     Int(i128),
-    String(Ustr),
-    Ident(Ustr),
+    String(&'static str),
+    Ident(&'static str),
 }
 
 #[derive(Debug, PartialEq)]
@@ -145,7 +144,7 @@ pub enum UnaryOp {
 }
 
 pub struct ForLoop {
-    ident: Ustr,
+    ident: &'static str,
     iter: Expr,
     body: Block,
 }
@@ -175,7 +174,7 @@ pub struct IfStmt {
 
 #[derive(Debug)]
 pub struct Param {
-    ident: Ustr,
+    ident: &'static str,
 }
 
 #[derive(Clone)]
@@ -368,7 +367,7 @@ impl<'a> Parser<'a> {
         Ok(Block { stmts })
     }
 
-    fn parse_ident(&mut self) -> Result<Ustr> {
+    fn parse_ident(&mut self) -> Result<&'static str> {
         let Token::Ident(ident) = self.expect_token(TokenKind::Ident)? else { unreachable!() };
         Ok(ident)
     }

@@ -1,8 +1,8 @@
 use std::fmt;
 
+use crate::intern::intern;
 use enum_kinds::EnumKind;
 use logos::Logos;
-use ustr::Ustr;
 
 #[derive(Default, Debug, Clone, PartialEq, thiserror::Error)]
 pub enum Error {
@@ -57,11 +57,14 @@ pub enum Token {
     // Literals
     #[regex(r"\d[\d_]*", |lex| &lex.slice().parse(), priority = 1)]
     Int(i128),
-    #[regex(r#""[^"]*""#, |lex| Ustr::from(&lex.slice()[1..lex.slice().len() - 1]))]
-    String(Ustr),
-    #[regex(r"\w[\w\d]*", |lex| Ustr::from(lex.slice()))]
-    Ident(Ustr),
+    #[regex(r#""[^"]*""#, |lex| intern(&lex.slice()[1..lex.slice().len() - 1]))]
+    String(S),
+    #[regex(r"\w[\w\d]*", |lex| intern(lex.slice()))]
+    Ident(S),
 }
+
+// avoid Logos' special case for &str
+type S = &'static str;
 
 impl Token {
     pub fn kind(self) -> TokenKind {
