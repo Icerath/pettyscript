@@ -252,12 +252,7 @@ impl<'a> Parser<'a> {
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
                 _ => {
                     let expr = self.parse_expr(0)?;
-                    let span = self.lexer.span();
-                    if self.expect_token(Token::Semicolon).is_err() {
-                        let span = LabeledSpan::at(span, "expected ';' here");
-                        return Err(miette::miette!(labels = vec![span], "Missing ';'")
-                            .with_source_code(self.src()));
-                    }
+                    self.expect_semicolon()?;
                     Stmt::Expr(expr)
                 }
             });
@@ -393,7 +388,7 @@ impl<'a> Parser<'a> {
                 return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]))
             }
         };
-        self.expect_token(Token::Semicolon)?;
+        self.expect_semicolon()?;
         Ok(VarDecl { ident, expr: Some(expr) })
     }
 
@@ -456,6 +451,16 @@ impl<'a> Parser<'a> {
 
     fn expect_token(&mut self, expected: impl Into<TokenKind>) -> Result<Token> {
         self.expect_any(&[expected.into()])
+    }
+
+    /// Semicolons specifically should not show as expected over the next token.
+    fn expect_semicolon(&mut self) -> Result<()> {
+        let span = self.lexer.span().end..self.lexer.span().end;
+        if let Token::Semicolon = self.bump()? {
+            return Ok(());
+        }
+        let span = LabeledSpan::at(span, "expected ';' here");
+        Err(miette::miette!(labels = vec![span], "Missing ';'").with_source_code(self.src()))
     }
 
     fn expect_any(&mut self, one_of: &[TokenKind]) -> Result<Token> {
