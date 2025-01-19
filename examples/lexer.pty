@@ -1,0 +1,45 @@
+// Slowly building a lexer using pettyscript.
+
+struct Lexer { str, remaining }
+
+enum Token {
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Comma,
+    Dot,
+    Bang,
+    Semicolon,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Pipe,
+    Ampersand,
+    RAngle,
+    LAngle,
+    RAngleEq,
+    LAngleEq,
+    Eq,
+    EqEq,
+    BangEq,
+    Range,
+    RangeInclusive,
+    // Keywords
+    Or,
+    And,
+    If,
+    Else,
+    In,
+    Fn,
+    For,
+    Return,
+    Struct,
+    Enum,
+    // Literals
+    Int,
+    String,
+    Ident,
+}

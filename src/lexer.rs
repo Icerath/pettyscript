@@ -54,6 +54,8 @@ pub enum Token {
     #[token("fn")] Fn,
     #[token("for")] For,
     #[token("return")] Return,
+    #[token("struct")] Struct,
+    #[token("enum")] Enum,
     // Literals
     #[regex(r"\d[\d_]*", |lex| &lex.slice().parse(), priority = 1)]
     Int(i128),
@@ -110,6 +112,8 @@ impl TokenKind {
             Self::Slash => "/",
             Self::Star => "*",
             Self::String => "string",
+            Self::Struct => "struct",
+            Self::Enum => "enum",
         }
     }
 }

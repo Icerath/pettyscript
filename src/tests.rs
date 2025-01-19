@@ -6,5 +6,9 @@ use crate::lexer::Token;
 fn test_examples() {
     assert!(Token::lexer(include_str!("../examples/fizzbuzz.pty"))
         .collect::<Result<Vec<_>, _>>()
-        .is_ok())
+        .is_ok());
+
+    assert!(Token::lexer(include_str!("../examples/lexer.pty"))
+        .collect::<Result<Vec<_>, _>>()
+        .is_ok());
 }

@@ -6,6 +6,8 @@ use miette::{Context, Error, IntoDiagnostic, LabeledSpan, Result};
 use crate::lexer::{Token, TokenKind};
 
 pub enum Stmt {
+    Struct(Struct),
+    Enum(Enum),
     Function(Function),
     ForLoop(ForLoop),
     IfChain(IfChain),
@@ -16,6 +18,8 @@ pub enum Stmt {
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Struct(r#struct) => fmt::Debug::fmt(r#struct, f),
+            Self::Enum(r#enum) => fmt::Debug::fmt(r#enum, f),
             Self::Block(block) => fmt::Debug::fmt(block, f),
             Self::Function(fun) => fmt::Debug::fmt(fun, f),
             Self::IfChain(if_chain) => fmt::Debug::fmt(if_chain, f),
@@ -25,9 +29,37 @@ impl fmt::Debug for Stmt {
     }
 }
 
+pub struct Struct {
+    ident: &'static str,
+    fields: Box<[&'static str]>,
+}
+
+impl fmt::Debug for Struct {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("struct")
+            .field("ident", &format_args!("{}", self.ident))
+            .field("fields", &self.fields)
+            .finish()
+    }
+}
+
+pub struct Enum {
+    ident: &'static str,
+    variants: Box<[&'static str]>,
+}
+
+impl fmt::Debug for Enum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("enum")
+            .field("ident", &format_args!("{}", self.ident))
+            .field("variants", &self.variants)
+            .finish()
+    }
+}
+
 pub struct Function {
     ident: &'static str,
-    params: Box<[Param]>,
+    params: Box<[&'static str]>,
     block: Block,
 }
 
@@ -172,11 +204,6 @@ pub struct IfStmt {
     body: Block,
 }
 
-#[derive(Debug)]
-pub struct Param {
-    ident: &'static str,
-}
-
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a, Token>,
@@ -203,6 +230,8 @@ impl<'a> Parser<'a> {
         loop {
             break Ok(match self.peek()? {
                 Token::Semicolon => continue,
+                Token::Struct => Stmt::Struct(self.parse_struct()?),
+                Token::Enum => Stmt::Enum(self.parse_enum()?),
                 Token::Fn => Stmt::Function(self.parse_fn()?),
                 Token::For => Stmt::ForLoop(self.parse_for_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
@@ -333,22 +362,40 @@ impl<'a> Parser<'a> {
         Ok(IfStmt { condition, body })
     }
 
+    fn parse_struct(&mut self) -> Result<Struct> {
+        self.expect_token(Token::Struct)?;
+        let ident = self.parse_ident()?;
+        self.expect_token(Token::LBrace)?;
+        let fields = self.parse_separated_idents(TokenKind::RBrace)?;
+        self.expect_token(Token::RBrace)?;
+        Ok(Struct { ident, fields })
+    }
+
+    fn parse_enum(&mut self) -> Result<Enum> {
+        self.expect_token(Token::Enum)?;
+        let ident = self.parse_ident()?;
+        self.expect_token(Token::LBrace)?;
+        let variants = self.parse_separated_idents(TokenKind::RBrace)?;
+        self.expect_token(Token::RBrace)?;
+        Ok(Enum { ident, variants })
+    }
+
     fn parse_fn(&mut self) -> Result<Function> {
         self.expect_token(Token::Fn)?;
         let ident = self.parse_ident()?;
         self.expect_token(Token::LParen)?;
-        let params = self.parse_params()?;
+        let params = self.parse_separated_idents(TokenKind::RParen)?;
         self.expect_token(Token::RParen)?;
         let block = self.parse_block()?;
         Ok(Function { ident, params, block })
     }
 
-    fn parse_params(&mut self) -> Result<Box<[Param]>> {
+    fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[&'static str]>> {
         let mut params = vec![];
-        while self.peek()? != Token::RParen {
+        while self.peek()?.kind() != terminator {
             let ident = self.parse_ident()?;
-            params.push(Param { ident });
-            if self.peek()? == Token::RParen {
+            params.push(ident);
+            if self.peek()?.kind() == terminator {
                 break;
             }
             self.expect_token(Token::Comma)?;
