@@ -17,11 +17,13 @@ pub enum Stmt {
     Let(VarDecl),
     Const(VarDecl),
     Assign(Assign),
+    Return(Return),
 }
 
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Return(r#return) => fmt::Debug::fmt(r#return, f),
             Self::Assign(Assign { root, segments, expr }) => f
                 .debug_struct("Assign")
                 .field("root", root)
@@ -45,6 +47,9 @@ impl fmt::Debug for Stmt {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct Return(pub Expr);
 
 pub struct VarDecl {
     ident: &'static str,
@@ -307,6 +312,7 @@ impl<'a> Parser<'a> {
         loop {
             break Ok(match self.peek()? {
                 Token::Semicolon => continue,
+                Token::Return => Stmt::Return(self.parse_return_stmt()?),
                 Token::Let => Stmt::Let(self.parse_let_decl()?),
                 Token::Const => Stmt::Const(self.parse_const_decl()?),
                 Token::Struct => Stmt::Struct(self.parse_struct()?),
@@ -509,6 +515,13 @@ impl<'a> Parser<'a> {
         let condition = self.parse_expr(0, false)?;
         let body = self.parse_block()?;
         Ok(IfStmt { condition, body })
+    }
+
+    fn parse_return_stmt(&mut self) -> Result<Return> {
+        self.expect_token(Token::Return)?;
+        let expr = self.parse_root_expr()?;
+        self.expect_token(Token::Semicolon)?;
+        Ok(Return(expr))
     }
 
     fn parse_let_decl(&mut self) -> Result<VarDecl> {
