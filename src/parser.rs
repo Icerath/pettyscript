@@ -17,12 +17,16 @@ pub enum Stmt {
     Let(VarDecl),
     Const(VarDecl),
     Assign(Assign),
+    Continue,
+    Break,
     Return(Return),
 }
 
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Continue => f.debug_struct("Continue").finish(),
+            Self::Break => f.debug_struct("Break").finish(),
             Self::Return(r#return) => fmt::Debug::fmt(r#return, f),
             Self::Assign(Assign { root, segments, expr }) => f
                 .debug_struct("Assign")
@@ -320,6 +324,16 @@ impl<'a> Parser<'a> {
                     continue;
                 }
                 Token::Return => Stmt::Return(self.parse_return_stmt()?),
+                Token::Break => {
+                    let _ = self.bump();
+                    self.expect_semicolon()?;
+                    Stmt::Break
+                }
+                Token::Continue => {
+                    let _ = self.bump();
+                    self.expect_semicolon()?;
+                    Stmt::Continue
+                }
                 Token::Let => Stmt::Let(self.parse_let_decl()?),
                 Token::Const => Stmt::Const(self.parse_const_decl()?),
                 Token::Struct => Stmt::Struct(self.parse_struct()?),
@@ -527,7 +541,7 @@ impl<'a> Parser<'a> {
     fn parse_return_stmt(&mut self) -> Result<Return> {
         self.expect_token(Token::Return)?;
         let expr = self.parse_root_expr()?;
-        self.expect_token(Token::Semicolon)?;
+        self.expect_semicolon()?;
         Ok(Return(expr))
     }
 
@@ -578,7 +592,7 @@ impl<'a> Parser<'a> {
             }
         }
         let expr = self.parse_root_expr()?;
-        self.expect_token(Token::Semicolon)?;
+        self.expect_semicolon()?;
         Ok(Assign { root, segments: segments.into(), expr })
     }
 
