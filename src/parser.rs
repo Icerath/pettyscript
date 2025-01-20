@@ -299,6 +299,10 @@ impl<'a> Parser<'a> {
     pub fn parse_root(mut self) -> Result<Box<[Stmt]>> {
         let mut stmts = vec![];
         while self.lexer.clone().next().is_some() {
+            if self.peek()? == Token::Semicolon {
+                let _ = self.bump();
+                continue;
+            }
             stmts.push(self.parse_stmt()?);
         }
         Ok(stmts.into_boxed_slice())
@@ -311,7 +315,10 @@ impl<'a> Parser<'a> {
     fn parse_stmt(&mut self) -> Result<Stmt> {
         loop {
             break Ok(match self.peek()? {
-                Token::Semicolon => continue,
+                Token::Semicolon => {
+                    let _ = self.bump();
+                    continue;
+                }
                 Token::Return => Stmt::Return(self.parse_return_stmt()?),
                 Token::Let => Stmt::Let(self.parse_let_decl()?),
                 Token::Const => Stmt::Const(self.parse_const_decl()?),
@@ -620,6 +627,10 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::LBrace)?;
         let mut stmts = vec![];
         while self.peek()? != Token::RBrace {
+            if self.peek()? == Token::Semicolon {
+                let _ = self.bump();
+                continue;
+            }
             stmts.push(self.parse_stmt()?);
         }
         let stmts = stmts.into_boxed_slice();

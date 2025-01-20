@@ -49,7 +49,7 @@ fn lexer_next(lexer) {
     let first_char = lexer.remaining[0];
     if first_char == '[' {
         lexer.remaining = lexer.remaining[1..lexer.remaining.len];
-        return Token.LBracket;
+        return Token.LBracket;;
     }
 }
 
