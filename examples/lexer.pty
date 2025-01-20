@@ -44,8 +44,14 @@ enum Token {
     Ident,
 }
 
+fn lexer_next(lexer) {}
 
 fn main() {
-    println(hi);
+    let str = open_file("examples/lexer.pty");
+    let remaining = str;
     let lexer = Lexer { str, remaining };
+
+    while true {
+        let token = lexer_next(lexer);
+    }
 }

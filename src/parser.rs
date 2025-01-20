@@ -10,6 +10,7 @@ pub enum Stmt {
     Enum(Enum),
     Function(Function),
     ForLoop(ForLoop),
+    WhileLoop(WhileLoop),
     IfChain(IfChain),
     Expr(Expr),
     Block(Block),
@@ -30,6 +31,7 @@ impl fmt::Debug for Stmt {
             Self::Enum(r#enum) => fmt::Debug::fmt(r#enum, f),
             Self::Block(block) => fmt::Debug::fmt(block, f),
             Self::Function(fun) => fmt::Debug::fmt(fun, f),
+            Self::WhileLoop(while_loop) => fmt::Debug::fmt(while_loop, f),
             Self::IfChain(if_chain) => fmt::Debug::fmt(if_chain, f),
             Self::Expr(expr) => fmt::Debug::fmt(expr, f),
             Self::ForLoop(for_loop) => fmt::Debug::fmt(for_loop, f),
@@ -224,6 +226,17 @@ impl fmt::Debug for ForLoop {
     }
 }
 
+pub struct WhileLoop {
+    expr: Expr,
+    body: Block,
+}
+
+impl fmt::Debug for WhileLoop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WhileLoop").field("expr", &self.expr).field("body", &self.body).finish()
+    }
+}
+
 #[derive(Debug)]
 pub struct IfChain {
     first: IfStmt,
@@ -269,6 +282,7 @@ impl<'a> Parser<'a> {
                 Token::Enum => Stmt::Enum(self.parse_enum()?),
                 Token::Fn => Stmt::Function(self.parse_fn()?),
                 Token::For => Stmt::ForLoop(self.parse_for_loop()?),
+                Token::While => Stmt::WhileLoop(self.parse_while_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
                 _ => {
                     let expr = self.parse_expr(0)?;
@@ -393,6 +407,13 @@ impl<'a> Parser<'a> {
         let iter = self.parse_expr(0)?;
         let body = self.parse_block()?;
         Ok(ForLoop { ident, iter, body })
+    }
+
+    fn parse_while_loop(&mut self) -> Result<WhileLoop> {
+        self.expect_token(Token::While)?;
+        let expr = self.parse_expr(0)?;
+        let body = self.parse_block()?;
+        Ok(WhileLoop { expr, body })
     }
 
     fn parse_if_chain(&mut self) -> Result<IfChain> {
