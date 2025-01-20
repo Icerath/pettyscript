@@ -99,6 +99,7 @@ impl fmt::Debug for Block {
 }
 
 pub enum Expr {
+    FieldAccess { expr: Box<Expr>, field: &'static str },
     Literal(Literal),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
@@ -109,6 +110,11 @@ pub enum Expr {
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::FieldAccess { expr, field } => f
+                .debug_struct("field_access")
+                .field("expr", expr)
+                .field("field", &format_args!("{}", field))
+                .finish(),
             Self::InitStruct { r#struct, fields } => f
                 .debug_struct("InitStruct")
                 .field("struct", r#struct)
@@ -328,22 +334,30 @@ impl<'a> Parser<'a> {
     fn parse_leaf_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
         let mut expr = self.parse_unary_expr(allow_struct_init)?;
 
-        while let Token::LParen = self.peek()? {
-            let _ = self.bump()?;
-
-            let mut args = vec![];
-            while self.peek()? != Token::RParen {
-                let expr = self.parse_root_expr()?;
-                args.push(expr);
-                if self.peek()? == Token::RParen {
-                    break;
+        loop {
+            match self.peek()? {
+                Token::LParen => {
+                    let _ = self.bump()?;
+                    let mut args = vec![];
+                    while self.peek()? != Token::RParen {
+                        let expr = self.parse_root_expr()?;
+                        args.push(expr);
+                        if self.peek()? == Token::RParen {
+                            break;
+                        }
+                        self.expect_token(Token::Comma)?;
+                    }
+                    let _ = self.bump();
+                    expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
                 }
-                self.expect_token(Token::Comma)?;
+                Token::Dot => {
+                    let _ = self.bump()?;
+                    let field = self.parse_ident()?;
+                    expr = Expr::FieldAccess { expr: Box::new(expr), field };
+                }
+                _ => break,
             }
-            let _ = self.bump();
-            expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
         }
-
         if !allow_struct_init {
             return Ok(expr);
         }
