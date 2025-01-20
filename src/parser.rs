@@ -131,7 +131,7 @@ impl fmt::Debug for Expr {
     }
 }
 
-struct StructInitField {
+pub struct StructInitField {
     ident: &'static str,
     expr: Option<Expr>,
 }
@@ -239,15 +239,15 @@ impl fmt::Debug for WhileLoop {
 
 #[derive(Debug)]
 pub struct IfChain {
-    first: IfStmt,
-    else_ifs: Box<[IfStmt]>,
-    r#else: Option<Block>,
+    pub first: IfStmt,
+    pub else_ifs: Box<[IfStmt]>,
+    pub r#else: Option<Block>,
 }
 
 #[derive(Debug)]
 pub struct IfStmt {
-    condition: Expr,
-    body: Block,
+    pub condition: Expr,
+    pub body: Block,
 }
 
 #[derive(Clone)]
