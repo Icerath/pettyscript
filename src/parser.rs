@@ -304,7 +304,7 @@ impl<'a> Parser<'a> {
         let mut stmts = vec![];
         while self.lexer.clone().next().is_some() {
             if self.peek()? == Token::Semicolon {
-                let _ = self.bump();
+                self.skip();
                 continue;
             }
             stmts.push(self.parse_stmt()?);
@@ -320,17 +320,17 @@ impl<'a> Parser<'a> {
         loop {
             break Ok(match self.peek()? {
                 Token::Semicolon => {
-                    let _ = self.bump();
+                    self.skip();
                     continue;
                 }
                 Token::Return => Stmt::Return(self.parse_return_stmt()?),
                 Token::Break => {
-                    let _ = self.bump();
+                    self.skip();
                     self.expect_semicolon()?;
                     Stmt::Break
                 }
                 Token::Continue => {
-                    let _ = self.bump();
+                    self.skip();
                     self.expect_semicolon()?;
                     Stmt::Continue
                 }
@@ -386,7 +386,7 @@ impl<'a> Parser<'a> {
             if !ops.contains(&op) {
                 break;
             };
-            let _ = self.bump()?;
+            self.skip();
             let expr = self.parse_expr(precedence + 1, allow_struct_init)?;
             root = Expr::Binary { op, exprs: Box::new([root, expr]) }
         }
@@ -399,7 +399,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.peek()? {
                 Token::LParen => {
-                    let _ = self.bump()?;
+                    self.skip();
                     let mut args = vec![];
                     while self.peek()? != Token::RParen {
                         let expr = self.parse_root_expr()?;
@@ -409,16 +409,16 @@ impl<'a> Parser<'a> {
                         }
                         self.expect_token(Token::Comma)?;
                     }
-                    let _ = self.bump();
+                    self.skip();
                     expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
                 }
                 Token::Dot => {
-                    let _ = self.bump()?;
+                    self.skip();
                     let field = self.parse_ident()?;
                     expr = Expr::FieldAccess { expr: Box::new(expr), field };
                 }
                 Token::LBracket => {
-                    let _ = self.bump()?;
+                    self.skip();
                     let index = self.parse_root_expr()?;
                     self.expect_token(Token::RBracket)?;
                     expr = Expr::Index { expr: Box::new(expr), index: Box::new(index) };
@@ -431,7 +431,7 @@ impl<'a> Parser<'a> {
         }
 
         if let Token::LBrace = self.peek()? {
-            let _ = self.bump()?;
+            self.skip();
 
             let mut fields = vec![];
             while self.peek()? != Token::RBrace {
@@ -451,7 +451,7 @@ impl<'a> Parser<'a> {
                 };
                 fields.push(StructInitField { ident, expr });
             }
-            let _ = self.bump();
+            self.skip();
             expr = Expr::InitStruct { r#struct: Box::new(expr), fields: fields.into() }
         }
 
@@ -470,7 +470,7 @@ impl<'a> Parser<'a> {
 
     fn parse_paren_expr(&mut self) -> Result<Expr> {
         if self.peek()? == Token::LParen {
-            let _ = self.bump()?;
+            self.skip();
             let expr = self.parse_root_expr()?;
             self.expect_token(Token::RParen)?;
             return Ok(expr);
@@ -515,7 +515,7 @@ impl<'a> Parser<'a> {
         let mut else_ifs = vec![];
         let mut r#else = None;
         while let Token::Else = self.peek()? {
-            let _ = self.bump();
+            self.skip();
             match self.peek()? {
                 Token::If => else_ifs.push(self.parse_if_stmt()?),
                 Token::LBrace => {
@@ -523,7 +523,7 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 got => {
-                    let _ = self.bump();
+                    self.skip();
                     return Err(self.expect_failed(got.kind(), &[TokenKind::If, TokenKind::LBrace]));
                 }
             }
@@ -574,18 +574,18 @@ impl<'a> Parser<'a> {
         loop {
             match self.peek()? {
                 Token::Dot => {
-                    let _ = self.bump();
+                    self.skip();
                     let field = self.parse_ident()?;
                     segments.push(AssignSegment::Field(field));
                 }
                 Token::LBracket => {
-                    let _ = self.bump();
+                    self.skip();
                     let index = self.parse_root_expr()?;
                     self.expect_token(Token::RBracket)?;
                     segments.push(AssignSegment::Index(index));
                 }
                 Token::Eq => {
-                    let _ = self.bump();
+                    self.skip();
                     break;
                 }
                 _ => return Err(miette::miette!("")),
@@ -642,7 +642,7 @@ impl<'a> Parser<'a> {
         let mut stmts = vec![];
         while self.peek()? != Token::RBrace {
             if self.peek()? == Token::Semicolon {
-                let _ = self.bump();
+                self.skip();
                 continue;
             }
             stmts.push(self.parse_stmt()?);
@@ -693,6 +693,13 @@ impl<'a> Parser<'a> {
 
     fn bump(&mut self) -> Result<Token> {
         self.lexer.next().context("Lexer Error")?.into_diagnostic()
+    }
+
+    fn skip(&mut self) {
+        #[cfg(debug_assertions)]
+        let _ = self.lexer.next().unwrap().unwrap();
+        #[cfg(not(debug_assertions))]
+        let _ = self.lexer.next();
     }
 
     fn peek(&self) -> Result<Token> {
