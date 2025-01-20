@@ -284,6 +284,7 @@ impl<'a> Parser<'a> {
                 Token::For => Stmt::ForLoop(self.parse_for_loop()?),
                 Token::While => Stmt::WhileLoop(self.parse_while_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
+                Token::LBrace => Stmt::Block(self.parse_block()?),
                 _ => {
                     let expr = self.parse_root_expr()?;
                     self.expect_semicolon()?;
