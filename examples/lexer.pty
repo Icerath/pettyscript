@@ -52,8 +52,7 @@ fn lexer_next(lexer) {
     let token;
 
     while true {
-    if false {}
-        else if starts_with(lexer.remaining, "//") {
+        if starts_with(lexer.remaining, "//") {
             let i = 2;
             while lexer.remaining[i] != "\n" {
                 i = i + 1;
