@@ -572,21 +572,16 @@ impl<'a> Parser<'a> {
         let root = self.parse_ident()?;
         let mut segments = vec![];
         loop {
-            match self.peek()? {
+            match self.bump()? {
+                Token::Eq => break,
                 Token::Dot => {
-                    self.skip();
                     let field = self.parse_ident()?;
                     segments.push(AssignSegment::Field(field));
                 }
                 Token::LBracket => {
-                    self.skip();
                     let index = self.parse_root_expr()?;
                     self.expect_token(Token::RBracket)?;
                     segments.push(AssignSegment::Index(index));
-                }
-                Token::Eq => {
-                    self.skip();
-                    break;
                 }
                 _ => return Err(miette::miette!("")),
             }
