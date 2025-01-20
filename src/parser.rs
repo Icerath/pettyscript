@@ -75,7 +75,7 @@ impl fmt::Debug for Enum {
 pub struct Function {
     ident: &'static str,
     params: Box<[&'static str]>,
-    block: Block,
+    body: Block,
 }
 
 impl fmt::Debug for Function {
@@ -83,7 +83,7 @@ impl fmt::Debug for Function {
         f.debug_struct("Fn")
             .field("ident", &format_args!("{}", self.ident))
             .field("params", &self.params)
-            .field("block", &self.block)
+            .field("body", &self.body)
             .finish()
     }
 }
@@ -501,8 +501,8 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::LParen)?;
         let params = self.parse_separated_idents(TokenKind::RParen)?;
         self.expect_token(Token::RParen)?;
-        let block = self.parse_block()?;
-        Ok(Function { ident, params, block })
+        let body = self.parse_block()?;
+        Ok(Function { ident, params, body })
     }
 
     fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[&'static str]>> {
