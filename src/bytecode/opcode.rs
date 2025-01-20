@@ -5,6 +5,7 @@ pub const VERSION: u32 = 0;
 
 #[derive(EnumKind, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
+#[repr(u8)]
 pub enum Op {
     FnCall { numargs: u8 },
     Mod,
@@ -19,6 +20,7 @@ pub enum Op {
     Store(u32),
     Pop,
     IterNext,
+    End,
 }
 
 pub enum Constant {
@@ -56,21 +58,29 @@ impl BytecodeBuilder {
 
     pub fn insert(&mut self, instruction: Op) {
         use Op as I;
-        println!("{instruction:?}");
 
         let op = OpCode::from(instruction);
         self.instruction_data.push(op as u8);
 
         match instruction {
             I::FnCall { numargs } => self.instruction_data.push(numargs),
-            I::Store(ident) => self.instruction_data.extend(ident.to_le_bytes()),
+            I::Store(ident) | I::Load(ident) => self.instruction_data.extend(ident.to_le_bytes()),
             I::CJump(label) | I::Jump(label) => {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }
             I::LoadConst(key) => {
-                let bytes: [u8; 16] = unsafe { std::mem::transmute(key) };
-                self.instruction_data.extend(&bytes);
+                match key {
+                    ConstantKey::Int(int) => {
+                        self.instruction_data.push(0);
+                        self.instruction_data.extend(int.to_le_bytes());
+                    }
+                    ConstantKey::String { ptr, len } => {
+                        self.instruction_data.push(1);
+                        self.instruction_data.extend(ptr.to_le_bytes());
+                        self.instruction_data.extend(len.to_le_bytes());
+                    }
+                };
             }
             _ => {}
         }
@@ -104,11 +114,8 @@ impl BytecodeBuilder {
                 (&mut self.instruction_data[jump..jump + 4]).try_into().unwrap();
             let label = u32::from_le_bytes(*bytes);
             let new_label = self.labels[label as usize];
-            println!("replaced {label} with {new_label}");
             *bytes = new_label.to_le_bytes();
         }
-        println!("{:?}", self.string_map);
-        println!("{:?}", self.identifiers);
         let mut output = vec![];
         output.extend(VERSION.to_le_bytes());
         let string_data_len: u32 = self.string_data.len().try_into().unwrap();
@@ -116,5 +123,16 @@ impl BytecodeBuilder {
         output.extend_from_slice(&self.string_data);
         output.extend_from_slice(&self.instruction_data);
         output
+    }
+}
+
+impl TryFrom<u8> for OpCode {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value >= OpCode::End as u8 {
+            return Err(());
+        }
+        unsafe { std::mem::transmute(value) }
     }
 }

@@ -6,6 +6,7 @@ mod lexer;
 pub mod parser;
 #[cfg(test)]
 mod tests;
+mod vm;
 
 fn main() {
     let content = include_str!("../examples/fizzbuzz.pty");
@@ -14,6 +15,7 @@ fn main() {
         Ok(ast) => ast,
         Err(err) => panic!("{err:?}"),
     };
-    let bytes = codegen::codegen(&ast);
-    std::fs::write("output.ptyb", bytes).unwrap();
+    let bytecode = codegen::codegen(&ast);
+    std::fs::write("output.ptyb", &bytecode).unwrap();
+    vm::execute_bytecode(&bytecode);
 }

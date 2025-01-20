@@ -7,6 +7,7 @@ use crate::{
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::new();
+    codegen.load_builtins();
     codegen.gen_block(ast);
     codegen.finish()
 }
@@ -30,6 +31,10 @@ struct Codegen {
 impl Codegen {
     fn new() -> Self {
         Self { builder: BytecodeBuilder::default(), scopes: vec![] }
+    }
+
+    fn load_builtins(&mut self) {
+        self.builder.insert_identifer("println");
     }
 
     fn gen_block(&mut self, ast: &[Stmt]) {
