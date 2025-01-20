@@ -56,14 +56,14 @@ impl fmt::Debug for Stmt {
 pub struct Return(pub Expr);
 
 pub struct VarDecl {
-    ident: &'static str,
-    expr: Option<Expr>,
+    pub ident: &'static str,
+    pub expr: Option<Expr>,
 }
 
 pub struct Assign {
-    root: &'static str,
-    segments: Box<[AssignSegment]>,
-    expr: Expr,
+    pub root: &'static str,
+    pub segments: Box<[AssignSegment]>,
+    pub expr: Expr,
 }
 
 #[derive(Debug)]
@@ -73,13 +73,13 @@ pub enum AssignSegment {
 }
 
 pub struct Struct {
-    ident: &'static str,
-    fields: Box<[&'static str]>,
+    pub ident: &'static str,
+    pub fields: Box<[&'static str]>,
 }
 
 impl fmt::Debug for Struct {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("struct")
+        f.debug_struct("Struct")
             .field("ident", &format_args!("{}", self.ident))
             .field("fields", &self.fields)
             .finish()
@@ -87,13 +87,13 @@ impl fmt::Debug for Struct {
 }
 
 pub struct Enum {
-    ident: &'static str,
-    variants: Box<[&'static str]>,
+    pub ident: &'static str,
+    pub variants: Box<[&'static str]>,
 }
 
 impl fmt::Debug for Enum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("enum")
+        f.debug_struct("Enum")
             .field("ident", &format_args!("{}", self.ident))
             .field("variants", &self.variants)
             .finish()
@@ -101,9 +101,9 @@ impl fmt::Debug for Enum {
 }
 
 pub struct Function {
-    ident: &'static str,
-    params: Box<[&'static str]>,
-    body: Block,
+    pub ident: &'static str,
+    pub params: Box<[&'static str]>,
+    pub body: Block,
 }
 
 impl fmt::Debug for Function {
@@ -117,7 +117,7 @@ impl fmt::Debug for Function {
 }
 
 pub struct Block {
-    stmts: Box<[Stmt]>,
+    pub stmts: Box<[Stmt]>,
 }
 
 impl fmt::Debug for Block {
@@ -251,9 +251,9 @@ pub enum UnaryOp {
 }
 
 pub struct ForLoop {
-    ident: &'static str,
-    iter: Expr,
-    body: Block,
+    pub ident: &'static str,
+    pub iter: Expr,
+    pub body: Block,
 }
 
 impl fmt::Debug for ForLoop {

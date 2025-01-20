@@ -1,4 +1,6 @@
 use parser::Parser;
+pub mod bytecode;
+pub mod codegen;
 mod intern;
 mod lexer;
 pub mod parser;
@@ -6,10 +8,12 @@ pub mod parser;
 mod tests;
 
 fn main() {
-    let content = include_str!("../examples/lexer.pty");
+    let content = include_str!("../examples/fizzbuzz.pty");
     let parser = Parser::new(content);
-    match parser.parse_root() {
-        Ok(stmts) => println!("{stmts:#?}"),
-        Err(err) => eprintln!("{err:?}"),
-    }
+    let ast = match parser.parse_root() {
+        Ok(ast) => ast,
+        Err(err) => panic!("{err:?}"),
+    };
+    let bytes = codegen::codegen(&ast);
+    std::fs::write("output.ptyb", bytes).unwrap();
 }
