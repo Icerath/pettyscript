@@ -46,11 +46,32 @@ enum Token {
 
 fn lexer_next(lexer) {
     lexer.remaining = trim(lexer.remaining);
-    let first_char = lexer.remaining[0];
-    if first_char == '[' {
-        lexer.remaining = lexer.remaining[1..lexer.remaining.len];
-        return Token.LBracket;;
-    }
+    const first_char = lexer.remaining[0];
+    let skip = 1;
+    let token;
+
+    while true {
+    if false {}
+        else if starts_with(lexer.remaining, "//") {
+            let i = 2;
+            while lexer.remaining[i] != "\n" {
+                i = i + 1;
+            }
+            lexer.remaining = lexer.remaining[i..lexer.remaining.len];
+            continue;
+        }
+        else if first_char == '[' { token = Token.LBracket; }
+        else if first_char == ']' { token = Token.RBracket; }
+        else if first_char == '(' { token = Token.LParen; }
+        else if first_char == ')' { token = Token.RParen; }
+        else if first_char == '{' { token = Token.LBrace; }
+        else if first_char == '}' { token = Token.RBrace; }
+        else if first_char == '<' { token = Token.LAngle; }
+        else if first_char == '>' { token = Token.RAngle; }
+        
+        lexer.remaining = lexer.remaining[skip..lexer.remaining.len];
+        return token;
+    } 
 }
 
 fn main() {

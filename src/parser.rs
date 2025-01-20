@@ -537,7 +537,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_const_decl(&mut self) -> Result<VarDecl> {
-        self.expect_token(Token::Let)?;
+        self.expect_token(Token::Const)?;
         self.parse_var_decl()
     }
 
