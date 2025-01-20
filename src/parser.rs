@@ -16,11 +16,18 @@ pub enum Stmt {
     Block(Block),
     Let(VarDecl),
     Const(VarDecl),
+    Assign(Assign),
 }
 
 impl fmt::Debug for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Assign(Assign { root, segments, expr }) => f
+                .debug_struct("Assign")
+                .field("root", root)
+                .field("segments", &segments)
+                .field("expr", expr)
+                .finish(),
             Self::Let(var) => {
                 f.debug_struct("let").field("ident", &var.ident).field("expr", &var.expr).finish()
             }
@@ -42,6 +49,18 @@ impl fmt::Debug for Stmt {
 pub struct VarDecl {
     ident: &'static str,
     expr: Option<Expr>,
+}
+
+pub struct Assign {
+    root: &'static str,
+    segments: Box<[AssignSegment]>,
+    expr: Expr,
+}
+
+#[derive(Debug)]
+pub enum AssignSegment {
+    Field(&'static str),
+    Index(Expr),
 }
 
 pub struct Struct {
@@ -295,6 +314,16 @@ impl<'a> Parser<'a> {
                 Token::While => Stmt::WhileLoop(self.parse_while_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
                 Token::LBrace => Stmt::Block(self.parse_block()?),
+                Token::Ident(_) => {
+                    let prev = self.clone();
+                    let Ok(assign) = self.parse_assignment() else {
+                        *self = prev;
+                        let expr = self.parse_root_expr()?;
+                        self.expect_semicolon()?;
+                        break Ok(Stmt::Expr(expr));
+                    };
+                    Stmt::Assign(assign)
+                }
                 _ => {
                     let expr = self.parse_root_expr()?;
                     self.expect_semicolon()?;
@@ -500,6 +529,34 @@ impl<'a> Parser<'a> {
         };
         self.expect_semicolon()?;
         Ok(VarDecl { ident, expr: Some(expr) })
+    }
+
+    fn parse_assignment(&mut self) -> Result<Assign> {
+        let root = self.parse_ident()?;
+        let mut segments = vec![];
+        loop {
+            match self.peek()? {
+                Token::Dot => {
+                    let _ = self.bump();
+                    let field = self.parse_ident()?;
+                    segments.push(AssignSegment::Field(field));
+                }
+                Token::LBracket => {
+                    let _ = self.bump();
+                    let index = self.parse_root_expr()?;
+                    self.expect_token(Token::RBracket)?;
+                    segments.push(AssignSegment::Index(index));
+                }
+                Token::Eq => {
+                    let _ = self.bump();
+                    break;
+                }
+                _ => return Err(miette::miette!("")),
+            }
+        }
+        let expr = self.parse_root_expr()?;
+        self.expect_token(Token::Semicolon)?;
+        Ok(Assign { root, segments: segments.into(), expr })
     }
 
     fn parse_struct(&mut self) -> Result<Struct> {
