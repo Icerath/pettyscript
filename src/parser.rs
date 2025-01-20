@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
                 Token::While => Stmt::WhileLoop(self.parse_while_loop()?),
                 Token::If => Stmt::IfChain(self.parse_if_chain()?),
                 _ => {
-                    let expr = self.parse_expr(0)?;
+                    let expr = self.parse_root_expr()?;
                     self.expect_semicolon()?;
                     Stmt::Expr(expr)
                 }
@@ -293,7 +293,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_expr(&mut self, precedence: u8) -> Result<Expr> {
+    fn parse_root_expr(&mut self) -> Result<Expr> {
+        self.parse_expr(0, true)
+    }
+
+    fn parse_expr(&mut self, precedence: u8, allow_struct_init: bool) -> Result<Expr> {
         const OPS: &[&[BinOp]] = &[
             &[BinOp::Or],
             &[BinOp::And],
@@ -304,9 +308,9 @@ impl<'a> Parser<'a> {
         ];
 
         let Some(&ops) = OPS.get(precedence as usize) else {
-            return self.parse_leaf_expr();
+            return self.parse_leaf_expr(allow_struct_init);
         };
-        let mut root = self.parse_expr(precedence + 1)?;
+        let mut root = self.parse_expr(precedence + 1, allow_struct_init)?;
         loop {
             let token = self.peek()?;
             let Ok(op) = BinOp::try_from(token.kind()) else { break };
@@ -314,21 +318,21 @@ impl<'a> Parser<'a> {
                 break;
             };
             let _ = self.bump()?;
-            let expr = self.parse_expr(precedence + 1)?;
+            let expr = self.parse_expr(precedence + 1, allow_struct_init)?;
             root = Expr::Binary { op, exprs: Box::new([root, expr]) }
         }
         Ok(root)
     }
 
-    fn parse_leaf_expr(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_unary_expr()?;
+    fn parse_leaf_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
+        let mut expr = self.parse_unary_expr(allow_struct_init)?;
 
         while let Token::LParen = self.peek()? {
             let _ = self.bump()?;
 
             let mut args = vec![];
             while self.peek()? != Token::RParen {
-                let expr = self.parse_expr(0)?;
+                let expr = self.parse_root_expr()?;
                 args.push(expr);
                 if self.peek()? == Token::RParen {
                     break;
@@ -337,6 +341,10 @@ impl<'a> Parser<'a> {
             }
             let _ = self.bump();
             expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
+        }
+
+        if !allow_struct_init {
+            return Ok(expr);
         }
 
         if let Token::LBrace = self.peek()? {
@@ -351,7 +359,7 @@ impl<'a> Parser<'a> {
                 }
                 let expr = match self.bump()? {
                     Token::Comma => None,
-                    Token::Colon => Some(self.parse_expr(0)?),
+                    Token::Colon => Some(self.parse_root_expr()?),
                     got => {
                         return Err(
                             self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])
@@ -367,11 +375,12 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn parse_unary_expr(&mut self) -> Result<Expr> {
+    fn parse_unary_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
         match self.peek()? {
-            Token::Bang => {
-                Ok(Expr::Unary { op: UnaryOp::Not, expr: Box::new(self.parse_expr(0)?) })
-            }
+            Token::Bang => Ok(Expr::Unary {
+                op: UnaryOp::Not,
+                expr: Box::new(self.parse_expr(0, allow_struct_init)?),
+            }),
             _ => self.parse_paren_expr(),
         }
     }
@@ -379,7 +388,7 @@ impl<'a> Parser<'a> {
     fn parse_paren_expr(&mut self) -> Result<Expr> {
         if self.peek()? == Token::LParen {
             let _ = self.bump()?;
-            let expr = self.parse_expr(0)?;
+            let expr = self.parse_root_expr()?;
             self.expect_token(Token::RParen)?;
             return Ok(expr);
         }
@@ -404,14 +413,14 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::For)?;
         let ident = self.parse_ident()?;
         self.expect_token(Token::In)?;
-        let iter = self.parse_expr(0)?;
+        let iter = self.parse_expr(0, false)?;
         let body = self.parse_block()?;
         Ok(ForLoop { ident, iter, body })
     }
 
     fn parse_while_loop(&mut self) -> Result<WhileLoop> {
         self.expect_token(Token::While)?;
-        let expr = self.parse_expr(0)?;
+        let expr = self.parse_expr(0, false)?;
         let body = self.parse_block()?;
         Ok(WhileLoop { expr, body })
     }
@@ -440,7 +449,7 @@ impl<'a> Parser<'a> {
 
     fn parse_if_stmt(&mut self) -> Result<IfStmt> {
         self.expect_token(Token::If)?;
-        let condition = self.parse_expr(0)?;
+        let condition = self.parse_expr(0, false)?;
         let body = self.parse_block()?;
         Ok(IfStmt { condition, body })
     }
@@ -459,7 +468,7 @@ impl<'a> Parser<'a> {
         let ident = self.parse_ident()?;
         let expr = match self.bump()? {
             Token::Semicolon => return Ok(VarDecl { ident, expr: None }),
-            Token::Eq => self.parse_expr(0)?,
+            Token::Eq => self.parse_root_expr()?,
             got => {
                 return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]))
             }
@@ -565,11 +574,5 @@ impl<'a> Parser<'a> {
 
     fn peek(&self) -> Result<Token> {
         self.clone().bump()
-    }
-
-    fn peek_span(&mut self) -> Result<std::ops::Range<usize>> {
-        let mut copy = self.clone();
-        let _ = copy.bump()?;
-        Ok(copy.lexer.span())
     }
 }
