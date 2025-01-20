@@ -178,7 +178,8 @@ impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int(int) => write!(f, "Int({int})"),
-            Self::String(str) => write!(f, "String({:?})", str),
+            Self::Char(char) => write!(f, "Char({char:?}"),
+            Self::String(str) => write!(f, "String({str:?})"),
             Self::Ident(ident) => write!(f, "Ident({ident})"),
         }
     }
@@ -186,6 +187,7 @@ impl fmt::Debug for Literal {
 
 pub enum Literal {
     Int(i128),
+    Char(char),
     String(&'static str),
     Ident(&'static str),
 }
@@ -452,12 +454,13 @@ impl<'a> Parser<'a> {
     fn parse_literal(&mut self) -> Result<Literal> {
         Ok(match self.bump()? {
             Token::Int(int) => Literal::Int(int),
+            Token::Char(char) => Literal::Char(char),
             Token::Ident(ident) => Literal::Ident(ident),
             Token::String(str) => Literal::String(str),
             got => {
                 return Err(self.expect_failed(
                     got.kind(),
-                    &[TokenKind::Int, TokenKind::String, TokenKind::Ident],
+                    &[TokenKind::Int, TokenKind::Char, TokenKind::String, TokenKind::Ident],
                 ));
             }
         })

@@ -45,14 +45,17 @@ enum Token {
 }
 
 fn lexer_next(lexer) {
-    let char = lexer.str[0];
-    lexer.str = lexer.str[1..lexer.str.len];
+    lexer.remaining = trim(lexer.remaining);
+    let first_char = lexer.remaining[0];
+    if first_char == '[' {
+        lexer.remaining = lexer.remaining[1..lexer.remaining.len];
+        // return Token.LBracket;
+    }
 }
 
 fn main() {
     let str = open_file("examples/lexer.pty");
-    let remaining = str;
-    let lexer = Lexer { str, remaining };
+    let lexer = Lexer { str, remaining: str };
 
     while true {
         let token = lexer_next(lexer);

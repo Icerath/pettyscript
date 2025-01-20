@@ -63,6 +63,8 @@ pub enum Token {
     #[token("struct")] Struct,
     #[token("enum")] Enum,
     // Literals
+    #[regex("'[^']'", |lex| lex.slice().chars().next().unwrap())]
+    Char(char),
     #[regex(r"\d[\d_]*", |lex| &lex.slice().parse(), priority = 1)]
     Int(i128),
     #[regex(r#""[^"]*""#, |lex| intern(&lex.slice()[1..lex.slice().len() - 1]))]
@@ -121,6 +123,7 @@ impl TokenKind {
             Self::Colon => ":",
             Self::Slash => "/",
             Self::Star => "*",
+            Self::Char => "char",
             Self::String => "string",
             Self::Struct => "struct",
             Self::Enum => "enum",
