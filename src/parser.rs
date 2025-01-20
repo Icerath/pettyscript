@@ -99,6 +99,7 @@ impl fmt::Debug for Block {
 }
 
 pub enum Expr {
+    Index { expr: Box<Expr>, index: Box<Expr> },
     FieldAccess { expr: Box<Expr>, field: &'static str },
     Literal(Literal),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
@@ -110,6 +111,9 @@ pub enum Expr {
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Index { expr, index } => {
+                f.debug_struct("Index").field("expr", expr).field("index", index).finish()
+            }
             Self::FieldAccess { expr, field } => f
                 .debug_struct("field_access")
                 .field("expr", expr)
@@ -354,6 +358,12 @@ impl<'a> Parser<'a> {
                     let _ = self.bump()?;
                     let field = self.parse_ident()?;
                     expr = Expr::FieldAccess { expr: Box::new(expr), field };
+                }
+                Token::LBracket => {
+                    let _ = self.bump()?;
+                    let index = self.parse_root_expr()?;
+                    self.expect_token(Token::RBracket)?;
+                    expr = Expr::Index { expr: Box::new(expr), index: Box::new(index) };
                 }
                 _ => break,
             }

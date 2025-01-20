@@ -45,7 +45,7 @@ enum Token {
 }
 
 fn lexer_next(lexer) {
-    let char = lexer.str.int; // [0];
+    let char = lexer.str[0];
     // lexer.str = lexer.str[1..];
 }
 
