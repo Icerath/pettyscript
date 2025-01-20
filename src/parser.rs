@@ -358,8 +358,18 @@ impl<'a> Parser<'a> {
             Token::Bang => {
                 Ok(Expr::Unary { op: UnaryOp::Not, expr: Box::new(self.parse_expr(0)?) })
             }
-            _ => self.parse_literal().map(Expr::Literal),
+            _ => self.parse_paren_expr(),
         }
+    }
+
+    fn parse_paren_expr(&mut self) -> Result<Expr> {
+        if self.peek()? == Token::LParen {
+            let _ = self.bump()?;
+            let expr = self.parse_expr(0)?;
+            self.expect_token(Token::RParen)?;
+            return Ok(expr);
+        }
+        self.parse_literal().map(Expr::Literal)
     }
 
     fn parse_literal(&mut self) -> Result<Literal> {

@@ -46,5 +46,6 @@ enum Token {
 
 
 fn main() {
+    println(hi);
     let lexer = Lexer { str, remaining };
 }
