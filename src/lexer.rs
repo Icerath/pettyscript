@@ -1,8 +1,9 @@
 use std::fmt;
 
-use crate::intern::intern;
 use enum_kinds::EnumKind;
 use logos::Logos;
+
+use crate::intern::intern;
 
 #[derive(Default, Debug, Clone, PartialEq, thiserror::Error)]
 pub enum Error {
@@ -67,11 +68,11 @@ pub enum Token {
     // Literals
     #[regex("'[^']'", |lex| lex.slice().chars().next().unwrap())]
     Char(char),
-    #[regex(r"\d[\d_]*", |lex| &lex.slice().parse(), priority = 1)]
+    #[regex(r"\d[\d_]*", |lex| lex.slice().parse())]
     Int(i128),
     #[regex(r#""[^"]*""#, |lex| intern(&lex.slice()[1..lex.slice().len() - 1]))]
     String(S),
-    #[regex(r"\w[\w\d]*", |lex| intern(lex.slice()))]
+    #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
 }
 
