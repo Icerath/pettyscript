@@ -1,14 +1,7 @@
-use logos::Logos;
-
-use crate::lexer::Token;
+use crate::parser::Parser;
 
 #[test]
 fn test_examples() {
-    assert!(Token::lexer(include_str!("../examples/fizzbuzz.pty"))
-        .collect::<Result<Vec<_>, _>>()
-        .is_ok());
-
-    assert!(Token::lexer(include_str!("../examples/lexer.pty"))
-        .collect::<Result<Vec<_>, _>>()
-        .is_ok());
+    let _ = Parser::new(include_str!("../examples/fizzbuzz.pty")).parse_root().unwrap();
+    let _ = Parser::new(include_str!("../examples/lexer.pty")).parse_root().unwrap();
 }
