@@ -1,5 +1,8 @@
 use core::fmt;
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    rc::Rc,
+};
 
 use bstr::ByteSlice;
 use rustc_hash::FxHashMap;
@@ -14,6 +17,7 @@ pub enum Value {
     Builtin(Builtin),
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
+    String(Rc<Box<str>>),
     RangeInclusive(Box<[i64; 2]>),
     Struct { fields: Box<FxHashMap<StrIdent, Value>> },
 }
@@ -210,6 +214,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 let str = std::str::from_utf8(&self.consts[ptr..ptr + len]).unwrap();
                 write!(f, "{str}")
             }
+            Value::String(str) => write!(f, "{str}"),
         }
     }
 }
