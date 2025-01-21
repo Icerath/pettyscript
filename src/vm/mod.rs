@@ -13,6 +13,7 @@ use crate::bytecode::{OpCode, StrIdent, VERSION};
 pub enum Value {
     Null,
     Bool(bool),
+    Char(char),
     Int(i64),
     Builtin(Builtin),
     Function { label: u32 },
@@ -200,6 +201,19 @@ where
                 };
                 stack.push(value);
             }
+            OpCode::Index => {
+                let rhs = stack.pop().unwrap();
+                let lhs = stack.last().unwrap();
+                let value = match lhs {
+                    Value::String(str) => match rhs {
+                        Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
+                        Value::RangeInclusive(_) => todo!(),
+                        _ => panic!("{rhs:?}"),
+                    },
+                    _ => todo!(),
+                };
+                stack.push(value);
+            }
             _ => todo!("{op:?}"),
         }
     }
@@ -216,6 +230,7 @@ struct DisplayValue<'a, 'b> {
 impl fmt::Display for DisplayValue<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
+            Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
                 for (i, (key, value)) in fields.iter().enumerate() {
