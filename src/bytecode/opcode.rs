@@ -3,6 +3,12 @@ use rustc_hash::FxHashMap;
 
 pub const VERSION: u32 = 0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StrIdent {
+    pub ptr: u32,
+    pub len: u32,
+}
+
 #[derive(EnumKind, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
@@ -26,10 +32,10 @@ pub enum Op {
     LoadString { ptr: u32, len: u32 },
     Jump(u32),
     CJump(u32),
-    Load(u32),
-    Store(u32),
-    LoadField(u32),
-    StoreField(u32),
+    Load(StrIdent),
+    Store(StrIdent),
+    LoadField(StrIdent),
+    StoreField(StrIdent),
     Pop,
     IterNext,
     End,
@@ -39,7 +45,6 @@ pub enum Op {
 pub struct BytecodeBuilder {
     string_map: FxHashMap<&'static str, u32>,
     string_data: Vec<u8>,
-    identifiers: FxHashMap<&'static str, u32>,
     instruction_data: Vec<u8>,
     labels: Vec<u32>,
     jumps: Vec<usize>,
@@ -68,9 +73,15 @@ impl BytecodeBuilder {
 
         match instruction {
             I::FnCall { numargs } => self.instruction_data.push(numargs),
-            I::Store(ident) | I::Load(ident) => self.instruction_data.extend(ident.to_le_bytes()),
+            I::Store(ident) | I::Load(ident) => {
+                let StrIdent { ptr, len } = ident;
+                self.instruction_data.extend(ptr.to_le_bytes());
+                self.instruction_data.extend(len.to_le_bytes());
+            }
             I::StoreField(field) | I::LoadField(field) => {
-                self.instruction_data.extend(field.to_le_bytes())
+                let StrIdent { ptr, len } = field;
+                self.instruction_data.extend(ptr.to_le_bytes());
+                self.instruction_data.extend(len.to_le_bytes());
             }
             I::CreateFunction { label } | I::CJump(label) | I::Jump(label) => {
                 self.jumps.push(self.instruction_data.len());
@@ -86,9 +97,9 @@ impl BytecodeBuilder {
         }
     }
 
-    pub fn insert_identifer(&mut self, ident: &'static str) -> u32 {
-        let len = self.identifiers.len() as u32;
-        *self.identifiers.entry(ident).or_insert(len)
+    pub fn insert_identifer(&mut self, ident: &'static str) -> StrIdent {
+        let [ptr, len] = self.insert_string(ident);
+        StrIdent { ptr, len }
     }
 
     pub fn insert_string(&mut self, str: &'static str) -> [u32; 2] {

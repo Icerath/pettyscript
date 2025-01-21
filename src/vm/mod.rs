@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use rustc_hash::FxHashMap;
 
-use crate::bytecode::{OpCode, VERSION};
+use crate::bytecode::{OpCode, StrIdent, VERSION};
 
 const NUM_BUILTINS: u32 = 1;
 
@@ -15,7 +15,7 @@ pub enum Value {
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     RangeInclusive(Box<[i64; 2]>),
-    Struct { fields: Box<FxHashMap<u32, Value>> },
+    Struct { fields: Box<FxHashMap<StrIdent, Value>> },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,7 +43,7 @@ where
     let consts = &reader.bytes[..len_consts];
     reader.bytes = &reader.bytes[len_consts..];
 
-    let mut idents = vec![];
+    let mut idents = FxHashMap::default();
     let mut stack = vec![];
     let mut call_stack = vec![];
 
@@ -136,22 +136,17 @@ where
                 reader.head = to as usize;
             }
             OpCode::Store => {
-                let ident = reader.read_u32();
+                let ident = reader.read_ident();
                 let value = stack.pop().unwrap();
-
-                idents.resize_with(idents.len().max(ident as usize + 1), || Value::Null);
-                idents[ident as usize] = value;
+                idents.insert(ident, value);
             }
             OpCode::Load => {
-                let ident = reader.read_u32();
-                let is_builtin = ident < NUM_BUILTINS;
-                let value = if is_builtin {
-                    match ident {
-                        0 => Value::Builtin(Builtin::Println),
-                        _ => unreachable!(),
-                    }
-                } else {
-                    idents[ident as usize].clone()
+                let ident = reader.read_ident();
+                let ident_str =
+                    &consts[ident.ptr as usize..ident.ptr as usize + ident.len as usize];
+                let value = match ident_str {
+                    b"println" => Value::Builtin(Builtin::Println),
+                    _ => idents[&ident].clone(),
                 };
                 stack.push(value);
             }
@@ -179,7 +174,7 @@ where
             OpCode::LoadNull => stack.push(Value::Null),
             OpCode::Ret => reader.head = call_stack.pop().unwrap(),
             OpCode::StoreField => {
-                let field = reader.read_u32();
+                let field = reader.read_ident();
                 let value = stack.pop().unwrap();
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {
                     unimplemented!("{:?}", stack.last().unwrap())
@@ -202,6 +197,11 @@ pub struct BytecodeReader<'a> {
 }
 
 impl<'a> BytecodeReader<'a> {
+    pub fn read_ident(&mut self) -> StrIdent {
+        let ptr = self.read_u32();
+        let len = self.read_u32();
+        StrIdent { ptr, len }
+    }
     pub fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, head: 0 }
     }
