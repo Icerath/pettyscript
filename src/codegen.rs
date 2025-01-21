@@ -110,6 +110,7 @@ impl Codegen {
                         }
                         AssignSegment::Index(_) => todo!(),
                     }
+                    self.builder.insert(Op::Pop);
                 }
             }
             Stmt::WhileLoop(WhileLoop { expr, body }) => {

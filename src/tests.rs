@@ -38,4 +38,5 @@ fn test_obvious() {
     test_expr!("println(true && true)", "true");
     test_expr!("let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
     test_expr!("let lexer = Lexer { len: 10 }; println(1 < lexer.len);", "true");
+    // test_expr!("let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);", "11");
 }
