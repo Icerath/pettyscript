@@ -27,4 +27,5 @@ fn test_obvious() {
         "0\n1\n2\n3"
     );
     test_expr!("println(A { str: 1 })", "{ str: 1 }");
+    test_expr!("println((A { name: \"Bob\" }).name)", "Bob");
 }

@@ -191,6 +191,15 @@ where
             OpCode::EmptyStruct => {
                 stack.push(Value::Struct { fields: Box::default() });
             }
+            OpCode::LoadField => {
+                let ident = reader.read_ident();
+                let Value::Struct { fields } = stack.last().unwrap() else { panic!() };
+                let value = match fields.get(&ident) {
+                    Some(value) => value.clone(),
+                    None => panic!("struct does not contain field: {ident:?}"),
+                };
+                stack.push(value);
+            }
             _ => todo!("{op:?}"),
         }
     }
