@@ -191,7 +191,7 @@ impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int(int) => write!(f, "Int({int})"),
-            Self::Char(char) => write!(f, "Char({char:?}"),
+            Self::Char(char) => write!(f, "Char({char:?})"),
             Self::String(str) => write!(f, "String({str:?})"),
             Self::Ident(ident) => write!(f, "Ident({ident})"),
         }
@@ -271,8 +271,8 @@ impl fmt::Debug for ForLoop {
 }
 
 pub struct WhileLoop {
-    expr: Expr,
-    body: Block,
+    pub expr: Expr,
+    pub body: Block,
 }
 
 impl fmt::Debug for WhileLoop {

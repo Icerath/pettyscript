@@ -8,12 +8,15 @@ pub const VERSION: u32 = 0;
 #[repr(u8)]
 pub enum Op {
     FnCall { numargs: u8 },
+    Not,
     Mod,
     Eq,
     Add,
     Range,
     RangeInclusive,
     LoadNull,
+    Index,
+    LoadChar(char),
     LoadInt(i64),
     LoadString { ptr: u32, len: u32 },
     Jump(u32),
@@ -68,6 +71,7 @@ impl BytecodeBuilder {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }
+            I::LoadChar(char) => self.instruction_data.extend((char as u32).to_le_bytes()),
             I::LoadInt(int) => self.instruction_data.extend(int.to_le_bytes()),
             I::LoadString { ptr, len } => {
                 self.instruction_data.extend(ptr.to_le_bytes());

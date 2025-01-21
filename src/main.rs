@@ -9,7 +9,7 @@ mod tests;
 mod vm;
 
 fn main() {
-    let content = include_str!("../examples/lexer.pty");
+    let content = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(content).unwrap();
     let bytecode = codegen::codegen(&ast);
     std::fs::write("output.ptyb", &bytecode).unwrap();

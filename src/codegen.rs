@@ -1,5 +1,3 @@
-use core::panic;
-
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
@@ -8,7 +6,7 @@ use crate::{
 };
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
-    let mut codegen = Codegen::new();
+    let mut codegen = Codegen::default();
     codegen.load_builtins();
     codegen.gen_block(ast);
     codegen.finish()
@@ -25,16 +23,16 @@ struct Scope {
     types: FxHashMap<&'static str, Type>,
 }
 
+#[derive(Default)]
 struct Codegen {
     builder: BytecodeBuilder,
     scopes: Vec<Scope>,
+    continue_label: Option<u32>,
+    break_label: Option<u32>,
+    return_label: Option<u32>,
 }
 
 impl Codegen {
-    fn new() -> Self {
-        Self { builder: BytecodeBuilder::default(), scopes: vec![] }
-    }
-
     fn load_builtins(&mut self) {
         self.builder.insert_identifer("println");
     }
@@ -96,10 +94,23 @@ impl Codegen {
                     }
                 }
             }
+            Stmt::WhileLoop(WhileLoop { expr, body }) => {
+                let start_label = self.builder.create_label();
+                let prev_continue = self.continue_label.replace(start_label);
+                let end_label = self.builder.create_label();
+                self.builder.insert_label(start_label);
+                self.expr(expr);
+                self.builder.insert(Op::CJump(end_label));
+                self.gen_block(&body.stmts);
+                self.builder.insert(Op::CJump(start_label));
+                self.builder.insert_label(end_label);
+                self.continue_label = prev_continue;
+            }
             Stmt::ForLoop(ForLoop { ident, iter, body }) => {
                 self.scopes.push(Scope::default());
                 self.expr(iter);
                 let start_label = self.builder.create_label();
+                let prev_continue = self.continue_label.replace(start_label);
                 self.builder.insert_label(start_label);
                 self.builder.insert(Op::IterNext);
                 let end_label = self.builder.create_label();
@@ -109,6 +120,7 @@ impl Codegen {
                 self.gen_block(&body.stmts);
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
+                self.continue_label = prev_continue;
             }
             Stmt::IfChain(IfChain { first, else_ifs, r#else }) => {
                 self.expr(&first.condition);
@@ -135,6 +147,12 @@ impl Codegen {
                 self.expr(expr);
                 self.builder.insert(Op::Pop);
             }
+            Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
+            Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
+            Stmt::Return(Return(expr)) => {
+                self.expr(expr);
+                self.builder.insert(Op::Jump(self.return_label.unwrap()));
+            }
             _ => todo!("{node:?}"),
         }
     }
@@ -142,26 +160,31 @@ impl Codegen {
     fn expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Literal(literal) => match literal {
-                Literal::Int(int) => {
-                    self.builder.insert(Op::LoadInt(*int as _));
+                Literal::Char(char) => self.builder.insert(Op::LoadChar(*char)),
+                Literal::Int(int) => self.builder.insert(Op::LoadInt(*int as _)),
+                Literal::String(string) => {
+                    let [ptr, len] = self.builder.insert_string(string);
+                    self.builder.insert(Op::LoadString { ptr, len });
                 }
                 Literal::Ident(ident) => {
                     let key = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::Load(key));
                 }
-                Literal::String(string) => {
-                    let [ptr, len] = self.builder.insert_string(string);
-                    self.builder.insert(Op::LoadString { ptr, len });
-                }
-                _ => todo!("{literal:?}"),
             },
-            Expr::Binary { op, exprs } => {
+            Expr::Binary { op, exprs } => 'block: {
                 let op = match op {
                     BinOp::Range => Op::Range,
                     BinOp::RangeInclusive => Op::RangeInclusive,
                     BinOp::Eq => Op::Eq,
                     BinOp::Mod => Op::Mod,
                     BinOp::Add => Op::Add,
+                    BinOp::Neq => {
+                        self.expr(&exprs[0]);
+                        self.expr(&exprs[1]);
+                        self.builder.insert(Op::Eq);
+                        self.builder.insert(Op::Not);
+                        break 'block;
+                    }
                     _ => todo!("{op:?}"),
                 };
                 self.expr(&exprs[0]);
@@ -174,6 +197,16 @@ impl Codegen {
                 }
                 self.expr(function);
                 self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
+            }
+            Expr::FieldAccess { expr, field } => {
+                self.expr(expr);
+                let field = self.builder.insert_identifer(field);
+                self.builder.insert(Op::LoadField(field));
+            }
+            Expr::Index { expr, index } => {
+                self.expr(expr);
+                self.expr(index);
+                self.builder.insert(Op::Index);
             }
             _ => todo!("{expr:?}"),
         }
