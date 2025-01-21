@@ -27,6 +27,7 @@ pub enum Value {
 pub enum Builtin {
     Println,
     ReadFile,
+    StartsWith,
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -126,6 +127,30 @@ where
                         };
                         stack.push(Value::String(Rc::new(string.into())));
                     }
+                    Value::Builtin(Builtin::StartsWith) => {
+                        assert_eq!(numargs, 2);
+                        let rhs = stack.pop().unwrap();
+                        let lhs = stack.pop().unwrap();
+
+                        let rhs = match rhs {
+                            Value::StringLiteral { ptr, len } => std::str::from_utf8(
+                                &consts[ptr as usize..ptr as usize + len as usize],
+                            )
+                            .unwrap(),
+                            Value::String(ref str) => str,
+                            val => panic!("{val:?}"),
+                        };
+
+                        let lhs = match lhs {
+                            Value::StringLiteral { ptr, len } => std::str::from_utf8(
+                                &consts[ptr as usize..ptr as usize + len as usize],
+                            )
+                            .unwrap(),
+                            Value::String(ref str) => str,
+                            val => panic!("{val:?}"),
+                        };
+                        stack.push(Value::Bool(lhs.starts_with(rhs)));
+                    }
                     Value::Function { label } => {
                         let here = reader.head;
                         call_stack.push(here);
@@ -151,6 +176,7 @@ where
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
                     b"read_file" => Value::Builtin(Builtin::ReadFile),
+                    b"starts_with" => Value::Builtin(Builtin::StartsWith),
                     _ => match idents.get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
