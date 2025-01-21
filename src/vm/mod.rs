@@ -42,7 +42,7 @@ pub fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()
 where
     W: Write,
 {
-    const { assert!(size_of::<Value>() == 16) };
+    const { assert!(size_of::<Option<Value>>() == 16) };
 
     let mut reader = BytecodeReader::new(bytecode);
     let version = reader.read_u32();
