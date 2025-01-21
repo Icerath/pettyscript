@@ -63,6 +63,13 @@ where
         };
     }
 
+    macro_rules! str_literal {
+        ($ptr: expr, $len: expr) => {{
+            let ptr = $ptr;
+            &consts[ptr as usize..ptr as usize + $len as usize]
+        }};
+    }
+
     while let Some(&byte) = reader.bytes.get(reader.head) {
         reader.head += 1;
         let op = OpCode::try_from(byte).unwrap();
@@ -116,10 +123,7 @@ where
                         assert_eq!(numargs, 1);
                         let string = match stack.pop().unwrap() {
                             Value::StringLiteral { ptr, len } => {
-                                let str = std::str::from_utf8(
-                                    &consts[ptr as usize..ptr as usize + len as usize],
-                                )
-                                .unwrap();
+                                let str = str_literal!(ptr, len).to_str().unwrap();
                                 std::fs::read_to_string(str).unwrap()
                             }
                             Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
@@ -133,19 +137,17 @@ where
                         let lhs = stack.pop().unwrap();
 
                         let rhs = match rhs {
-                            Value::StringLiteral { ptr, len } => std::str::from_utf8(
-                                &consts[ptr as usize..ptr as usize + len as usize],
-                            )
-                            .unwrap(),
+                            Value::StringLiteral { ptr, len } => {
+                                std::str::from_utf8(str_literal!(ptr, len)).unwrap()
+                            }
                             Value::String(ref str) => str,
                             val => panic!("{val:?}"),
                         };
 
                         let lhs = match lhs {
-                            Value::StringLiteral { ptr, len } => std::str::from_utf8(
-                                &consts[ptr as usize..ptr as usize + len as usize],
-                            )
-                            .unwrap(),
+                            Value::StringLiteral { ptr, len } => {
+                                std::str::from_utf8(str_literal!(ptr, len)).unwrap()
+                            }
                             Value::String(ref str) => str,
                             val => panic!("{val:?}"),
                         };
@@ -171,8 +173,7 @@ where
             }
             OpCode::Load => {
                 let ident = reader.read_ident();
-                let ident_str =
-                    &consts[ident.ptr as usize..ident.ptr as usize + ident.len as usize];
+                let ident_str = str_literal!(ident.ptr, ident.len);
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
                     b"read_file" => Value::Builtin(Builtin::ReadFile),
@@ -210,7 +211,7 @@ where
                             ptr == rhs_ptr && len == rhs_len
                         }
                         Value::String(rhs) => {
-                            let lhs = &consts[ptr as usize..ptr as usize + len as usize];
+                            let lhs = str_literal!(ptr, len);
                             lhs == rhs.as_bytes()
                         }
                         _ => panic!(),
@@ -219,7 +220,7 @@ where
                         Value::Null => false,
                         Value::Char(rhs) => todo!(),
                         Value::StringLiteral { ptr, len } => {
-                            let rhs = &consts[ptr as usize..ptr as usize + len as usize];
+                            let rhs = str_literal!(ptr, len);
                             lhs.as_bytes() == rhs
                         }
                         _ => panic!(),
@@ -229,11 +230,7 @@ where
                         Value::Char(rhs) => lhs == rhs,
                         Value::StringLiteral { ptr, len } => {
                             len as usize == lhs.len_utf8()
-                                && consts[ptr as usize..ptr as usize + len as usize]
-                                    .chars()
-                                    .next()
-                                    .unwrap()
-                                    == lhs
+                                && str_literal!(ptr, len).chars().next().unwrap() == lhs
                         }
                         _ => panic!(),
                     },
