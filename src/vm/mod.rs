@@ -1,5 +1,6 @@
 use core::fmt;
 use std::{
+    cell::RefCell,
     io::{self, Write},
     rc::Rc,
 };
@@ -21,7 +22,7 @@ pub enum Value {
     String(Rc<Box<str>>),
     Range(Box<[i64; 2]>),
     RangeInclusive(Box<[i64; 2]>),
-    Struct { fields: Box<FxHashMap<StrIdent, Value>> },
+    Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -289,10 +290,10 @@ where
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {
                     unimplemented!("{:?}", stack.last().unwrap())
                 };
-                fields.insert(field, value);
+                fields.borrow_mut().insert(field, value);
             }
             OpCode::EmptyStruct => {
-                stack.push(Value::Struct { fields: Box::default() });
+                stack.push(Value::Struct { fields: Rc::default() });
             }
             OpCode::LoadField => {
                 let ident = reader.read_ident();
@@ -300,7 +301,7 @@ where
                     Value::Struct { fields } => fields,
                     other => panic!("{other:?}"),
                 };
-                let value = match fields.get(&ident) {
+                let value = match fields.borrow().get(&ident) {
                     Some(value) => value.clone(),
                     None => panic!("struct does not contain field: {ident:?}"),
                 };
@@ -377,11 +378,11 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
-                for (i, (key, value)) in fields.iter().enumerate() {
+                for (i, (key, value)) in fields.borrow().iter().enumerate() {
                     let key = self.consts[key.ptr as usize..key.ptr as usize + key.len as usize]
                         .as_bstr();
                     let prefix = if i != 0 { "," } else { "" };
-                    write!(f, "{prefix} {key}: {}", Self { value, ..*self })?;
+                    write!(f, "{prefix} {key}: {}", DisplayValue { value, ..*self })?;
                 }
                 write!(f, " }}")
             }
