@@ -126,6 +126,7 @@ impl Codegen {
                     BinOp::RangeInclusive => Op::RangeInclusive,
                     BinOp::Eq => Op::Eq,
                     BinOp::Mod => Op::Mod,
+                    BinOp::Add => Op::Add,
                     _ => todo!("{op:?}"),
                 };
                 self.expr(&exprs[0]);

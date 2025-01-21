@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use crate::bytecode::{OpCode, VERSION};
 
 const NUM_BUILTINS: u32 = 1;
@@ -18,6 +20,14 @@ pub enum Builtin {
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
+    let stdout = std::io::stdout().lock();
+    execute_bytecode_with(stdout, bytecode).unwrap();
+}
+
+pub fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
+where
+    W: Write,
+{
     const { assert!(size_of::<Value>() == 16) };
 
     let mut reader = BytecodeReader::new(bytecode);
@@ -89,21 +99,21 @@ pub fn execute_bytecode(bytecode: &[u8]) {
                         assert_eq!(numargs, 1);
                         let value = stack.pop().unwrap();
                         match value {
-                            Value::Null => println!("null"),
-                            Value::Bool(bool) => println!("{bool}"),
-                            Value::Builtin(function) => println!("Function::{function:?}"),
-                            Value::Int(int) => println!("{int}"),
+                            Value::Null => writeln!(stdout, "null"),
+                            Value::Bool(bool) => writeln!(stdout, "{bool}"),
+                            Value::Builtin(function) => writeln!(stdout, "Function::{function:?}"),
+                            Value::Int(int) => writeln!(stdout, "{int}"),
                             Value::RangeInclusive(range) => {
-                                println!("{}..={}", &range[0], &range[1]);
+                                writeln!(stdout, "{}..={}", &range[0], &range[1])
                             }
                             Value::StringLiteral { ptr, len } => {
                                 let str = std::str::from_utf8(
                                     &consts[ptr as usize..ptr as usize + len as usize],
                                 )
                                 .unwrap();
-                                println!("{str}");
+                                writeln!(stdout, "{str}")
                             }
-                        }
+                        }?;
                     }
                     _ => todo!("{function:?}"),
                 }
@@ -146,9 +156,16 @@ pub fn execute_bytecode(bytecode: &[u8]) {
                 let lhs = pop_int!();
                 stack.push(Value::Bool(lhs == rhs));
             }
+            OpCode::Add => {
+                let rhs = pop_int!();
+                let lhs = pop_int!();
+                stack.push(Value::Int(lhs + rhs));
+            }
             _ => todo!("{op:?}"),
         }
     }
+
+    Ok(())
 }
 
 pub struct BytecodeReader<'a> {

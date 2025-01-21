@@ -5,6 +5,10 @@ use miette::{Context, Error, IntoDiagnostic, LabeledSpan, Result};
 
 use crate::lexer::{Token, TokenKind};
 
+pub fn parse(src: &str) -> Result<Box<[Stmt]>> {
+    Parser::new(src).parse_root()
+}
+
 pub enum Stmt {
     Struct(Struct),
     Enum(Enum),
@@ -291,16 +295,16 @@ pub struct IfStmt {
 }
 
 #[derive(Clone)]
-pub struct Parser<'a> {
+struct Parser<'a> {
     lexer: Lexer<'a, Token>,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(content: &'a str) -> Self {
+    fn new(content: &'a str) -> Self {
         Self { lexer: Token::lexer(content) }
     }
 
-    pub fn parse_root(mut self) -> Result<Box<[Stmt]>> {
+    fn parse_root(mut self) -> Result<Box<[Stmt]>> {
         let mut stmts = vec![];
         while self.lexer.clone().next().is_some() {
             if self.peek()? == Token::Semicolon {
