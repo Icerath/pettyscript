@@ -1,11 +1,5 @@
 fn main() {
     for i in 1..=100 {
-        if i % 4 == 0 {
-            continue;
-        }
-        // if i == 50 {
-        //     break;
-        // }
         if i % 15 == 0 {
             println("FizzBuzz");
         } else if i % 3 == 0 {

@@ -19,4 +19,7 @@ macro_rules! test_expr {
 #[test]
 fn test_obvious() {
     test_expr!("println(1 + 2)", "3");
+    test_expr!("for i in 0..=5 { println(i); }", "0\n1\n2\n3\n4\n5");
+    test_expr!("for i in 0..=5 { if i == 0 { continue; } println(i); }", "1\n2\n3\n4\n5");
+    test_expr!("for i in 0..=5 { if i == 4 { break; } println(i); }", "0\n1\n2\n3");
 }

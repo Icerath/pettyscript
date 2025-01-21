@@ -41,6 +41,7 @@ impl Codegen {
         for node in ast {
             self.scopes.push(Scope::default());
             self.r#gen(node);
+            self.scopes.pop();
         }
     }
 
@@ -96,31 +97,40 @@ impl Codegen {
             }
             Stmt::WhileLoop(WhileLoop { expr, body }) => {
                 let start_label = self.builder.create_label();
-                let prev_continue = self.continue_label.replace(start_label);
                 let end_label = self.builder.create_label();
+
+                let prev_continue = self.continue_label.replace(start_label);
+                let prev_break = self.break_label.replace(end_label);
+
                 self.builder.insert_label(start_label);
                 self.expr(expr);
                 self.builder.insert(Op::CJump(end_label));
                 self.gen_block(&body.stmts);
                 self.builder.insert(Op::CJump(start_label));
                 self.builder.insert_label(end_label);
+
                 self.continue_label = prev_continue;
+                self.break_label = prev_break;
             }
             Stmt::ForLoop(ForLoop { ident, iter, body }) => {
-                self.scopes.push(Scope::default());
-                self.expr(iter);
                 let start_label = self.builder.create_label();
+                let end_label = self.builder.create_label();
+
                 let prev_continue = self.continue_label.replace(start_label);
+                let prev_break = self.break_label.replace(end_label);
+
+                self.expr(iter);
                 self.builder.insert_label(start_label);
                 self.builder.insert(Op::IterNext);
-                let end_label = self.builder.create_label();
                 self.builder.insert(Op::CJump(end_label));
                 let ident = self.builder.insert_identifer(ident);
                 self.builder.insert(Op::Store(ident));
                 self.gen_block(&body.stmts);
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
+
                 self.continue_label = prev_continue;
+                self.break_label = prev_break;
             }
             Stmt::IfChain(IfChain { first, else_ifs, r#else }) => {
                 self.expr(&first.condition);
