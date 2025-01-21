@@ -57,7 +57,7 @@ fn lexer_next(lexer) {
             while i < str_len(lexer.remaining) && lexer.remaining[i] != "\n" {
                 i = i + 1;
             }
-            lexer.remaining = lexer.remaining[i..lexer.remaining.len];
+            lexer.remaining = lexer.remaining[i..str_len(lexer.remaining)];
             continue;
         }
         else if first_char == '[' { token = Token.LBracket; }

@@ -290,7 +290,10 @@ where
             }
             OpCode::LoadField => {
                 let ident = reader.read_ident();
-                let Value::Struct { fields } = stack.pop().unwrap() else { panic!() };
+                let fields = match stack.pop().unwrap() {
+                    Value::Struct { fields } => fields,
+                    other => panic!("{other:?}"),
+                };
                 let value = match fields.get(&ident) {
                     Some(value) => value.clone(),
                     None => panic!("struct does not contain field: {ident:?}"),
