@@ -283,6 +283,14 @@ where
                 };
                 stack.push(value);
             }
+            OpCode::Not => {
+                let bool = match stack.pop().unwrap() {
+                    Value::Null => false,
+                    Value::Bool(bool) => bool,
+                    _ => panic!(),
+                };
+                stack.push(Value::Bool(!bool));
+            }
             _ => todo!("{op:?}"),
         }
     }
