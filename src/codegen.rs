@@ -7,7 +7,6 @@ use crate::{
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::default();
-    codegen.load_builtins();
     codegen.gen_block(ast);
     let main = codegen.builder.insert_identifer("main");
     codegen.builder.insert(Op::Load(main));
@@ -36,10 +35,6 @@ struct Codegen {
 }
 
 impl Codegen {
-    fn load_builtins(&mut self) {
-        self.builder.insert_identifer("println");
-    }
-
     fn gen_block(&mut self, ast: &[Stmt]) {
         for node in ast {
             self.scopes.push(Scope::default());
