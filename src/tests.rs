@@ -31,4 +31,5 @@ fn test_obvious() {
     test_expr!("println(1 < 2)", "true");
     test_expr!("println(5 > 4)", "true");
     test_expr!("println(str_len(\"123456789\"))", "9");
+    test_expr!("let i = 5; println(i < str_len(\"123456789\"))", "true");
 }

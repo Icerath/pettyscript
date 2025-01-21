@@ -54,7 +54,7 @@ fn lexer_next(lexer) {
     while true {
         if starts_with(lexer.remaining, "//") {
             let i = 2;
-            while i < str_len(lexer) && lexer.remaining[i] != "\n" {
+            while i < str_len(lexer.remaining) && lexer.remaining[i] != "\n" {
                 i = i + 1;
             }
             lexer.remaining = lexer.remaining[i..lexer.remaining.len];
