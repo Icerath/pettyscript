@@ -313,6 +313,10 @@ where
                     Value::String(str) => match rhs {
                         Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                         Value::RangeInclusive(_) => todo!(),
+                        Value::Range(range) => {
+                            let [start, end] = *range;
+                            Value::String(Rc::new(str[start as usize..end as usize].into()))
+                        }
                         _ => panic!("{rhs:?}"),
                     },
                     _ => todo!(),
