@@ -28,6 +28,7 @@ pub enum Builtin {
     Println,
     ReadFile,
     StartsWith,
+    StrLen,
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -153,6 +154,16 @@ where
                         };
                         stack.push(Value::Bool(lhs.starts_with(rhs)));
                     }
+                    Value::Builtin(Builtin::StrLen) => {
+                        assert_eq!(numargs, 1);
+                        let len = match stack.pop().unwrap() {
+                            Value::StringLiteral { len, .. } => len,
+                            Value::String(ref str) => str.len() as u32,
+                            val => panic!("{val:?}"),
+                        };
+
+                        stack.push(Value::Int(len as i64));
+                    }
                     Value::Function { label } => {
                         let here = reader.head;
                         call_stack.push(here);
@@ -178,6 +189,7 @@ where
                     b"println" => Value::Builtin(Builtin::Println),
                     b"read_file" => Value::Builtin(Builtin::ReadFile),
                     b"starts_with" => Value::Builtin(Builtin::StartsWith),
+                    b"str_len" => Value::Builtin(Builtin::StrLen),
                     _ => match idents.get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
