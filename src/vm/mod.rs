@@ -1,6 +1,7 @@
 use core::fmt;
 use std::io::{self, Write};
 
+use bstr::ByteSlice;
 use rustc_hash::FxHashMap;
 
 use crate::bytecode::{OpCode, StrIdent, VERSION};
@@ -128,7 +129,10 @@ where
                     &consts[ident.ptr as usize..ident.ptr as usize + ident.len as usize];
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
-                    _ => idents[&ident].clone(),
+                    _ => match idents.get(&ident) {
+                        Some(value) => value.clone(),
+                        None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
+                    },
                 };
                 stack.push(value);
             }
@@ -185,10 +189,8 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Struct { fields } => {
                 write!(f, "{{")?;
                 for (i, (key, value)) in fields.iter().enumerate() {
-                    let key = std::str::from_utf8(
-                        &self.consts[key.ptr as usize..key.ptr as usize + key.len as usize],
-                    )
-                    .unwrap();
+                    let key = self.consts[key.ptr as usize..key.ptr as usize + key.len as usize]
+                        .as_bstr();
                     let prefix = if i != 0 { "," } else { "" };
                     write!(f, "{prefix} {key}: {}", Self { value, ..*self })?;
                 }
