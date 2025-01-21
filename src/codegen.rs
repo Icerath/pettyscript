@@ -205,6 +205,8 @@ impl Codegen {
                     BinOp::Eq => Op::Eq,
                     BinOp::Mod => Op::Mod,
                     BinOp::Add => Op::Add,
+                    BinOp::Less => Op::Less,
+                    BinOp::Greater => Op::Greater,
                     BinOp::Neq => {
                         self.expr(&exprs[0]);
                         self.expr(&exprs[1]);

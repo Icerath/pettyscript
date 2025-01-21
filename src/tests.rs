@@ -28,4 +28,6 @@ fn test_obvious() {
     );
     test_expr!("println(A { str: 1 })", "{ str: 1 }");
     test_expr!("println((A { name: \"Bob\" }).name)", "Bob");
+    test_expr!("println(1 < 2)", "true");
+    test_expr!("println(5 > 4)", "true");
 }

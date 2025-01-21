@@ -291,6 +291,28 @@ where
                 };
                 stack.push(Value::Bool(!bool));
             }
+            OpCode::Less => {
+                let rhs = stack.pop().unwrap();
+                let is_less = match stack.pop().unwrap() {
+                    Value::Int(lhs) => match rhs {
+                        Value::Int(rhs) => lhs < rhs,
+                        _ => panic!(),
+                    },
+                    val => todo!("{val:?}"),
+                };
+                stack.push(Value::Bool(is_less));
+            }
+            OpCode::Greater => {
+                let rhs = stack.pop().unwrap();
+                let is_greater = match stack.pop().unwrap() {
+                    Value::Int(lhs) => match rhs {
+                        Value::Int(rhs) => lhs > rhs,
+                        _ => panic!(),
+                    },
+                    val => todo!("{val:?}"),
+                };
+                stack.push(Value::Bool(is_greater));
+            }
             _ => todo!("{op:?}"),
         }
     }

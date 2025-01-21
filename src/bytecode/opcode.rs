@@ -13,6 +13,8 @@ pub struct StrIdent {
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
+    Less,
+    Greater,
     EmptyStruct,
     Ret,
     FnCall { numargs: u8 },
