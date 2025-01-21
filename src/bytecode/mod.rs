@@ -1,3 +1,3 @@
 mod opcode;
 
-pub use opcode::{BytecodeBuilder, Constant, ConstantKey, Op, OpCode, VERSION};
+pub use opcode::{BytecodeBuilder, Op, OpCode, VERSION};

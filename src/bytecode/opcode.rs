@@ -13,7 +13,8 @@ pub enum Op {
     Add,
     Range,
     RangeInclusive,
-    LoadConst(ConstantKey),
+    LoadInt(i64),
+    LoadString { ptr: u32, len: u32 },
     Jump(u32),
     CJump(u32),
     Load(u32),
@@ -21,17 +22,6 @@ pub enum Op {
     Pop,
     IterNext,
     End,
-}
-
-pub enum Constant {
-    String(&'static str),
-    Int(i64),
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ConstantKey {
-    String { ptr: u32, len: u32 },
-    Int(i64),
 }
 
 #[derive(Default)]
@@ -59,6 +49,9 @@ impl BytecodeBuilder {
     pub fn insert(&mut self, instruction: Op) {
         use Op as I;
 
+        const { assert!(size_of::<Op>() == 16) };
+        const { assert!(size_of::<OpCode>() == 1) };
+
         let op = OpCode::from(instruction);
         self.instruction_data.push(op as u8);
 
@@ -69,18 +62,10 @@ impl BytecodeBuilder {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }
-            I::LoadConst(key) => {
-                match key {
-                    ConstantKey::Int(int) => {
-                        self.instruction_data.push(0);
-                        self.instruction_data.extend(int.to_le_bytes());
-                    }
-                    ConstantKey::String { ptr, len } => {
-                        self.instruction_data.push(1);
-                        self.instruction_data.extend(ptr.to_le_bytes());
-                        self.instruction_data.extend(len.to_le_bytes());
-                    }
-                };
+            I::LoadInt(int) => self.instruction_data.extend(int.to_le_bytes()),
+            I::LoadString { ptr, len } => {
+                self.instruction_data.extend(ptr.to_le_bytes());
+                self.instruction_data.extend(len.to_le_bytes());
             }
             _ => {}
         }
@@ -91,21 +76,13 @@ impl BytecodeBuilder {
         *self.identifiers.entry(ident).or_insert(len)
     }
 
-    pub fn insert_constant(&mut self, constant: Constant) -> ConstantKey {
-        match constant {
-            Constant::String(str) => {
-                let ptr = *self.string_map.entry(str).or_insert_with(|| {
-                    let ptr = self.string_data.len() as u32;
-                    self.string_data.extend(str.as_bytes());
-                    ptr
-                });
-                ConstantKey::String {
-                    ptr,
-                    len: str.len().try_into().expect("Tried to insert a string too large"),
-                }
-            }
-            Constant::Int(int) => ConstantKey::Int(int),
-        }
+    pub fn insert_string(&mut self, str: &'static str) -> [u32; 2] {
+        let ptr = *self.string_map.entry(str).or_insert_with(|| {
+            let ptr = self.string_data.len().try_into().expect("String data has grown too large");
+            self.string_data.extend(str.as_bytes());
+            ptr
+        });
+        [ptr, str.len() as u32]
     }
 
     pub fn finish(mut self) -> Vec<u8> {

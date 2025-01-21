@@ -46,16 +46,11 @@ pub fn execute_bytecode(bytecode: &[u8]) {
         reader.head += 1;
         let op = OpCode::try_from(byte).unwrap();
         match op {
-            OpCode::LoadConst => {
-                match reader.read::<1>()[0] {
-                    0 => stack.push(Value::Int(i64::from_le_bytes(*reader.read::<8>()))),
-                    1 => {
-                        let ptr = reader.read_u32();
-                        let len = reader.read_u32();
-                        stack.push(Value::StringLiteral { ptr, len });
-                    }
-                    n => unreachable!("{n:?}"),
-                };
+            OpCode::LoadInt => stack.push(Value::Int(i64::from_le_bytes(*reader.read::<8>()))),
+            OpCode::LoadString => {
+                let ptr = reader.read_u32();
+                let len = reader.read_u32();
+                stack.push(Value::StringLiteral { ptr, len });
             }
             OpCode::RangeInclusive => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };

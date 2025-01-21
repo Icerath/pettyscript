@@ -1,7 +1,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    bytecode::{BytecodeBuilder, Constant, Op},
+    bytecode::{BytecodeBuilder, Op},
     parser::*,
 };
 
@@ -108,16 +108,15 @@ impl Codegen {
         match expr {
             Expr::Literal(literal) => match literal {
                 Literal::Int(int) => {
-                    let constant = self.builder.insert_constant(Constant::Int(*int as _));
-                    self.builder.insert(Op::LoadConst(constant));
+                    self.builder.insert(Op::LoadInt(*int as _));
                 }
                 Literal::Ident(ident) => {
                     let key = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::Load(key));
                 }
                 Literal::String(string) => {
-                    let key = self.builder.insert_constant(Constant::String(string));
-                    self.builder.insert(Op::LoadConst(key));
+                    let [ptr, len] = self.builder.insert_string(string);
+                    self.builder.insert(Op::LoadString { ptr, len });
                 }
                 _ => todo!("{literal:?}"),
             },
