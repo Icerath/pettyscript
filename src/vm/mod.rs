@@ -206,7 +206,7 @@ where
                     },
                     Value::StringLiteral { ptr, len } => match rhs {
                         Value::Null => false,
-                        Value::Char(rhs) => todo!(),
+                        Value::Char(rhs) => str_char_eq(str_literal!(ptr, len), rhs),
                         Value::StringLiteral { ptr: rhs_ptr, len: rhs_len } => {
                             ptr == rhs_ptr && len == rhs_len
                         }
@@ -218,7 +218,7 @@ where
                     },
                     Value::String(lhs) => match rhs {
                         Value::Null => false,
-                        Value::Char(rhs) => todo!(),
+                        Value::Char(rhs) => str_char_eq(lhs.as_bytes(), rhs),
                         Value::StringLiteral { ptr, len } => {
                             let rhs = str_literal!(ptr, len);
                             lhs.as_bytes() == rhs
@@ -229,8 +229,7 @@ where
                         Value::Null => false,
                         Value::Char(rhs) => lhs == rhs,
                         Value::StringLiteral { ptr, len } => {
-                            len as usize == lhs.len_utf8()
-                                && str_literal!(ptr, len).chars().next().unwrap() == lhs
+                            str_char_eq(str_literal!(ptr, len), lhs)
                         }
                         _ => panic!(),
                     },
@@ -289,6 +288,10 @@ where
     }
 
     Ok(())
+}
+
+fn str_char_eq(str: &[u8], char: char) -> bool {
+    str.len() == char.len_utf8() && str.chars().next().unwrap() == char
 }
 
 #[derive(Clone, Copy)]
