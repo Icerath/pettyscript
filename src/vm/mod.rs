@@ -173,6 +173,7 @@ where
                 }
             }
             OpCode::Pop => _ = stack.pop(),
+            OpCode::Dup => stack.push(stack.last().unwrap().clone()),
             OpCode::Jump => {
                 let to = reader.read_u32();
                 reader.head = to as usize;

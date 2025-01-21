@@ -39,6 +39,7 @@ pub enum Op {
     LoadField(StrIdent),
     StoreField(StrIdent),
     Pop,
+    Dup,
     IterNext,
     End,
 }
