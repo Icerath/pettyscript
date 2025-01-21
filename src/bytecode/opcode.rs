@@ -7,6 +7,7 @@ pub const VERSION: u32 = 0;
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
+    Ret,
     FnCall { numargs: u8 },
     Not,
     Mod,
@@ -16,6 +17,7 @@ pub enum Op {
     RangeInclusive,
     LoadNull,
     Index,
+    CreateFunction { label: u32 },
     LoadTrue,
     LoadFalse,
     LoadChar(char),
@@ -69,7 +71,7 @@ impl BytecodeBuilder {
             I::StoreField(field) | I::LoadField(field) => {
                 self.instruction_data.extend(field.to_le_bytes())
             }
-            I::CJump(label) | I::Jump(label) => {
+            I::CreateFunction { label } | I::CJump(label) | I::Jump(label) => {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }

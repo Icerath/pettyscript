@@ -9,6 +9,9 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::default();
     codegen.load_builtins();
     codegen.gen_block(ast);
+    let main = codegen.builder.insert_identifer("main");
+    codegen.builder.insert(Op::Load(main));
+    codegen.builder.insert(Op::FnCall { numargs: 0 });
     codegen.finish()
 }
 
@@ -29,7 +32,6 @@ struct Codegen {
     scopes: Vec<Scope>,
     continue_label: Option<u32>,
     break_label: Option<u32>,
-    return_label: Option<u32>,
 }
 
 impl Codegen {
@@ -59,7 +61,24 @@ impl Codegen {
             }
             Stmt::Function(Function { ident, params, body }) => {
                 self.scope().types.insert(ident, Type::Function { nparams: params.len() });
+
+                let ident_key = self.builder.insert_identifer(ident);
+
+                let function_start = self.builder.create_label();
+                let function_end = self.builder.create_label();
+
+                self.builder.insert(Op::CreateFunction { label: function_start });
+                self.builder.insert(Op::Store(ident_key));
+
+                self.builder.insert(Op::Jump(function_end));
+                self.builder.insert_label(function_start);
+
                 self.gen_block(&body.stmts);
+
+                self.builder.insert(Op::LoadNull);
+                self.builder.insert(Op::Ret);
+
+                self.builder.insert_label(function_end);
             }
             Stmt::Let(VarDecl { ident, expr }) | Stmt::Const(VarDecl { ident, expr }) => {
                 match expr {
@@ -161,7 +180,7 @@ impl Codegen {
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
             Stmt::Return(Return(expr)) => {
                 self.expr(expr);
-                self.builder.insert(Op::Jump(self.return_label.unwrap()));
+                self.builder.insert(Op::Ret);
             }
             _ => todo!("{node:?}"),
         }
@@ -170,7 +189,7 @@ impl Codegen {
     fn expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Literal(literal) => match literal {
-                Literal::Bool(true) => dbg!(self.builder.insert(Op::LoadTrue)),
+                Literal::Bool(true) => self.builder.insert(Op::LoadTrue),
                 Literal::Bool(false) => self.builder.insert(Op::LoadFalse),
                 Literal::Char(char) => self.builder.insert(Op::LoadChar(*char)),
                 Literal::Int(int) => self.builder.insert(Op::LoadInt(*int as _)),

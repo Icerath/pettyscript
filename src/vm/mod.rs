@@ -10,6 +10,7 @@ pub enum Value {
     Bool(bool),
     Int(i64),
     Builtin(Builtin),
+    Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     RangeInclusive(Box<[i64; 2]>),
 }
@@ -40,8 +41,8 @@ where
     reader.bytes = &reader.bytes[len_consts..];
 
     let mut idents = vec![];
-
     let mut stack = vec![];
+    let mut call_stack = vec![];
 
     macro_rules! pop_int {
         () => {
@@ -99,6 +100,7 @@ where
                         assert_eq!(numargs, 1);
                         let value = stack.pop().unwrap();
                         match value {
+                            Value::Function { label } => writeln!(stdout, "Function at {label}"),
                             Value::Null => writeln!(stdout, "null"),
                             Value::Bool(bool) => writeln!(stdout, "{bool}"),
                             Value::Builtin(function) => writeln!(stdout, "Function::{function:?}"),
@@ -115,10 +117,13 @@ where
                             }
                         }?;
                     }
+                    Value::Function { label } => {
+                        let here = reader.head;
+                        call_stack.push(here);
+                        reader.head = label as usize;
+                    }
                     _ => todo!("{function:?}"),
                 }
-                for _ in 0..numargs {}
-
                 stack.push(Value::Null);
             }
             OpCode::Pop => _ = stack.pop(),
@@ -163,6 +168,12 @@ where
             }
             OpCode::LoadTrue => stack.push(Value::Bool(true)),
             OpCode::LoadFalse => stack.push(Value::Bool(false)),
+            OpCode::CreateFunction => {
+                let label = reader.read_u32();
+                stack.push(Value::Function { label });
+            }
+            OpCode::LoadNull => stack.push(Value::Null),
+            OpCode::Ret => reader.head = call_stack.pop().unwrap(),
             _ => todo!("{op:?}"),
         }
     }
