@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use crate::bytecode::{OpCode, StrIdent, VERSION};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -23,7 +23,7 @@ pub enum Value {
     Struct { fields: Box<FxHashMap<StrIdent, Value>> },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Builtin {
     Println,
     ReadFile,
@@ -190,9 +190,56 @@ where
                 stack.push(Value::Int(lhs % rhs));
             }
             OpCode::Eq => {
-                let rhs = pop_int!();
-                let lhs = pop_int!();
-                stack.push(Value::Bool(lhs == rhs));
+                let rhs = stack.pop().unwrap();
+                let is_eq = match stack.pop().unwrap() {
+                    Value::Null => rhs == Value::Null,
+                    Value::Bool(lhs) => match rhs {
+                        Value::Null => false,
+                        Value::Bool(rhs) => lhs == rhs,
+                        _ => panic!(),
+                    },
+                    Value::Int(lhs) => match rhs {
+                        Value::Null => false,
+                        Value::Int(rhs) => lhs == rhs,
+                        _ => panic!(),
+                    },
+                    Value::StringLiteral { ptr, len } => match rhs {
+                        Value::Null => false,
+                        Value::Char(rhs) => todo!(),
+                        Value::StringLiteral { ptr: rhs_ptr, len: rhs_len } => {
+                            ptr == rhs_ptr && len == rhs_len
+                        }
+                        Value::String(rhs) => {
+                            let lhs = &consts[ptr as usize..ptr as usize + len as usize];
+                            lhs == rhs.as_bytes()
+                        }
+                        _ => panic!(),
+                    },
+                    Value::String(lhs) => match rhs {
+                        Value::Null => false,
+                        Value::Char(rhs) => todo!(),
+                        Value::StringLiteral { ptr, len } => {
+                            let rhs = &consts[ptr as usize..ptr as usize + len as usize];
+                            lhs.as_bytes() == rhs
+                        }
+                        _ => panic!(),
+                    },
+                    Value::Char(lhs) => match rhs {
+                        Value::Null => false,
+                        Value::Char(rhs) => lhs == rhs,
+                        Value::StringLiteral { ptr, len } => {
+                            len as usize == lhs.len_utf8()
+                                && consts[ptr as usize..ptr as usize + len as usize]
+                                    .chars()
+                                    .next()
+                                    .unwrap()
+                                    == lhs
+                        }
+                        _ => panic!(),
+                    },
+                    val => todo!("{val:?}"),
+                };
+                stack.push(Value::Bool(is_eq));
             }
             OpCode::Add => {
                 let rhs = pop_int!();
