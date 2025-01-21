@@ -106,7 +106,7 @@ impl Codegen {
                 self.expr(expr);
                 self.builder.insert(Op::CJump(end_label));
                 self.gen_block(&body.stmts);
-                self.builder.insert(Op::CJump(start_label));
+                self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
 
                 self.continue_label = prev_continue;

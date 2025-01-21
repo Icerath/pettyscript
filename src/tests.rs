@@ -22,4 +22,8 @@ fn test_obvious() {
     test_expr!("for i in 0..=5 { println(i); }", "0\n1\n2\n3\n4\n5");
     test_expr!("for i in 0..=5 { if i == 0 { continue; } println(i); }", "1\n2\n3\n4\n5");
     test_expr!("for i in 0..=5 { if i == 4 { break; } println(i); }", "0\n1\n2\n3");
+    test_expr!(
+        "let i = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
+        "0\n1\n2\n3"
+    );
 }
