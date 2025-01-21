@@ -128,9 +128,8 @@ fn lexer_next(lexer) {
 }
 
 fn main() {
-    let str = open_file("examples/lexer.pty");
+    let str = read_file("examples/lexer.pty");
     let lexer = Lexer { str, remaining: str };
-
     while true {
         let token = lexer_next(lexer);
     }

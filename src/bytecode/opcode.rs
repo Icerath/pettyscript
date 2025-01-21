@@ -7,6 +7,7 @@ pub const VERSION: u32 = 0;
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
+    EmptyStruct,
     Ret,
     FnCall { numargs: u8 },
     Not,

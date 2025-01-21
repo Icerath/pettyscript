@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 
+use rustc_hash::FxHashMap;
+
 use crate::bytecode::{OpCode, VERSION};
 
 const NUM_BUILTINS: u32 = 1;
@@ -13,6 +15,7 @@ pub enum Value {
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     RangeInclusive(Box<[i64; 2]>),
+    Struct { fields: Box<FxHashMap<u32, Value>> },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -100,6 +103,7 @@ where
                         assert_eq!(numargs, 1);
                         let value = stack.pop().unwrap();
                         match value {
+                            Value::Struct { fields } => writeln!(stdout, "{fields:?}"),
                             Value::Function { label } => writeln!(stdout, "Function at {label}"),
                             Value::Null => writeln!(stdout, "null"),
                             Value::Bool(bool) => writeln!(stdout, "{bool}"),
@@ -174,6 +178,17 @@ where
             }
             OpCode::LoadNull => stack.push(Value::Null),
             OpCode::Ret => reader.head = call_stack.pop().unwrap(),
+            OpCode::StoreField => {
+                let field = reader.read_u32();
+                let value = stack.pop().unwrap();
+                let Value::Struct { fields } = stack.last_mut().unwrap() else {
+                    unimplemented!("{:?}", stack.last().unwrap())
+                };
+                fields.insert(field, value);
+            }
+            OpCode::EmptyStruct => {
+                stack.push(Value::Struct { fields: Box::default() });
+            }
             _ => todo!("{op:?}"),
         }
     }

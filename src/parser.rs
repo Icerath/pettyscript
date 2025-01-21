@@ -174,8 +174,8 @@ impl fmt::Debug for Expr {
 }
 
 pub struct StructInitField {
-    ident: &'static str,
-    expr: Option<Expr>,
+    pub ident: &'static str,
+    pub expr: Option<Expr>,
 }
 
 impl fmt::Debug for StructInitField {

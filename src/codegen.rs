@@ -239,6 +239,18 @@ impl Codegen {
                 self.expr(index);
                 self.builder.insert(Op::Index);
             }
+            Expr::InitStruct { r#struct, fields } => {
+                let _ = r#struct;
+                self.builder.insert(Op::EmptyStruct);
+                for StructInitField { ident, expr } in fields {
+                    let ident = self.builder.insert_identifer(ident);
+                    match expr {
+                        Some(expr) => self.expr(expr),
+                        None => self.builder.insert(Op::Load(ident)),
+                    }
+                    self.builder.insert(Op::StoreField(ident));
+                }
+            }
             _ => todo!("{expr:?}"),
         }
     }
