@@ -86,8 +86,8 @@ impl Codegen {
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
                 let root = self.builder.insert_identifer(root);
+                self.expr(expr);
                 if segments.is_empty() {
-                    self.expr(expr);
                     self.builder.insert(Op::Store(root));
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
