@@ -11,6 +11,7 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let main = codegen.builder.insert_identifer("main");
     codegen.builder.insert(Op::Load(main));
     codegen.builder.insert(Op::FnCall { numargs: 0 });
+    codegen.builder.insert(Op::Pop);
     codegen.finish()
 }
 
@@ -127,6 +128,7 @@ impl Codegen {
 
                 self.continue_label = prev_continue;
                 self.break_label = prev_break;
+                self.builder.insert(Op::Pop);
             }
             Stmt::ForLoop(ForLoop { ident, iter, body }) => {
                 let start_label = self.builder.create_label();
@@ -144,6 +146,7 @@ impl Codegen {
                 self.gen_block(&body.stmts);
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
+                self.builder.insert(Op::Pop);
 
                 self.continue_label = prev_continue;
                 self.break_label = prev_break;
