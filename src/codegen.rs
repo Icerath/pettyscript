@@ -15,6 +15,7 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     codegen.finish()
 }
 
+#[expect(unused)]
 enum Type {
     Struct { fields: FxHashSet<&'static str> },
     Enum { variants: FxHashSet<&'static str> },
