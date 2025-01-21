@@ -19,6 +19,7 @@ pub enum Value {
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     String(Rc<Box<str>>),
+    Range(Box<[i64; 2]>),
     RangeInclusive(Box<[i64; 2]>),
     Struct { fields: Box<FxHashMap<StrIdent, Value>> },
 }
@@ -81,6 +82,11 @@ where
                 let ptr = reader.read_u32();
                 let len = reader.read_u32();
                 stack.push(Value::StringLiteral { ptr, len });
+            }
+            OpCode::Range => {
+                let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
+                let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
+                stack.push(Value::Range(Box::new([start, end])));
             }
             OpCode::RangeInclusive => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
@@ -379,6 +385,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Builtin(function) => write!(f, "Function::{function:?}"),
             Value::Int(int) => write!(f, "{int}"),
+            Value::Range(range) => write!(f, "{}..{}", &range[0], &range[1]),
             Value::RangeInclusive(range) => {
                 write!(f, "{}..={}", &range[0], &range[1])
             }
