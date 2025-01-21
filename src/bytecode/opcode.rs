@@ -13,12 +13,15 @@ pub enum Op {
     Add,
     Range,
     RangeInclusive,
+    LoadNull,
     LoadInt(i64),
     LoadString { ptr: u32, len: u32 },
     Jump(u32),
     CJump(u32),
     Load(u32),
     Store(u32),
+    LoadField(u32),
+    StoreField(u32),
     Pop,
     IterNext,
     End,
@@ -58,6 +61,9 @@ impl BytecodeBuilder {
         match instruction {
             I::FnCall { numargs } => self.instruction_data.push(numargs),
             I::Store(ident) | I::Load(ident) => self.instruction_data.extend(ident.to_le_bytes()),
+            I::StoreField(field) | I::LoadField(field) => {
+                self.instruction_data.extend(field.to_le_bytes())
+            }
             I::CJump(label) | I::Jump(label) => {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());

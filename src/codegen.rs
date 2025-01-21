@@ -1,3 +1,5 @@
+use core::panic;
+
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
@@ -60,7 +62,40 @@ impl Codegen {
                 self.scope().types.insert(ident, Type::Function { nparams: params.len() });
                 self.gen_block(&body.stmts);
             }
-            Stmt::Assign(_) => todo!(),
+            Stmt::Let(VarDecl { ident, expr }) | Stmt::Const(VarDecl { ident, expr }) => {
+                match expr {
+                    Some(expr) => self.expr(expr),
+                    None => self.builder.insert(Op::LoadNull),
+                }
+                let ident = self.builder.insert_identifer(ident);
+                self.builder.insert(Op::Store(ident));
+            }
+            Stmt::Assign(Assign { root, segments, expr }) => {
+                let root = self.builder.insert_identifer(root);
+                if segments.is_empty() {
+                    self.expr(expr);
+                    self.builder.insert(Op::Store(root));
+                } else {
+                    let (last, rest) = segments.split_last().unwrap();
+                    self.builder.insert(Op::Load(root));
+                    for segment in rest {
+                        match segment {
+                            AssignSegment::Index(_) => todo!(),
+                            AssignSegment::Field(field) => {
+                                let field = self.builder.insert_identifer(field);
+                                self.builder.insert(Op::LoadField(field));
+                            }
+                        }
+                    }
+                    match last {
+                        AssignSegment::Field(field) => {
+                            let field = self.builder.insert_identifer(field);
+                            self.builder.insert(Op::StoreField(field));
+                        }
+                        AssignSegment::Index(_) => todo!(),
+                    }
+                }
+            }
             Stmt::ForLoop(ForLoop { ident, iter, body }) => {
                 self.scopes.push(Scope::default());
                 self.expr(iter);
