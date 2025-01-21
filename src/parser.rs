@@ -190,6 +190,7 @@ impl fmt::Debug for StructInitField {
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Bool(bool) => write!(f, "Bool({bool})"),
             Self::Int(int) => write!(f, "Int({int})"),
             Self::Char(char) => write!(f, "Char({char:?})"),
             Self::String(str) => write!(f, "String({str:?})"),
@@ -199,6 +200,7 @@ impl fmt::Debug for Literal {
 }
 
 pub enum Literal {
+    Bool(bool),
     Int(i128),
     Char(char),
     String(&'static str),
@@ -488,6 +490,8 @@ impl<'a> Parser<'a> {
             Token::Char(char) => Literal::Char(char),
             Token::Ident(ident) => Literal::Ident(ident),
             Token::String(str) => Literal::String(str),
+            Token::True => Literal::Bool(true),
+            Token::False => Literal::Bool(false),
             got => {
                 return Err(self.expect_failed(
                     got.kind(),

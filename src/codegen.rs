@@ -170,6 +170,8 @@ impl Codegen {
     fn expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Literal(literal) => match literal {
+                Literal::Bool(true) => dbg!(self.builder.insert(Op::LoadTrue)),
+                Literal::Bool(false) => self.builder.insert(Op::LoadFalse),
                 Literal::Char(char) => self.builder.insert(Op::LoadChar(*char)),
                 Literal::Int(int) => self.builder.insert(Op::LoadInt(*int as _)),
                 Literal::String(string) => {

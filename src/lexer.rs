@@ -65,6 +65,8 @@ pub enum Token {
     #[token("return")] Return,
     #[token("struct")] Struct,
     #[token("enum")] Enum,
+    #[token("true")] True,
+    #[token("false")] False,
     // Literals
     #[regex("'[^']'", |lex| lex.slice().chars().next().unwrap())]
     Char(char),
@@ -88,6 +90,8 @@ impl Token {
 impl TokenKind {
     pub fn repr(self) -> &'static str {
         match self {
+            Self::True => "true",
+            Self::False => "false",
             Self::Or => "or",
             Self::And => "and",
             Self::Ampersand => "&",

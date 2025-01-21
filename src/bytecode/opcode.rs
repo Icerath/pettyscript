@@ -16,6 +16,8 @@ pub enum Op {
     RangeInclusive,
     LoadNull,
     Index,
+    LoadTrue,
+    LoadFalse,
     LoadChar(char),
     LoadInt(i64),
     LoadString { ptr: u32, len: u32 },

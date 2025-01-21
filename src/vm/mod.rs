@@ -161,6 +161,8 @@ where
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs + rhs));
             }
+            OpCode::LoadTrue => stack.push(Value::Bool(true)),
+            OpCode::LoadFalse => stack.push(Value::Bool(false)),
             _ => todo!("{op:?}"),
         }
     }
