@@ -1,10 +1,9 @@
+use core::fmt;
 use std::io::{self, Write};
 
 use rustc_hash::FxHashMap;
 
 use crate::bytecode::{OpCode, StrIdent, VERSION};
-
-const NUM_BUILTINS: u32 = 1;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -102,24 +101,7 @@ where
                     Value::Builtin(Builtin::Println) => {
                         assert_eq!(numargs, 1);
                         let value = stack.pop().unwrap();
-                        match value {
-                            Value::Struct { fields } => writeln!(stdout, "{fields:?}"),
-                            Value::Function { label } => writeln!(stdout, "Function at {label}"),
-                            Value::Null => writeln!(stdout, "null"),
-                            Value::Bool(bool) => writeln!(stdout, "{bool}"),
-                            Value::Builtin(function) => writeln!(stdout, "Function::{function:?}"),
-                            Value::Int(int) => writeln!(stdout, "{int}"),
-                            Value::RangeInclusive(range) => {
-                                writeln!(stdout, "{}..={}", &range[0], &range[1])
-                            }
-                            Value::StringLiteral { ptr, len } => {
-                                let str = std::str::from_utf8(
-                                    &consts[ptr as usize..ptr as usize + len as usize],
-                                )
-                                .unwrap();
-                                writeln!(stdout, "{str}")
-                            }
-                        }?;
+                        writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
                     }
                     Value::Function { label } => {
                         let here = reader.head;
@@ -189,6 +171,45 @@ where
     }
 
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct DisplayValue<'a, 'b> {
+    consts: &'a [u8],
+    value: &'b Value,
+}
+
+impl fmt::Display for DisplayValue<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            Value::Struct { fields } => {
+                write!(f, "{{")?;
+                for (i, (key, value)) in fields.iter().enumerate() {
+                    let key = std::str::from_utf8(
+                        &self.consts[key.ptr as usize..key.ptr as usize + key.len as usize],
+                    )
+                    .unwrap();
+                    let prefix = if i != 0 { "," } else { "" };
+                    write!(f, "{prefix} {key}: {}", Self { value, ..*self })?;
+                }
+                write!(f, " }}")
+            }
+            Value::Function { label } => write!(f, "Function at {label}"),
+            Value::Null => write!(f, "null"),
+            Value::Bool(bool) => write!(f, "{bool}"),
+            Value::Builtin(function) => write!(f, "Function::{function:?}"),
+            Value::Int(int) => write!(f, "{int}"),
+            Value::RangeInclusive(range) => {
+                write!(f, "{}..={}", &range[0], &range[1])
+            }
+            Value::StringLiteral { ptr, len } => {
+                let ptr = *ptr as usize;
+                let len = *len as usize;
+                let str = std::str::from_utf8(&self.consts[ptr..ptr + len]).unwrap();
+                write!(f, "{str}")
+            }
+        }
+    }
 }
 
 pub struct BytecodeReader<'a> {

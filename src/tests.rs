@@ -26,5 +26,5 @@ fn test_obvious() {
         "let i = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
         "0\n1\n2\n3"
     );
-    // test_expr!("println(A { str: 1 })", "{2: Int(1)}");
+    test_expr!("println(A { str: 1 })", "{ str: 1 }");
 }
