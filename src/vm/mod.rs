@@ -25,6 +25,7 @@ pub enum Value {
 #[derive(Debug, Clone, Copy)]
 pub enum Builtin {
     Println,
+    ReadFile,
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -107,6 +108,22 @@ where
                         assert_eq!(numargs, 1);
                         let value = stack.pop().unwrap();
                         writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
+                        stack.push(Value::Null);
+                    }
+                    Value::Builtin(Builtin::ReadFile) => {
+                        assert_eq!(numargs, 1);
+                        let string = match stack.pop().unwrap() {
+                            Value::StringLiteral { ptr, len } => {
+                                let str = std::str::from_utf8(
+                                    &consts[ptr as usize..ptr as usize + len as usize],
+                                )
+                                .unwrap();
+                                std::fs::read_to_string(str).unwrap()
+                            }
+                            Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
+                            val => panic!("{val:?}"),
+                        };
+                        stack.push(Value::String(Rc::new(string.into())));
                     }
                     Value::Function { label } => {
                         let here = reader.head;
@@ -115,7 +132,6 @@ where
                     }
                     _ => todo!("{function:?}"),
                 }
-                stack.push(Value::Null);
             }
             OpCode::Pop => _ = stack.pop(),
             OpCode::Jump => {
@@ -133,6 +149,7 @@ where
                     &consts[ident.ptr as usize..ident.ptr as usize + ident.len as usize];
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
+                    b"read_file" => Value::Builtin(Builtin::ReadFile),
                     _ => match idents.get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
