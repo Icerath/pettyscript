@@ -439,7 +439,6 @@ impl<'a> Parser<'a> {
 
         if let Token::LBrace = self.peek()? {
             self.skip();
-
             let mut fields = vec![];
             while self.peek()? != Token::RBrace {
                 let ident = self.parse_ident()?;
@@ -449,7 +448,13 @@ impl<'a> Parser<'a> {
                 }
                 let expr = match self.bump()? {
                     Token::Comma => None,
-                    Token::Colon => Some(self.parse_root_expr()?),
+                    Token::Colon => {
+                        let expr = self.parse_root_expr()?;
+                        if self.peek()? == Token::Comma {
+                            self.skip();
+                        }
+                        Some(expr)
+                    }
                     got => {
                         return Err(
                             self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])

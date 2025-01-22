@@ -60,4 +60,5 @@ fn test_obvious() {
     test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
     test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
     test_expr!(r#"let tok; tok = "a"; println(tok);"#, "a");
+    test_expr!("Point { x: 0, y: 0 }", "");
 }
