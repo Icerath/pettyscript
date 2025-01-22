@@ -72,10 +72,17 @@ pub enum Token {
     Char(char),
     #[regex(r"\d[\d_]*", |lex| lex.slice().parse())]
     Int(i128),
-    #[regex(r#""[^"]*""#, |lex| intern(&lex.slice()[1..lex.slice().len() - 1]))]
+    #[regex(r#""[^"]*""#, string_escape)]
     String(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
+}
+
+type Lexer<'a> = logos::Lexer<'a, Token>;
+
+fn string_escape(lex: &mut Lexer) -> &'static str {
+    // TODO: Impl proper string escaping
+    intern(&lex.slice()[1..lex.slice().len() - 1].replace(r"\n", "\n"))
 }
 
 // avoid Logos' special case for &str
