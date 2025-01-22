@@ -433,7 +433,7 @@ where
         }
     }
 
-    debug_assert!(stack.is_empty(), "{stack:?}");
+    debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
 
     Ok(())
 }
