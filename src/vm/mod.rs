@@ -434,6 +434,7 @@ where
     }
 
     debug_assert!(stack.is_empty(), "{stack:?}");
+
     Ok(())
 }
 

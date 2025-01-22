@@ -36,6 +36,10 @@ fn test_obvious() {
     test_expr!("println(false && true)", "false");
     test_expr!("println(true && false)", "false");
     test_expr!("println(true && true)", "true");
+    test_expr!("println(false || false)", "false");
+    test_expr!("println(false || true)", "true");
+    test_expr!("println(true || false)", "true");
+    test_expr!("println(true || true)", "true");
     test_expr!("let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
     test_expr!("let lexer = Lexer { len: 10 }; println(1 < lexer.len);", "true");
     test_expr!("let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);", "11");
@@ -49,5 +53,11 @@ fn test_obvious() {
     test_expr!(r#"println('/' == "/")"#, "true");
     test_expr!(r#"println("/" == "/")"#, "true");
     test_expr!(r#"println("/" == "/")"#, "true");
-    test_expr!(r#"enum Emotion { Happy }; println(Emotion.Happy)"#, "Happy");
+    test_expr!("enum Emotion { Happy }; println(Emotion.Happy)", "Happy");
+    test_expr!("if 5 < 1 { println(true); } else { println(false); } ", "false");
+    test_expr!(r#"println("Hello, World!"[5])"#, ",");
+    test_expr!(r#"println("Hello, World!"[7..13])"#, "World!");
+    test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
+    test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
+    test_expr!(r#"let tok; tok = "a"; println(tok);"#, "a");
 }

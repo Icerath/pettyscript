@@ -93,16 +93,16 @@ fn lexer_next(lexer) {
         // Keywords
         else if starts_with(lexer.remaining, "or") { token = Token.Or; skip = 2; }
         else if starts_with(lexer.remaining, "||") { token = Token.Or; skip = 2; }
-        else if starts_with(lexer.remaining, "and") { token = Token.Or; skip = 3; }
-        else if starts_with(lexer.remaining, "&&") { token = Token.Or; skip = 2; }
+        else if starts_with(lexer.remaining, "and") { token = Token.And; skip = 3; }
+        else if starts_with(lexer.remaining, "&&") { token = Token.And; skip = 2; }
         else if starts_with(lexer.remaining, "if") { token = Token.If; skip = 2; }
         else if starts_with(lexer.remaining, "else") { token = Token.Else; skip = 4; }
         else if starts_with(lexer.remaining, "in") { token = Token.In; skip = 2; }
         else if starts_with(lexer.remaining, "fn") { token = Token.Fn; skip = 2; }
         else if starts_with(lexer.remaining, "for") { token = Token.For; skip = 3; }
-        else if starts_with(lexer.remaining, "return") { token = Token.Return; skip = 3; }
-        else if starts_with(lexer.remaining, "struct") { token = Token.Struct; skip = 3; }
-        else if starts_with(lexer.remaining, "enum") { token = Token.Enum; skip = 3; }
+        else if starts_with(lexer.remaining, "return") { token = Token.Return; skip = 6; }
+        else if starts_with(lexer.remaining, "struct") { token = Token.Struct; skip = 6; }
+        else if starts_with(lexer.remaining, "enum") { token = Token.Enum; skip = 4; }
         // Literals
         else if is_digit(first_char) || first_char == '_' {
             while is_digit(lexer.remaining[skip]) {
