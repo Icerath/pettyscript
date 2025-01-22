@@ -320,6 +320,20 @@ where
                         }
                         _ => panic!("{rhs:?}"),
                     },
+                    Value::StringLiteral { ptr, len } => {
+                        let str = &str_literal!(ptr, len);
+                        match rhs {
+                            Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
+                            Value::RangeInclusive(_) => todo!(),
+                            Value::Range(range) => {
+                                let [start, end] = *range;
+                                Value::String(Rc::new(
+                                    str[start as usize..end as usize].to_str().unwrap().into(),
+                                ))
+                            }
+                            _ => panic!("{rhs:?}"),
+                        }
+                    }
                     _ => todo!("{lhs:?}"),
                 };
                 stack.push(value);
