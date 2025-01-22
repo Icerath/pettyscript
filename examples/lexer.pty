@@ -43,6 +43,7 @@ enum Token {
     Enum,
     // Literals
     Int,
+    Character,
     String,
     Ident,
 }
@@ -109,6 +110,10 @@ fn lexer_next(lexer) {
             }
             token = Token.Int;
         }
+        else if first_char == "'" {
+            skip = skip + 2;
+            token = Token.Character;
+        } 
         else if first_char == '"' {
             while lexer.remaining[skip] != '"' {
                 skip = skip + 1;
