@@ -374,6 +374,7 @@ where
                         Value::RangeInclusive(_) => todo!(),
                         Value::Range(range) => {
                             let [start, end] = *range;
+                            println!("{start:?} - {end:?}");
                             Value::String(Rc::new(str[start as usize..end as usize].into()))
                         }
                         _ => panic!("{rhs:?}"),
