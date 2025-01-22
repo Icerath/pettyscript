@@ -32,6 +32,8 @@ pub enum Builtin {
     StartsWith,
     StrLen,
     Trim,
+    IsDigit,
+    IsAlphabetical,
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -189,6 +191,38 @@ where
                             };
                             stack.push(Value::String(Rc::new(str.trim().into())));
                         }
+                        Builtin::IsAlphabetical => 'block: {
+                            assert_eq!(numargs, 1);
+                            let value = stack.pop().unwrap();
+                            let str = match value {
+                                Value::StringLiteral { ptr, len } => {
+                                    str_literal!(ptr, len).to_str().unwrap()
+                                }
+                                Value::String(ref str) => str,
+                                Value::Char(char) => {
+                                    stack.push(Value::Bool(char.is_alphabetic()));
+                                    break 'block;
+                                }
+                                val => panic!("{val:?}"),
+                            };
+                            stack.push(Value::Bool(str.chars().all(|c| c.is_alphabetic())))
+                        }
+                        Builtin::IsDigit => 'block: {
+                            assert_eq!(numargs, 1);
+                            let value = stack.pop().unwrap();
+                            let str = match value {
+                                Value::StringLiteral { ptr, len } => {
+                                    str_literal!(ptr, len).to_str().unwrap()
+                                }
+                                Value::String(ref str) => str,
+                                Value::Char(char) => {
+                                    stack.push(Value::Bool(char.is_ascii_digit()));
+                                    break 'block;
+                                }
+                                val => panic!("{val:?}"),
+                            };
+                            stack.push(Value::Bool(str.chars().all(|c| c.is_ascii_digit())))
+                        }
                     },
 
                     Value::Function { label } => {
@@ -219,6 +253,8 @@ where
                     b"starts_with" => Value::Builtin(Builtin::StartsWith),
                     b"str_len" => Value::Builtin(Builtin::StrLen),
                     b"trim" => Value::Builtin(Builtin::Trim),
+                    b"is_digit" => Value::Builtin(Builtin::IsDigit),
+                    b"is_alphabetical" => Value::Builtin(Builtin::IsAlphabetical),
                     _ => match idents.get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
