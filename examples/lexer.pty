@@ -102,24 +102,25 @@ fn lexer_next(lexer) {
         else if starts_with(lexer.remaining, "enum") { token = Token.Enum; skip = 3; }
         // Literals
         else if is_digit(first_char) {
-            while is_digit(remaining.str[skip]) {
+            while is_digit(remaining.remaining[skip]) {
                 skip = skip + 1;
             }
             token = Token.Int;
         }
         else if first_char == '"' {
-            while remaining.str[skip] != '"' {
+            while remaining.remaining[skip] != '"' {
                 skip = skip + 1;
             }
             token = Token.String;
         } else if is_alphabetical(first_char) {
-            while is_alphabetical(remaining.str[skip]) {
+            while is_alphabetical(lexer.remaining[skip]) {
                 skip = skip + 1;
             }
             token = Token.Ident;
         } else {
             // TODO: f strings
-            println("Invalid Symbol: {first_char}");
+            println("Invalid Symbol: {}");
+            println(first_char);
             exit(1);
         }
         lexer.remaining = lexer.remaining[skip..str_len(lexer.remaining)];
