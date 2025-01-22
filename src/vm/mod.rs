@@ -34,6 +34,7 @@ pub enum Builtin {
     Trim,
     IsDigit,
     IsAlphabetical,
+    Exit,
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -223,6 +224,11 @@ where
                             };
                             stack.push(Value::Bool(str.chars().all(|c| c.is_ascii_digit())))
                         }
+                        Builtin::Exit => {
+                            assert!(numargs <= 1);
+                            let int = if numargs == 1 { pop_int!() as i32 } else { 0 };
+                            std::process::exit(int)
+                        }
                     },
 
                     Value::Function { label } => {
@@ -255,6 +261,7 @@ where
                     b"trim" => Value::Builtin(Builtin::Trim),
                     b"is_digit" => Value::Builtin(Builtin::IsDigit),
                     b"is_alphabetical" => Value::Builtin(Builtin::IsAlphabetical),
+                    b"exit" => Value::Builtin(Builtin::Exit),
                     _ => match idents.get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
