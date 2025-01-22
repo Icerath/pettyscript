@@ -43,4 +43,9 @@ fn test_obvious() {
         "let lexer = Lexer { str: \"abc\" }; lexer.str = lexer.str[0..2]; println(lexer.str)",
         "ab"
     );
+    test_expr!("println('a')", "a");
+    test_expr!(r#"println('/' == '/')"#, "true");
+    test_expr!(r#"println("/" == '/')"#, "true");
+    test_expr!(r#"println('/' == "/")"#, "true");
+    test_expr!(r#"println("/" == "/")"#, "true");
 }

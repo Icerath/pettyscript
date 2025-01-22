@@ -68,7 +68,7 @@ pub enum Token {
     #[token("true")] True,
     #[token("false")] False,
     // Literals
-    #[regex("'[^']'", |lex| lex.slice().chars().next().unwrap())]
+    #[regex("'[^']'", |lex| lex.slice()[1..].chars().next().unwrap())]
     Char(char),
     #[regex(r"\d[\d_]*", |lex| lex.slice().parse())]
     Int(i128),
