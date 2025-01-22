@@ -84,8 +84,8 @@ fn lexer_next(lexer) {
         else if starts_with(lexer.remaining, "!=") { token = Token.BangEq; skip = 2; }
         else if starts_with(lexer.remaining, "<=") { token = Token.LAngleEq; skip = 2; }
         else if starts_with(lexer.remaining, ">=") { token = Token.RAngleEq; skip = 2; }
-        else if starts_with(lexer.remaining, "..") { token = Token.Range; skip = 2; }
         else if starts_with(lexer.remaining, "..=") { token = Token.RangeInclusive; skip = 3; }else if first_char == '[' { token = Token.LBracket; }
+        else if starts_with(lexer.remaining, "..") { token = Token.Range; skip = 2; }
         else if first_char == ']' { token = Token.RBracket; }
         else if first_char == '(' { token = Token.LParen; }
         else if first_char == ')' { token = Token.RParen; }
