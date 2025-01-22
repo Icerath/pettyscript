@@ -101,8 +101,8 @@ fn lexer_next(lexer) {
         else if starts_with(lexer.remaining, "struct") { token = Token.Struct; skip = 3; }
         else if starts_with(lexer.remaining, "enum") { token = Token.Enum; skip = 3; }
         // Literals
-        else if is_digit(first_char) {
-            while is_digit(remaining.remaining[skip]) {
+        else if is_digit(first_char) || first_char == '_' {
+            while is_digit(lexer.remaining[skip]) {
                 skip = skip + 1;
             }
             token = Token.Int;

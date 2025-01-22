@@ -237,6 +237,17 @@ impl Codegen {
                         self.builder.insert_label(end_label);
                         break 'block;
                     }
+                    BinOp::Or => {
+                        let end_label = self.builder.create_label();
+                        self.expr(&exprs[0]);
+                        self.builder.insert(Op::Dup);
+                        self.builder.insert(Op::Not);
+                        self.builder.insert(Op::CJump(end_label));
+                        self.builder.insert(Op::Pop);
+                        self.expr(&exprs[1]);
+                        self.builder.insert_label(end_label);
+                        break 'block;
+                    }
                     _ => todo!("{op:?}"),
                 };
                 self.expr(&exprs[0]);

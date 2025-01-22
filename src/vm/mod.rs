@@ -361,7 +361,10 @@ where
                 };
                 let value = match fields.borrow().get(&ident) {
                     Some(value) => value.clone(),
-                    None => panic!("struct does not contain field: {ident:?}"),
+                    None => panic!(
+                        "struct does not contain field: {:?}",
+                        str_literal!(ident.ptr, ident.len).as_bstr()
+                    ),
                 };
                 stack.push(value);
             }
