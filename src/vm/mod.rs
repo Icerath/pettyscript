@@ -309,7 +309,7 @@ where
             }
             OpCode::Index => {
                 let rhs = stack.pop().unwrap();
-                let lhs = stack.last().unwrap();
+                let lhs = stack.pop().unwrap();
                 let value = match lhs {
                     Value::String(str) => match rhs {
                         Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
@@ -320,7 +320,7 @@ where
                         }
                         _ => panic!("{rhs:?}"),
                     },
-                    _ => todo!(),
+                    _ => todo!("{lhs:?}"),
                 };
                 stack.push(value);
             }
