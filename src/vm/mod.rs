@@ -78,6 +78,10 @@ where
         reader.head += 1;
         let op = OpCode::try_from(byte).unwrap();
         match op {
+            OpCode::LoadChar => {
+                let char = char::try_from(reader.read_u32()).unwrap();
+                stack.push(Value::Char(char));
+            }
             OpCode::LoadInt => stack.push(Value::Int(i64::from_le_bytes(*reader.read::<8>()))),
             OpCode::LoadString => {
                 let ptr = reader.read_u32();
