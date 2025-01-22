@@ -236,6 +236,9 @@ where
                         let here = reader.head;
                         call_stack.push(here);
                         reader.head = label as usize;
+                        for _ in 0..numargs {
+                            let arg = stack.pop().unwrap();
+                        }
                     }
                     _ => todo!("{function:?}"),
                 }
