@@ -113,6 +113,7 @@ fn lexer_next(lexer) {
             while lexer.remaining[skip] != '"' {
                 skip = skip + 1;
             }
+            skip = skip + 1;
             token = Token.String;
         } else if is_alphabetical(first_char) {
             while is_alphabetical(lexer.remaining[skip]) {
@@ -135,5 +136,6 @@ fn main() {
     let lexer = Lexer { str, remaining: str };
     while true {
         let token = lexer_next(lexer);
+        println(token);
     }
 }
