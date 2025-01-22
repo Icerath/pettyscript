@@ -300,6 +300,7 @@ where
                             let rhs = str_literal!(ptr, len);
                             lhs.as_bytes() == rhs
                         }
+                        Value::String(rhs) => lhs == rhs,
                         _ => panic!(),
                     },
                     Value::Char(lhs) => match rhs {
@@ -308,6 +309,7 @@ where
                         Value::StringLiteral { ptr, len } => {
                             str_char_eq(str_literal!(ptr, len), lhs)
                         }
+                        Value::String(rhs) => str_char_eq(rhs.as_bytes(), lhs),
                         _ => panic!(),
                     },
                     val => todo!("{val:?}"),
