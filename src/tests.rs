@@ -48,4 +48,6 @@ fn test_obvious() {
     test_expr!(r#"println("/" == '/')"#, "true");
     test_expr!(r#"println('/' == "/")"#, "true");
     test_expr!(r#"println("/" == "/")"#, "true");
+    test_expr!(r#"println("/" == "/")"#, "true");
+    test_expr!(r#"enum Emotion { Happy }; println(Emotion.Happy)"#, "Happy");
 }

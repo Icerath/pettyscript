@@ -52,6 +52,14 @@ impl Codegen {
                     .insert(ident, Type::Struct { fields: fields.iter().copied().collect() });
             }
             Stmt::Enum(Enum { ident, variants }) => {
+                self.builder.insert(Op::EmptyStruct);
+
+                for variant in variants {
+                    let variant = self.builder.insert_identifer(variant);
+                    self.builder.insert(Op::StoreEnumVariant(variant));
+                }
+                let name = self.builder.insert_identifer(ident);
+                self.builder.insert(Op::Store(name));
                 self.scope()
                     .types
                     .insert(ident, Type::Enum { variants: variants.iter().copied().collect() });

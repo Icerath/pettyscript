@@ -26,6 +26,7 @@ pub enum Op {
     RangeInclusive,
     LoadNull,
     Index,
+    StoreEnumVariant(StrIdent),
     CreateFunction { label: u32 },
     LoadTrue,
     LoadFalse,
@@ -75,6 +76,10 @@ impl BytecodeBuilder {
         self.instruction_data.push(op as u8);
 
         match instruction {
+            I::StoreEnumVariant(name) => {
+                self.instruction_data.extend(name.ptr.to_le_bytes());
+                self.instruction_data.extend(name.len.to_le_bytes());
+            }
             I::FnCall { numargs } => self.instruction_data.push(numargs),
             I::Store(ident) | I::Load(ident) => {
                 let StrIdent { ptr, len } = ident;

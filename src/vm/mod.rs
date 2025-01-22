@@ -14,6 +14,7 @@ use crate::bytecode::{OpCode, StrIdent, VERSION};
 pub enum Value {
     Null,
     Bool(bool),
+    EnumVariant { name: StrIdent, key: u32 },
     Char(char),
     Int(i64),
     Builtin(Builtin),
@@ -344,6 +345,11 @@ where
                 };
                 fields.borrow_mut().insert(field, value);
             }
+            OpCode::StoreEnumVariant => {
+                let variant = reader.read_ident();
+                let Value::Struct { fields } = stack.last_mut().unwrap() else { panic!() };
+                fields.borrow_mut().insert(variant, Value::EnumVariant { name: variant, key: 0 });
+            }
             OpCode::EmptyStruct => {
                 stack.push(Value::Struct { fields: Rc::default() });
             }
@@ -441,6 +447,10 @@ struct DisplayValue<'a, 'b> {
 impl fmt::Display for DisplayValue<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
+            Value::EnumVariant { name: StrIdent { ptr, len }, .. } => {
+                write!(f, "{}", self.consts[*ptr as usize..*ptr as usize + *len as usize].as_bstr())
+            }
+
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
