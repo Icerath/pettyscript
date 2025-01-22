@@ -115,6 +115,16 @@ where
                             stack.push(Value::Bool(false));
                         }
                     }
+                    Value::Range(range) => {
+                        let [start, end] = **range;
+                        if start < end {
+                            range[0] += 1;
+                            stack.push(Value::Int(start));
+                            stack.push(Value::Bool(true));
+                        } else {
+                            stack.push(Value::Bool(false));
+                        }
+                    }
                     _ => unimplemented!("{last:?}"),
                 }
             }
