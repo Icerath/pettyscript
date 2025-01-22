@@ -141,6 +141,7 @@ impl TryFrom<u8> for OpCode {
     type Error = ();
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
+        let _ = Op::End;
         if value >= OpCode::End as u8 {
             return Err(());
         }
