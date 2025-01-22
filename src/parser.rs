@@ -450,8 +450,17 @@ impl<'a> Parser<'a> {
                     Token::Comma => None,
                     Token::Colon => {
                         let expr = self.parse_root_expr()?;
-                        if self.peek()? == Token::Comma {
-                            self.skip();
+                        match self.peek()? {
+                            Token::Comma => self.skip(),
+                            Token::RBrace => {}
+                            got => {
+                                // TODO: Better error placement
+                                self.skip();
+                                return Err(self.expect_failed(
+                                    got.kind(),
+                                    &[TokenKind::Comma, TokenKind::LBrace],
+                                ));
+                            }
                         }
                         Some(expr)
                     }
