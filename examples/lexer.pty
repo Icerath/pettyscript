@@ -142,5 +142,8 @@ fn main() {
     while true {
         let token = lexer_next(lexer);
         println(token);
+        if lexer.remaining == "" {
+            break;
+        }
     }
 }
