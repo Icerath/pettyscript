@@ -126,68 +126,71 @@ where
 
                 let function = stack.pop().unwrap();
                 match function {
-                    Value::Builtin(Builtin::Println) => {
-                        assert_eq!(numargs, 1);
-                        let value = stack.pop().unwrap();
-                        writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
-                        stack.push(Value::Null);
-                    }
-                    Value::Builtin(Builtin::ReadFile) => {
-                        assert_eq!(numargs, 1);
-                        let string = match stack.pop().unwrap() {
-                            Value::StringLiteral { ptr, len } => {
-                                let str = str_literal!(ptr, len).to_str().unwrap();
-                                std::fs::read_to_string(str).unwrap()
-                            }
-                            Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
-                            val => panic!("{val:?}"),
-                        };
-                        stack.push(Value::String(Rc::new(string.into())));
-                    }
-                    Value::Builtin(Builtin::StartsWith) => {
-                        assert_eq!(numargs, 2);
-                        let rhs = stack.pop().unwrap();
-                        let lhs = stack.pop().unwrap();
+                    Value::Builtin(builtin) => match builtin {
+                        Builtin::Println => {
+                            assert_eq!(numargs, 1);
+                            let value = stack.pop().unwrap();
+                            writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
+                            stack.push(Value::Null);
+                        }
+                        Builtin::ReadFile => {
+                            assert_eq!(numargs, 1);
+                            let string = match stack.pop().unwrap() {
+                                Value::StringLiteral { ptr, len } => {
+                                    let str = str_literal!(ptr, len).to_str().unwrap();
+                                    std::fs::read_to_string(str).unwrap()
+                                }
+                                Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
+                                val => panic!("{val:?}"),
+                            };
+                            stack.push(Value::String(Rc::new(string.into())));
+                        }
+                        Builtin::StartsWith => {
+                            assert_eq!(numargs, 2);
+                            let rhs = stack.pop().unwrap();
+                            let lhs = stack.pop().unwrap();
 
-                        let rhs = match rhs {
-                            Value::StringLiteral { ptr, len } => {
-                                std::str::from_utf8(str_literal!(ptr, len)).unwrap()
-                            }
-                            Value::String(ref str) => str,
-                            val => panic!("{val:?}"),
-                        };
+                            let rhs = match rhs {
+                                Value::StringLiteral { ptr, len } => {
+                                    std::str::from_utf8(str_literal!(ptr, len)).unwrap()
+                                }
+                                Value::String(ref str) => str,
+                                val => panic!("{val:?}"),
+                            };
 
-                        let lhs = match lhs {
-                            Value::StringLiteral { ptr, len } => {
-                                std::str::from_utf8(str_literal!(ptr, len)).unwrap()
-                            }
-                            Value::String(ref str) => str,
-                            val => panic!("{val:?}"),
-                        };
-                        stack.push(Value::Bool(lhs.starts_with(rhs)));
-                    }
-                    Value::Builtin(Builtin::StrLen) => {
-                        assert_eq!(numargs, 1);
-                        let len = match stack.pop().unwrap() {
-                            Value::StringLiteral { len, .. } => len,
-                            Value::String(ref str) => str.len() as u32,
-                            val => panic!("{val:?}"),
-                        };
+                            let lhs = match lhs {
+                                Value::StringLiteral { ptr, len } => {
+                                    std::str::from_utf8(str_literal!(ptr, len)).unwrap()
+                                }
+                                Value::String(ref str) => str,
+                                val => panic!("{val:?}"),
+                            };
+                            stack.push(Value::Bool(lhs.starts_with(rhs)));
+                        }
+                        Builtin::StrLen => {
+                            assert_eq!(numargs, 1);
+                            let len = match stack.pop().unwrap() {
+                                Value::StringLiteral { len, .. } => len,
+                                Value::String(ref str) => str.len() as u32,
+                                val => panic!("{val:?}"),
+                            };
 
-                        stack.push(Value::Int(len as i64));
-                    }
-                    Value::Builtin(Builtin::Trim) => {
-                        assert_eq!(numargs, 1);
-                        let value = stack.pop().unwrap();
-                        let str = match value {
-                            Value::StringLiteral { ptr, len } => {
-                                str_literal!(ptr, len).to_str().unwrap()
-                            }
-                            Value::String(ref str) => str,
-                            val => panic!("{val:?}"),
-                        };
-                        stack.push(Value::String(Rc::new(str.trim().into())));
-                    }
+                            stack.push(Value::Int(len as i64));
+                        }
+                        Builtin::Trim => {
+                            assert_eq!(numargs, 1);
+                            let value = stack.pop().unwrap();
+                            let str = match value {
+                                Value::StringLiteral { ptr, len } => {
+                                    str_literal!(ptr, len).to_str().unwrap()
+                                }
+                                Value::String(ref str) => str,
+                                val => panic!("{val:?}"),
+                            };
+                            stack.push(Value::String(Rc::new(str.trim().into())));
+                        }
+                    },
+
                     Value::Function { label } => {
                         let here = reader.head;
                         call_stack.push(here);
