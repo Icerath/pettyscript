@@ -1,9 +1,9 @@
 use parser::parse;
-pub mod bytecode;
-pub mod codegen;
+mod bytecode;
+mod codegen;
 mod intern;
 mod lexer;
-pub mod parser;
+mod parser;
 #[cfg(test)]
 mod tests;
 mod vm;

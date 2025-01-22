@@ -73,6 +73,7 @@ pub struct Assign {
 #[derive(Debug)]
 pub enum AssignSegment {
     Field(&'static str),
+    #[expect(unused)]
     Index(Expr),
 }
 

@@ -1,5 +1,3 @@
-use rustc_hash::{FxHashMap, FxHashSet};
-
 use crate::{
     bytecode::{BytecodeBuilder, Op},
     parser::*,
@@ -15,22 +13,9 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     codegen.finish()
 }
 
-#[expect(unused)]
-enum Type {
-    Struct { fields: FxHashSet<&'static str> },
-    Enum { variants: FxHashSet<&'static str> },
-    Function { nparams: usize },
-}
-
-#[derive(Default)]
-struct Scope {
-    types: FxHashMap<&'static str, Type>,
-}
-
 #[derive(Default)]
 struct Codegen {
     builder: BytecodeBuilder,
-    scopes: Vec<Scope>,
     continue_label: Option<u32>,
     break_label: Option<u32>,
 }
@@ -38,19 +23,13 @@ struct Codegen {
 impl Codegen {
     fn gen_block(&mut self, ast: &[Stmt]) {
         for node in ast {
-            self.scopes.push(Scope::default());
             self.r#gen(node);
-            self.scopes.pop();
         }
     }
 
     fn gen(&mut self, node: &Stmt) {
         match node {
-            Stmt::Struct(Struct { ident, fields }) => {
-                self.scope()
-                    .types
-                    .insert(ident, Type::Struct { fields: fields.iter().copied().collect() });
-            }
+            Stmt::Struct(_) => {}
             Stmt::Enum(Enum { ident, variants }) => {
                 self.builder.insert(Op::EmptyStruct);
 
@@ -60,13 +39,9 @@ impl Codegen {
                 }
                 let name = self.builder.insert_identifer(ident);
                 self.builder.insert(Op::Store(name));
-                self.scope()
-                    .types
-                    .insert(ident, Type::Enum { variants: variants.iter().copied().collect() });
             }
             Stmt::Function(Function { ident, params, body }) => {
-                self.scope().types.insert(ident, Type::Function { nparams: params.len() });
-
+                let _ = params;
                 let ident_key = self.builder.insert_identifer(ident);
 
                 let function_start = self.builder.create_label();
@@ -285,10 +260,6 @@ impl Codegen {
             }
             _ => todo!("{expr:?}"),
         }
-    }
-
-    fn scope(&mut self) -> &mut Scope {
-        self.scopes.last_mut().unwrap()
     }
 
     fn finish(self) -> Vec<u8> {
