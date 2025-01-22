@@ -243,7 +243,7 @@ where
                     _ => todo!("{function:?}"),
                 }
             }
-            OpCode::Pop => _ = stack.pop(),
+            OpCode::Pop => _ = stack.pop().unwrap(),
             OpCode::Dup => stack.push(stack.last().unwrap().clone()),
             OpCode::Jump => {
                 let to = reader.read_u32();

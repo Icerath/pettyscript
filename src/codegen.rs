@@ -112,7 +112,6 @@ impl Codegen {
 
                 self.continue_label = prev_continue;
                 self.break_label = prev_break;
-                self.builder.insert(Op::Pop);
             }
             Stmt::ForLoop(ForLoop { ident, iter, body }) => {
                 let start_label = self.builder.create_label();
