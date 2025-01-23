@@ -1,13 +1,19 @@
+use bstr::ByteSlice;
+
 use crate::{codegen, parser::parse, vm};
+
+fn exec_vm(bytecode: &[u8]) -> String {
+    let mut output = vec![];
+    vm::execute_bytecode_with(&mut output, bytecode).unwrap();
+    output.to_str().unwrap().trim().to_owned()
+}
 
 #[test]
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
     let code = codegen::codegen(&ast);
-    let mut output = vec![];
-    vm::execute_bytecode_with(&mut output, &code).unwrap();
-    let result = String::from_utf8(output).unwrap();
+    let result = exec_vm(&code);
 
     let expected: String = (1..=100)
         .map(|i| match i {
@@ -18,7 +24,7 @@ fn test_fizzbuzz_example() {
         })
         .collect();
 
-    assert_eq!(result, expected);
+    assert_eq!(result, expected.trim());
 }
 
 #[test]
@@ -33,9 +39,8 @@ macro_rules! test_expr {
     ($expr: literal, $expected: literal) => {
         let ast = parse(concat!($expr, ";")).unwrap();
         let bytecode = codegen::codegen(&ast);
-        let mut output = vec![];
-        vm::execute_bytecode_with(&mut output, &bytecode).unwrap();
-        assert_eq!(String::from_utf8(output).unwrap().trim(), $expected);
+        let output = exec_vm(&bytecode);
+        assert_eq!(output, $expected);
     };
 }
 
