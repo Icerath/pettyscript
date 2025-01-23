@@ -13,12 +13,14 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     for node in ast {
         codegen.r#gen(node);
     }
-    codegen.scopes.pop();
 
     let main = codegen.builder.insert_identifer("main");
-    codegen.builder.insert(Op::Load(main, 0));
-    codegen.builder.insert(Op::FnCall { numargs: 0 });
-    codegen.builder.insert(Op::Pop);
+    if codegen.scopes.last().unwrap().contains(&main) {
+        codegen.builder.insert(Op::Load(main, 0));
+        codegen.builder.insert(Op::FnCall { numargs: 0 });
+        codegen.builder.insert(Op::Pop);
+    }
+
     codegen.finish()
 }
 

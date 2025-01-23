@@ -8,7 +8,7 @@ fn test_examples() {
 
 macro_rules! test_expr {
     ($expr: literal, $expected: literal) => {
-        let ast = parse(concat!("fn main() { ", $expr, "; }")).unwrap();
+        let ast = parse(concat!($expr, ";")).unwrap();
         let bytecode = codegen::codegen(&ast);
         let mut output = vec![];
         vm::execute_bytecode_with(&mut output, &bytecode).unwrap();
