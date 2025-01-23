@@ -402,10 +402,16 @@ where
                             Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                             Value::RangeInclusive(_) => todo!(),
                             Value::Range(range) => {
-                                let [start, end] = *range;
-                                Value::String(Rc::new(
-                                    str[start as usize..end as usize].to_str().unwrap().into(),
-                                ))
+                                let range_start: u32 = range[0].try_into().unwrap();
+                                let range_len: u32 = range[1].try_into().unwrap();
+                                assert!(range_len > range_start);
+                                assert!(range_start <= len);
+                                assert!(range_len <= len);
+
+                                Value::StringLiteral {
+                                    ptr: ptr + range_start,
+                                    len: range_len - range_start,
+                                }
                             }
                             _ => panic!("{rhs:?}"),
                         }
