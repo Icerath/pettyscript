@@ -64,7 +64,6 @@ impl Codegen {
                 self.builder.insert(Op::Store(name, self.current_scope()));
             }
             Stmt::Function(Function { ident, params, body }) => {
-                let _ = params;
                 let ident_key = self.builder.insert_identifer(ident);
 
                 let function_start = self.builder.create_label();
@@ -79,7 +78,9 @@ impl Codegen {
 
                 self.scopes.push(FxHashSet::default());
                 for param in params {
-                    self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer(param));
+                    let param = self.builder.insert_identifer(param);
+                    self.scopes.last_mut().unwrap().insert(param);
+                    self.builder.insert(Op::Store(param, self.current_scope()));
                 }
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
