@@ -26,7 +26,7 @@ pub enum Value {
     Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
 }
 
-#[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq)]
+#[derive(macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq)]
 #[repr(u16)]
 pub enum Builtin {
     Println,
@@ -37,6 +37,21 @@ pub enum Builtin {
     IsDigit,
     IsAlphabetical,
     Exit,
+}
+
+impl Builtin {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Println => "println",
+            Self::ReadFile => "read_file",
+            Self::StartsWith => "starts_with",
+            Self::StrLen => "str_len",
+            Self::Trim => "trim",
+            Self::IsDigit => "is_digit",
+            Self::IsAlphabetical => "is_alphabetical",
+            Self::Exit => "exit",
+        }
+    }
 }
 
 impl TryFrom<u16> for Builtin {

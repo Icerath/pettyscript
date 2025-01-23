@@ -4,6 +4,25 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Fields, Ident, ItemEnum};
 
+#[proc_macro_derive(AllVariants)]
+pub fn all_variants_derive(input: TokenStream) -> TokenStream {
+    let enum_ = parse_macro_input!(input as ItemEnum);
+    let ident = enum_.ident;
+    let variant_count = enum_.variants.len();
+
+    let mut all_variants = quote! {};
+    for variant in enum_.variants {
+        let variant_ident = variant.ident;
+        all_variants.extend(quote! { Self::#variant_ident, });
+    }
+
+    quote! {
+        impl #ident {
+            pub const ALL: [Self; #variant_count] = [#all_variants]; }
+    }
+    .into()
+}
+
 #[proc_macro_derive(NumVariants)]
 pub fn num_variants_derive(input: TokenStream) -> TokenStream {
     let enum_ = parse_macro_input!(input as ItemEnum);

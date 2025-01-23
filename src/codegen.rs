@@ -35,20 +35,10 @@ struct Codegen {
 
 impl Codegen {
     fn insert_builtins(&mut self) {
-        // TODO: Generate all variants with macros
         // TODO: Filter out unused identifiers
         let scope = self.scopes.last_mut().unwrap();
-        for (name, builtin) in [
-            ("println", Builtin::Println),
-            ("read_file", Builtin::ReadFile),
-            ("starts_with", Builtin::StartsWith),
-            ("str_len", Builtin::StrLen),
-            ("trim", Builtin::Trim),
-            ("is_digit", Builtin::IsDigit),
-            ("is_alphabetical", Builtin::IsAlphabetical),
-            ("exit", Builtin::Exit),
-        ] {
-            let name = self.builder.insert_identifer(name);
+        for builtin in Builtin::ALL {
+            let name = self.builder.insert_identifer(builtin.name());
             self.builder.insert(Op::LoadBuiltin(builtin));
             self.builder.insert(Op::Store(name, 0));
             scope.insert(name);
