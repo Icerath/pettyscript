@@ -13,3 +13,4 @@ hashbrown = { version = "0.15.2", default-features = false, features = [
 ] }
 rustc-hash = "2.1.0"
 bstr = "1.11.3"
+num_enum = "0.7.3"

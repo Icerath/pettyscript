@@ -26,7 +26,8 @@ pub enum Value {
     Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(num_enum::TryFromPrimitive, Debug, Clone, Copy, PartialEq)]
+#[repr(u16)]
 pub enum Builtin {
     Println,
     ReadFile,
@@ -265,23 +266,16 @@ where
                 }
                 idents[scope].insert(ident, value);
             }
+            OpCode::LoadBuiltin => {
+                stack.push(Value::Builtin(Builtin::try_from(reader.read_u16()).unwrap()));
+            }
             OpCode::Load => {
                 let ident = reader.read_ident();
                 let scope = reader.read_u32() as usize;
                 let ident_str = str_literal!(ident.ptr, ident.len);
-                let value = match ident_str {
-                    b"println" => Value::Builtin(Builtin::Println),
-                    b"read_file" => Value::Builtin(Builtin::ReadFile),
-                    b"starts_with" => Value::Builtin(Builtin::StartsWith),
-                    b"str_len" => Value::Builtin(Builtin::StrLen),
-                    b"trim" => Value::Builtin(Builtin::Trim),
-                    b"is_digit" => Value::Builtin(Builtin::IsDigit),
-                    b"is_alphabetical" => Value::Builtin(Builtin::IsAlphabetical),
-                    b"exit" => Value::Builtin(Builtin::Exit),
-                    _ => match idents[scope].get(&ident) {
-                        Some(value) => value.clone(),
-                        None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
-                    },
+                let value = match idents[scope].get(&ident) {
+                    Some(value) => value.clone(),
+                    None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
                 };
                 stack.push(value);
             }
@@ -530,5 +524,9 @@ impl<'a> BytecodeReader<'a> {
 
     pub fn read_u32(&mut self) -> u32 {
         u32::from_le_bytes(*self.read::<4>())
+    }
+
+    pub fn read_u16(&mut self) -> u16 {
+        u16::from_le_bytes(*self.read::<2>())
     }
 }

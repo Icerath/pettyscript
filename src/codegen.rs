@@ -3,6 +3,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     bytecode::{BytecodeBuilder, Op, StrIdent},
     parser::*,
+    vm::Builtin,
 };
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
@@ -34,14 +35,24 @@ struct Codegen {
 
 impl Codegen {
     fn insert_builtins(&mut self) {
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("println"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("read_file"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("starts_with"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("str_len"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("trim"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("is_digit"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("is_alphabetical"));
-        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("exit"));
+        // TODO: Generate all variants with macros
+        // TODO: Filter out unused identifiers
+        let scope = self.scopes.last_mut().unwrap();
+        for (name, builtin) in [
+            ("println", Builtin::Println),
+            ("read_file", Builtin::ReadFile),
+            ("starts_with", Builtin::StartsWith),
+            ("str_len", Builtin::StrLen),
+            ("trim", Builtin::Trim),
+            ("is_digit", Builtin::IsDigit),
+            ("is_alphabetical", Builtin::IsAlphabetical),
+            ("exit", Builtin::Exit),
+        ] {
+            let name = self.builder.insert_identifer(name);
+            self.builder.insert(Op::LoadBuiltin(builtin));
+            self.builder.insert(Op::Store(name, 0));
+            scope.insert(name);
+        }
     }
     fn gen_block(&mut self, ast: &[Stmt]) {
         self.scopes.push(FxHashSet::default());
