@@ -220,14 +220,20 @@ where
                         Builtin::Trim => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
-                            let str = match value {
+                            let value = match value {
                                 Value::StringLiteral { ptr, len } => {
-                                    str_literal!(ptr, len).to_str().unwrap()
+                                    let str = str_literal!(ptr, len).to_str().unwrap();
+                                    let new = str.trim();
+                                    let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
+                                    Value::StringLiteral {
+                                        ptr: ptr + ptr_diff as u32,
+                                        len: new.len() as u32,
+                                    }
                                 }
-                                Value::String(ref str) => str,
+                                Value::String(ref str) => Value::String(Rc::new(str.trim().into())),
                                 val => panic!("{val:?}"),
                             };
-                            stack.push(Value::String(Rc::new(str.trim().into())));
+                            stack.push(value);
                         }
                         Builtin::IsAlphabetical => 'block: {
                             assert_eq!(numargs, 1);
@@ -423,13 +429,11 @@ where
                             Value::Range(range) => {
                                 let range_start: u32 = range[0].try_into().unwrap();
                                 let range_len: u32 = range[1].try_into().unwrap();
-                                assert!(range_len > range_start);
-                                assert!(range_start <= len);
-                                assert!(range_len <= len);
-
+                                let new = &str[range_start as usize..range_len as usize];
+                                let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
                                 Value::StringLiteral {
-                                    ptr: ptr + range_start,
-                                    len: range_len - range_start,
+                                    ptr: ptr + ptr_diff as u32,
+                                    len: new.len() as u32,
                                 }
                             }
                             _ => panic!("{rhs:?}"),

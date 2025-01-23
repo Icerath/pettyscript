@@ -130,6 +130,11 @@ fn test_str_len() {
 }
 
 #[test]
+fn test_trim() {
+    test_expr!(r#"println(trim("  \n   Hello, World!\n  "))"#, "Hello, World!");
+}
+
+#[test]
 fn test_late_initialization() {
     test_expr!(r#"let tok; tok = "a"; println(tok);"#, "a");
 }
