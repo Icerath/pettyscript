@@ -1,7 +1,22 @@
-use quote::quote;
-use syn::{Fields, Ident, ItemEnum};
-
 extern crate proc_macro;
+
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, Fields, Ident, ItemEnum};
+
+#[proc_macro_derive(NumVariants)]
+pub fn num_variants_derive(input: TokenStream) -> TokenStream {
+    let enum_ = parse_macro_input!(input as ItemEnum);
+    let num_variants = enum_.variants.len();
+    let ident = enum_.ident;
+
+    quote! {
+        impl #ident {
+            pub const VARIANT_COUNT: usize = #num_variants;
+        }
+    }
+    .into()
+}
 
 #[proc_macro_derive(EnumKind, attributes(enum_kind))]
 pub fn enumkind_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -26,7 +26,7 @@ pub enum Value {
     Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
 }
 
-#[derive(num_enum::TryFromPrimitive, Debug, Clone, Copy, PartialEq)]
+#[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq)]
 #[repr(u16)]
 pub enum Builtin {
     Println,
@@ -37,6 +37,16 @@ pub enum Builtin {
     IsDigit,
     IsAlphabetical,
     Exit,
+}
+
+impl TryFrom<u16> for Builtin {
+    type Error = u16;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value as usize >= Self::VARIANT_COUNT {
+            return Err(value);
+        }
+        Ok(unsafe { std::mem::transmute::<u16, Self>(value) })
+    }
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
