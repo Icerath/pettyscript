@@ -1,3 +1,4 @@
+use bstr::ByteSlice;
 use enum_kinds::EnumKind;
 use rustc_hash::FxHashMap;
 
@@ -35,8 +36,8 @@ pub enum Op {
     LoadString { ptr: u32, len: u32 },
     Jump(u32),
     CJump(u32),
-    Load(StrIdent),
-    Store(StrIdent),
+    Load(StrIdent, u32),
+    Store(StrIdent, u32),
     LoadField(StrIdent),
     StoreField(StrIdent),
     Pop,
@@ -81,10 +82,11 @@ impl BytecodeBuilder {
                 self.instruction_data.extend(name.len.to_le_bytes());
             }
             I::FnCall { numargs } => self.instruction_data.push(numargs),
-            I::Store(ident) | I::Load(ident) => {
+            I::Store(ident, scope) | I::Load(ident, scope) => {
                 let StrIdent { ptr, len } = ident;
                 self.instruction_data.extend(ptr.to_le_bytes());
                 self.instruction_data.extend(len.to_le_bytes());
+                self.instruction_data.extend(scope.to_le_bytes());
             }
             I::StoreField(field) | I::LoadField(field) => {
                 let StrIdent { ptr, len } = field;
@@ -108,6 +110,12 @@ impl BytecodeBuilder {
     pub fn insert_identifer(&mut self, ident: &'static str) -> StrIdent {
         let [ptr, len] = self.insert_string(ident);
         StrIdent { ptr, len }
+    }
+
+    pub fn read_identifer(&self, ident: StrIdent) -> &str {
+        let key = &self.string_data[ident.ptr as usize..ident.ptr as usize + ident.len as usize];
+        let key = key.to_str().unwrap();
+        self.string_map.get_key_value(key).unwrap().0
     }
 
     pub fn insert_string(&mut self, str: &'static str) -> [u32; 2] {

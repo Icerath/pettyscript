@@ -1,13 +1,22 @@
+use rustc_hash::FxHashSet;
+
 use crate::{
-    bytecode::{BytecodeBuilder, Op},
+    bytecode::{BytecodeBuilder, Op, StrIdent},
     parser::*,
 };
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::default();
-    codegen.gen_block(ast);
+
+    codegen.scopes.push(FxHashSet::default());
+    codegen.insert_builtins();
+    for node in ast {
+        codegen.r#gen(node);
+    }
+    codegen.scopes.pop();
+
     let main = codegen.builder.insert_identifer("main");
-    codegen.builder.insert(Op::Load(main));
+    codegen.builder.insert(Op::Load(main, 0));
     codegen.builder.insert(Op::FnCall { numargs: 0 });
     codegen.builder.insert(Op::Pop);
     codegen.finish()
@@ -15,16 +24,29 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
 
 #[derive(Default)]
 struct Codegen {
+    scopes: Vec<FxHashSet<StrIdent>>,
     builder: BytecodeBuilder,
     continue_label: Option<u32>,
     break_label: Option<u32>,
 }
 
 impl Codegen {
+    fn insert_builtins(&mut self) {
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("println"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("read_file"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("starts_with"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("str_len"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("trim"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("is_digit"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("is_alphabetical"));
+        self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer("exit"));
+    }
     fn gen_block(&mut self, ast: &[Stmt]) {
+        self.scopes.push(FxHashSet::default());
         for node in ast {
             self.r#gen(node);
         }
+        self.scopes.pop();
     }
 
     fn gen(&mut self, node: &Stmt) {
@@ -38,7 +60,8 @@ impl Codegen {
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
                 let name = self.builder.insert_identifer(ident);
-                self.builder.insert(Op::Store(name));
+                self.scopes.last_mut().unwrap().insert(name);
+                self.builder.insert(Op::Store(name, self.current_scope()));
             }
             Stmt::Function(Function { ident, params, body }) => {
                 let _ = params;
@@ -48,12 +71,20 @@ impl Codegen {
                 let function_end = self.builder.create_label();
 
                 self.builder.insert(Op::CreateFunction { label: function_start });
-                self.builder.insert(Op::Store(ident_key));
+                self.builder.insert(Op::Store(ident_key, self.current_scope()));
+                self.scopes.last_mut().unwrap().insert(ident_key);
 
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 
-                self.gen_block(&body.stmts);
+                self.scopes.push(FxHashSet::default());
+                for param in params {
+                    self.scopes.last_mut().unwrap().insert(self.builder.insert_identifer(param));
+                }
+                for stmt in &body.stmts {
+                    self.r#gen(stmt);
+                }
+                self.scopes.pop();
 
                 self.builder.insert(Op::LoadNull);
                 self.builder.insert(Op::Ret);
@@ -66,16 +97,18 @@ impl Codegen {
                     None => self.builder.insert(Op::LoadNull),
                 }
                 let ident = self.builder.insert_identifer(ident);
-                self.builder.insert(Op::Store(ident));
+                let newly_inserted = self.scopes.last_mut().unwrap().insert(ident);
+                assert!(newly_inserted, "Variable shadowing not supported yet");
+                self.builder.insert(Op::Store(ident, self.current_scope()));
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
                 let root = self.builder.insert_identifer(root);
                 if segments.is_empty() {
                     self.expr(expr);
-                    self.builder.insert(Op::Store(root));
+                    self.builder.insert(Op::Store(root, self.scope_of(root)));
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
-                    self.builder.insert(Op::Load(root));
+                    self.builder.insert(Op::Load(root, self.scope_of(root)));
                     for segment in rest {
                         match segment {
                             AssignSegment::Index(_) => todo!(),
@@ -125,8 +158,18 @@ impl Codegen {
                 self.builder.insert(Op::IterNext);
                 self.builder.insert(Op::CJump(end_label));
                 let ident = self.builder.insert_identifer(ident);
-                self.builder.insert(Op::Store(ident));
-                self.gen_block(&body.stmts);
+
+                self.scopes.push(FxHashSet::default());
+
+                let newly_inserted = self.scopes.last_mut().unwrap().insert(ident);
+                assert!(newly_inserted);
+                self.builder.insert(Op::Store(ident, self.current_scope()));
+
+                for stmt in &body.stmts {
+                    self.r#gen(stmt);
+                }
+                self.scopes.pop();
+
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
                 self.builder.insert(Op::Pop);
@@ -182,7 +225,7 @@ impl Codegen {
                 }
                 Literal::Ident(ident) => {
                     let key = self.builder.insert_identifer(ident);
-                    self.builder.insert(Op::Load(key));
+                    self.builder.insert(Op::Load(key, self.scope_of(key)));
                 }
             },
             Expr::Binary { op, exprs } => 'block: {
@@ -252,13 +295,24 @@ impl Codegen {
                     let ident = self.builder.insert_identifer(ident);
                     match expr {
                         Some(expr) => self.expr(expr),
-                        None => self.builder.insert(Op::Load(ident)),
+                        None => self.builder.insert(Op::Load(ident, self.scope_of(ident))),
                     }
                     self.builder.insert(Op::StoreField(ident));
                 }
             }
             _ => todo!("{expr:?}"),
         }
+    }
+
+    fn scope_of(&self, ident: StrIdent) -> u32 {
+        self.scopes
+            .iter()
+            .rposition(|x| x.contains(&ident))
+            .unwrap_or_else(|| panic!("ident: '{}' not found", self.builder.read_identifer(ident)))
+            as u32
+    }
+    fn current_scope(&self) -> u32 {
+        self.scopes.len() as u32 - 1
     }
 
     fn finish(self) -> Vec<u8> {

@@ -261,11 +261,13 @@ where
             }
             OpCode::Store => {
                 let ident = reader.read_ident();
+                let scope = reader.read_u32();
                 let value = stack.pop().unwrap();
                 idents.insert(ident, value);
             }
             OpCode::Load => {
                 let ident = reader.read_ident();
+                let scope = reader.read_u32();
                 let ident_str = str_literal!(ident.ptr, ident.len);
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
