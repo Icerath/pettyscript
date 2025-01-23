@@ -5,7 +5,20 @@ fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
     let code = codegen::codegen(&ast);
-    vm::execute_bytecode(&code);
+    let mut output = vec![];
+    vm::execute_bytecode_with(&mut output, &code).unwrap();
+    let result = String::from_utf8(output).unwrap();
+
+    let expected: String = (1..=100)
+        .map(|i| match i {
+            _ if i % 15 == 0 => "FizzBuzz\n".to_string(),
+            _ if i % 3 == 0 => "Fizz\n".into(),
+            _ if i % 5 == 0 => "Buzz\n".into(),
+            _ => i.to_string() + "\n",
+        })
+        .collect();
+
+    assert_eq!(result, expected);
 }
 
 #[test]
