@@ -1,6 +1,7 @@
 use bstr::ByteSlice;
+use logos::Logos;
 
-use crate::{codegen, parser::parse, vm};
+use crate::{codegen, lexer::Token, parser::parse, vm};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
@@ -29,10 +30,19 @@ fn test_fizzbuzz_example() {
 
 #[test]
 fn test_lexer_example() {
+    let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();
     let code = codegen::codegen(&ast);
-    vm::execute_bytecode(&code);
+    let result = exec_vm(&code);
+
+    let mut expected = String::new();
+    for token in Token::lexer(fizzbuzz_src) {
+        let token = token.unwrap();
+        expected.push_str(&format!("{:?}\n", token.kind()));
+    }
+
+    assert_eq!(result, expected.trim());
 }
 
 macro_rules! test_expr {
