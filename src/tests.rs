@@ -4,14 +4,16 @@ use crate::{codegen, parser::parse, vm};
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
-    let _ = codegen::codegen(&ast);
+    let code = codegen::codegen(&ast);
+    vm::execute_bytecode(&code);
 }
 
 #[test]
 fn test_lexer_example() {
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();
-    let _ = codegen::codegen(&ast);
+    let code = codegen::codegen(&ast);
+    vm::execute_bytecode(&code);
 }
 
 macro_rules! test_expr {
