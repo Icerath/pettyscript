@@ -58,7 +58,7 @@ where
     let consts = &reader.bytes[..len_consts];
     reader.bytes = &reader.bytes[len_consts..];
 
-    let mut idents = FxHashMap::default();
+    let mut idents = vec![FxHashMap::default()];
     let mut stack = vec![];
     let mut call_stack = vec![];
 
@@ -258,13 +258,16 @@ where
             }
             OpCode::Store => {
                 let ident = reader.read_ident();
-                let scope = reader.read_u32();
+                let scope = reader.read_u32() as usize;
                 let value = stack.pop().unwrap();
-                idents.insert(ident, value);
+                if scope >= idents.len() {
+                    idents.resize_with(scope + 1, FxHashMap::default);
+                }
+                idents[scope].insert(ident, value);
             }
             OpCode::Load => {
                 let ident = reader.read_ident();
-                let scope = reader.read_u32();
+                let scope = reader.read_u32() as usize;
                 let ident_str = str_literal!(ident.ptr, ident.len);
                 let value = match ident_str {
                     b"println" => Value::Builtin(Builtin::Println),
@@ -275,7 +278,7 @@ where
                     b"is_digit" => Value::Builtin(Builtin::IsDigit),
                     b"is_alphabetical" => Value::Builtin(Builtin::IsAlphabetical),
                     b"exit" => Value::Builtin(Builtin::Exit),
-                    _ => match idents.get(&ident) {
+                    _ => match idents[scope].get(&ident) {
                         Some(value) => value.clone(),
                         None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
                     },
