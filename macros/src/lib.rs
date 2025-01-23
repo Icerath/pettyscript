@@ -11,14 +11,8 @@ pub fn enumkind_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     if enum_.attrs.is_empty() {
         panic!("Expected #[enum_kind] attribute");
     }
-    let new_name = &enum_
-        .attrs
-        .iter()
-        .find(|meta| meta.meta.path().is_ident("enum_kind"))
-        .unwrap()
-        .meta
-        .require_list()
-        .unwrap();
+    let meta = &enum_.attrs.iter().find(|meta| meta.meta.path().is_ident("enum_kind")).unwrap();
+    let new_name = meta.meta.require_list().unwrap();
     let new_ident: Ident = new_name.parse_args().unwrap();
 
     let vis = enum_.vis;
