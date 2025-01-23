@@ -1,5 +1,4 @@
 use bstr::ByteSlice;
-use enum_kinds::EnumKind;
 use rustc_hash::FxHashMap;
 
 use crate::vm::Builtin;
@@ -12,7 +11,7 @@ pub struct StrIdent {
     pub len: u32,
 }
 
-#[derive(EnumKind, Clone, Copy, Debug)]
+#[derive(macros::EnumKind, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {

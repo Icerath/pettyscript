@@ -1,6 +1,5 @@
 use std::fmt;
 
-use enum_kinds::EnumKind;
 use logos::Logos;
 
 use crate::intern::intern;
@@ -14,7 +13,7 @@ pub enum Error {
     Unknown,
 }
 
-#[derive(Debug, Logos, Clone, Copy, PartialEq, EnumKind)]
+#[derive(Debug, Logos, Clone, Copy, PartialEq, macros::EnumKind)]
 #[enum_kind(TokenKind)]
 #[logos(error = Error)]
 #[logos(skip "//[^\n]*\n")]
