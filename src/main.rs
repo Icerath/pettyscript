@@ -1,4 +1,3 @@
-use parser::parse;
 mod bytecode;
 mod codegen;
 mod intern;
@@ -8,10 +7,24 @@ mod parser;
 mod tests;
 mod vm;
 
+use clap::Parser;
+use parser::parse;
+use std::path::PathBuf;
+
+#[derive(clap::Parser)]
+struct Args {
+    path: PathBuf,
+    #[arg(short, long)]
+    output_bytecode: Option<PathBuf>,
+}
+
 fn main() {
-    let content = include_str!("../examples/lexer.pty");
-    let ast = parse(content).unwrap();
+    let args = Args::parse();
+    let content = std::fs::read_to_string(args.path).unwrap();
+    let ast = parse(&content).unwrap();
     let bytecode = codegen::codegen(&ast);
-    std::fs::write("output.ptyb", &bytecode).unwrap();
+    if let Some(path) = args.output_bytecode {
+        std::fs::write(path, &bytecode).unwrap();
+    }
     vm::execute_bytecode(&bytecode);
 }

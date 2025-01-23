@@ -11,3 +11,4 @@ hashbrown = { version = "0.15.2", default-features = false }
 rustc-hash = "2.1.0"
 bstr = { version = "1.11.3", default-features = false }
 macros = { path = "./macros" }
+clap = { version = "4.5.27", features = ["derive"] }
