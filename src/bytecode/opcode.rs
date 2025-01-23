@@ -11,7 +11,7 @@ pub struct StrIdent {
     pub len: u32,
 }
 
-#[derive(macros::EnumKind, Clone, Copy, Debug)]
+#[derive(macros::EnumKind, macros::NumVariants, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
@@ -45,7 +45,6 @@ pub enum Op {
     Pop,
     Dup,
     IterNext,
-    End,
 }
 
 #[derive(Default)]
@@ -152,8 +151,7 @@ impl TryFrom<u8> for OpCode {
     type Error = ();
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let _ = Op::End;
-        if value >= OpCode::End as u8 {
+        if value as usize >= Op::VARIANT_COUNT {
             return Err(());
         }
         unsafe { std::mem::transmute(value) }

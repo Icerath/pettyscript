@@ -454,7 +454,6 @@ where
                 };
                 stack.push(Value::Bool(is_greater));
             }
-            _ => todo!("{op:?}"),
         }
     }
 
