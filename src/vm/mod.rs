@@ -446,7 +446,7 @@ where
         }
     }
 
-    // debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
+    debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
 
     Ok(())
 }
