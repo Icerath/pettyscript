@@ -210,7 +210,11 @@ impl Codegen {
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
             Stmt::Return(Return(expr)) => {
-                self.expr(expr);
+                if let Some(expr) = expr {
+                    self.expr(expr);
+                } else {
+                    self.builder.insert(Op::LoadNull);
+                }
                 // TODO: remove for loop iterators.
                 let offset = self.scopes[self.scopes.len() - 2].len();
                 self.builder.insert(Op::SubStackPtr(offset as u32));

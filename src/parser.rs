@@ -57,7 +57,7 @@ impl fmt::Debug for Stmt {
 }
 
 #[derive(Debug)]
-pub struct Return(pub Expr);
+pub struct Return(pub Option<Expr>);
 
 pub struct VarDecl {
     pub ident: &'static str,
@@ -563,7 +563,8 @@ impl<'a> Parser<'a> {
 
     fn parse_return_stmt(&mut self) -> Result<Return> {
         self.expect_token(Token::Return)?;
-        let expr = self.parse_root_expr()?;
+        let expr =
+            if self.peek()? == Token::Semicolon { None } else { Some(self.parse_root_expr()?) };
         self.expect_semicolon()?;
         Ok(Return(expr))
     }
