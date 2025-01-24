@@ -78,14 +78,14 @@ impl Codegen {
                 let offset = self.write_ident_offset(ident);
                 self.builder.insert(Op::Store(offset));
             }
+
             Stmt::Function(Function { ident, params, body }) => {
                 let function_start = self.builder.create_label();
                 let function_end = self.builder.create_label();
 
                 let offset = self.write_ident_offset(ident);
-                self.builder.insert(Op::CreateFunction { label: function_start });
+                self.builder.insert(Op::CreateFunction);
                 self.builder.insert(Op::Store(offset));
-
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 

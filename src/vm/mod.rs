@@ -358,7 +358,7 @@ where
             }
             Op::LoadTrue => stack.push(Value::Bool(true)),
             Op::LoadFalse => stack.push(Value::Bool(false)),
-            Op::CreateFunction { label } => stack.push(Value::Function { label }),
+            Op::CreateFunction => stack.push(Value::Function { label: reader.head as u32 + 5 + 5 }),
             Op::LoadNull => stack.push(Value::Null),
             Op::Ret => reader.head = call_stack.pop().unwrap(),
             Op::StoreField(field) => {

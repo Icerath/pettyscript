@@ -28,7 +28,7 @@ pub enum Op {
     LoadNull,
     Index,
     StoreEnumVariant(StrIdent),
-    CreateFunction { label: u32 },
+    CreateFunction,
     LoadTrue,
     LoadFalse,
     LoadChar(char),
@@ -135,7 +135,7 @@ impl BytecodeBuilder {
                 self.instruction_data.extend(ptr.to_le_bytes());
                 self.instruction_data.extend(len.to_le_bytes());
             }
-            I::CreateFunction { label } | I::CJump(label) | I::Jump(label) => {
+            I::CJump(label) | I::Jump(label) => {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }

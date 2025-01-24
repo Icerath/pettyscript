@@ -35,7 +35,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::SubStackPtr(offset) => println!("SUB_STACK_PTR {offset}"),
             Op::Jump(label) => println!("JUMP x{label:x}"),
             Op::CJump(label) => println!("CJUMP x{label:x}"),
-            Op::CreateFunction { label } => println!("CREATE_FUNCTION x{label:x}"),
+            Op::CreateFunction => println!("CREATE_FUNCTION"),
             Op::EmptyStruct => println!("EMPTY_STRUCT"),
             Op::FnCall { numargs } => println!("FN_CALL {numargs}"),
             Op::Greater => println!("GREATER"),
