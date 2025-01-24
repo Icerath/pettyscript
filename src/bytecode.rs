@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use crate::vm::Builtin;
+use crate::builtints::Builtin;
 
 pub const VERSION: u32 = 0;
 

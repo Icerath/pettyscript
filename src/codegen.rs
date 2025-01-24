@@ -1,9 +1,9 @@
 use rustc_hash::FxHashMap;
 
 use crate::{
+    builtints::Builtin,
     bytecode::{BytecodeBuilder, Op},
     parser::*,
-    vm::Builtin,
 };
 
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {

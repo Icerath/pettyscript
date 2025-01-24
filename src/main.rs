@@ -1,3 +1,4 @@
+mod builtints;
 mod bytecode;
 mod codegen;
 mod disassemble;
