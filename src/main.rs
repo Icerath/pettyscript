@@ -1,5 +1,6 @@
 mod bytecode;
 mod codegen;
+mod disassemble;
 mod intern;
 mod lexer;
 mod parser;
@@ -8,6 +9,7 @@ mod tests;
 mod vm;
 
 use clap::Parser;
+use disassemble::disassemble;
 use parser::parse;
 use std::path::PathBuf;
 
@@ -16,6 +18,9 @@ struct Args {
     path: PathBuf,
     #[arg(short, long)]
     output_bytecode: Option<PathBuf>,
+
+    #[arg(short, long)]
+    disassemble: bool,
 }
 
 fn main() {
@@ -26,5 +31,9 @@ fn main() {
     if let Some(path) = args.output_bytecode {
         std::fs::write(path, &bytecode).unwrap();
     }
-    vm::execute_bytecode(&bytecode);
+    if args.disassemble {
+        disassemble(&bytecode);
+    } else {
+        vm::execute_bytecode(&bytecode);
+    }
 }

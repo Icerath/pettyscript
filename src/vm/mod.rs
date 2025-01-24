@@ -506,8 +506,8 @@ impl fmt::Display for DisplayValue<'_, '_> {
 }
 
 pub struct BytecodeReader<'a> {
-    bytes: &'a [u8],
-    head: usize,
+    pub bytes: &'a [u8],
+    pub head: usize,
 }
 
 impl<'a> BytecodeReader<'a> {
