@@ -36,9 +36,7 @@ struct Codegen {
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            let offset = self.write_ident_offset(builtin.name());
-            self.builder.insert(Op::LoadBuiltin(builtin));
-            self.builder.insert(Op::Store(offset));
+            self.write_ident_offset(builtin.name());
         }
     }
 

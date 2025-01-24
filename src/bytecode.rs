@@ -43,7 +43,6 @@ pub enum Op {
     SubStackPtr(u32),
     LoadField(StrIdent),
     StoreField(StrIdent),
-    LoadBuiltin(Builtin),
     Pop,
     Dup,
     IterNext,
@@ -140,7 +139,6 @@ impl BytecodeBuilder {
                 self.jumps.push(self.instruction_data.len());
                 self.instruction_data.extend(label.to_le_bytes());
             }
-            I::LoadBuiltin(builtin) => self.instruction_data.extend((builtin as u16).to_le_bytes()),
             I::LoadChar(char) => self.instruction_data.extend((char as u32).to_le_bytes()),
             I::LoadInt(int) => self.instruction_data.extend(int.to_le_bytes()),
             I::LoadString { ptr, len } => {

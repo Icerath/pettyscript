@@ -42,7 +42,6 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::IterNext => println!("ITER_NEXT"),
             Op::Load(ident) => println!("LOAD {ident}"),
             Op::Store(ident) => println!("STORE {ident}"),
-            Op::LoadBuiltin(builtin) => println!("LOAD_BUILTIN {}", builtin.name()),
             Op::LoadChar(char) => println!("LOAD_CHAR '{char}'"),
             Op::LoadFalse => println!("LOAD_FALSE"),
             Op::LoadTrue => println!("LOAD_TRUE"),

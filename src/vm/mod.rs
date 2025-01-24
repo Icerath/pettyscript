@@ -108,6 +108,10 @@ where
     let mut variable_stack = vec![Value::Null; STACK_SIZE];
     let mut stack_ptr = 0usize;
 
+    for (offset, builtin) in Builtin::ALL.into_iter().enumerate() {
+        variable_stack[stack_ptr + offset] = Value::Builtin(builtin);
+    }
+
     while reader.head < reader.bytes.len() {
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
@@ -293,7 +297,6 @@ where
             Op::Pop => _ = stack.pop().unwrap(),
             Op::Dup => stack.push(stack.last().unwrap().clone()),
             Op::Jump(label) => reader.head = label as usize,
-            Op::LoadBuiltin(builtin) => stack.push(Value::Builtin(builtin)),
             Op::Mod => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
