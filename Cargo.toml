@@ -12,3 +12,7 @@ rustc-hash = "2.1.0"
 bstr = { version = "1.11.3", default-features = false }
 macros = { path = "./macros" }
 clap = { version = "4.5.27", features = ["derive"] }
+
+[profile.release]
+lto = "fat"
+panic = "abort"
