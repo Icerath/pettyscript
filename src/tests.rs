@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bstr::ByteSlice;
 use logos::Logos;
 
@@ -18,10 +20,10 @@ fn test_fizzbuzz_example() {
 
     let expected: String = (1..=100)
         .map(|i| match i {
-            _ if i % 15 == 0 => "FizzBuzz\n".to_string(),
+            _ if i % 15 == 0 => "FizzBuzz\n".into(),
             _ if i % 3 == 0 => "Fizz\n".into(),
             _ if i % 5 == 0 => "Buzz\n".into(),
-            _ => i.to_string() + "\n",
+            _ => Cow::Owned(i.to_string() + "\n"),
         })
         .collect();
 
