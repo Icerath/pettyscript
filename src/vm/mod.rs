@@ -87,6 +87,7 @@ where
     let mut stack = vec![];
     let mut call_stack = vec![];
     let mut variable_stacks: Vec<Vec<Value>> = vec![vec![]];
+    variable_stacks[0].extend(Builtin::ALL.map(Value::Builtin));
 
     macro_rules! pop_int {
         () => {
@@ -102,10 +103,6 @@ where
             let ptr = $ptr;
             &consts[ptr as usize..ptr as usize + $len as usize]
         }};
-    }
-
-    for builtin in Builtin::ALL {
-        variable_stacks[0].push(Value::Builtin(builtin));
     }
 
     while reader.head < reader.bytes.len() {
