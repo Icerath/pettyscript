@@ -116,18 +116,9 @@ where
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         match op {
-            Op::LoadGlobal(offset) => {
-                let val = variable_stack[offset as usize].clone();
-                stack.push(val);
-            }
-            Op::Load(offset) => {
-                let val = variable_stack[stack_ptr + offset as usize].clone();
-                stack.push(val);
-            }
-            Op::Store(offset) => {
-                let val = stack.pop().unwrap();
-                variable_stack[stack_ptr + offset as usize] = val;
-            }
+            Op::LoadGlobal(offset) => stack.push(variable_stack[offset as usize].clone()),
+            Op::Load(offset) => stack.push(variable_stack[stack_ptr + offset as usize].clone()),
+            Op::Store(offset) => variable_stack[stack_ptr + offset as usize] = stack.pop().unwrap(),
             Op::AddStackPtr(offset) => stack_ptr += offset as usize,
             Op::SubStackPtr(offset) => stack_ptr -= offset as usize,
             Op::LoadChar(char) => stack.push(Value::Char(char)),
