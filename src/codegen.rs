@@ -40,18 +40,6 @@ impl Codegen {
         }
     }
 
-    fn push_fn_scope(&mut self) {
-        let offset = self.scopes.last().unwrap().len();
-        self.builder.insert(Op::AddStackPtr(offset as u32));
-        self.scopes.push(FxHashMap::default());
-    }
-
-    fn pop_fn_scope(&mut self) {
-        self.scopes.pop().unwrap();
-        let offset = self.scopes.last().unwrap().len();
-        self.builder.insert(Op::SubStackPtr(offset as u32));
-    }
-
     fn gen_block(&mut self, ast: &[Stmt]) {
         for node in ast {
             self.r#gen(node);
@@ -89,7 +77,8 @@ impl Codegen {
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 
-                self.push_fn_scope();
+                self.scopes.push(FxHashMap::default());
+
                 for param in params {
                     let offset = self.write_ident_offset(param);
                     self.builder.insert(Op::Store(offset));
@@ -97,7 +86,7 @@ impl Codegen {
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
                 }
-                self.pop_fn_scope();
+                self.scopes.pop().unwrap();
 
                 self.builder.insert(Op::LoadNull);
                 self.builder.insert(Op::Ret);
@@ -216,8 +205,6 @@ impl Codegen {
                     self.builder.insert(Op::LoadNull);
                 }
                 // TODO: remove for loop iterators.
-                let offset = self.scopes[self.scopes.len() - 2].len();
-                self.builder.insert(Op::SubStackPtr(offset as u32));
                 self.builder.insert(Op::Ret);
             }
             _ => todo!("{node:?}"),

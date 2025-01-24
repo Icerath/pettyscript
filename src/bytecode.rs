@@ -39,8 +39,6 @@ pub enum Op {
     Load(u32),
     Store(u32),
     LoadGlobal(u32),
-    AddStackPtr(u32),
-    SubStackPtr(u32),
     LoadField(StrIdent),
     StoreField(StrIdent),
     Pop,
@@ -125,9 +123,6 @@ impl BytecodeBuilder {
             }
             I::FnCall { numargs } => self.instruction_data.push(numargs),
             I::Store(offset) | I::Load(offset) | I::LoadGlobal(offset) => {
-                self.instruction_data.extend(offset.to_le_bytes());
-            }
-            I::AddStackPtr(offset) | I::SubStackPtr(offset) => {
                 self.instruction_data.extend(offset.to_le_bytes());
             }
             I::StoreField(field) | I::LoadField(field) => {

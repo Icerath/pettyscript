@@ -86,6 +86,7 @@ where
 
     let mut stack = vec![];
     let mut call_stack = vec![];
+    let mut variable_stacks: Vec<Vec<Value>> = vec![vec![]];
 
     macro_rules! pop_int {
         () => {
@@ -103,24 +104,26 @@ where
         }};
     }
 
-    const STACK_SIZE: usize = 8 * 1024 * 1024 / size_of::<Value>();
-
-    let mut variable_stack = vec![Value::Null; STACK_SIZE];
-    let mut stack_ptr = 0usize;
-
-    for (offset, builtin) in Builtin::ALL.into_iter().enumerate() {
-        variable_stack[stack_ptr + offset] = Value::Builtin(builtin);
+    for builtin in Builtin::ALL {
+        variable_stacks[0].push(Value::Builtin(builtin));
     }
 
     while reader.head < reader.bytes.len() {
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         match op {
-            Op::LoadGlobal(offset) => stack.push(variable_stack[offset as usize].clone()),
-            Op::Load(offset) => stack.push(variable_stack[stack_ptr + offset as usize].clone()),
-            Op::Store(offset) => variable_stack[stack_ptr + offset as usize] = stack.pop().unwrap(),
-            Op::AddStackPtr(offset) => stack_ptr += offset as usize,
-            Op::SubStackPtr(offset) => stack_ptr -= offset as usize,
+            Op::LoadGlobal(offset) => stack.push(variable_stacks[0][offset as usize].clone()),
+            Op::Load(offset) => {
+                stack.push(variable_stacks.last().unwrap()[offset as usize].clone())
+            }
+            Op::Store(offset) => {
+                let offset = offset as usize;
+                let variable_stack = variable_stacks.last_mut().unwrap();
+                if offset >= variable_stack.len() {
+                    variable_stack.resize_with(offset + 1, || Value::Null);
+                }
+                variable_stack[offset] = stack.pop().unwrap()
+            }
             Op::LoadChar(char) => stack.push(Value::Char(char)),
             Op::LoadInt(int) => stack.push(Value::Int(int)),
             Op::LoadString { ptr, len } => stack.push(Value::StringLiteral { ptr, len }),
@@ -278,6 +281,7 @@ where
                     },
 
                     Value::Function { label } => {
+                        variable_stacks.push(vec![]);
                         let here = reader.head;
                         call_stack.push(here);
                         reader.head = label as usize;
@@ -351,7 +355,10 @@ where
             Op::LoadFalse => stack.push(Value::Bool(false)),
             Op::CreateFunction => stack.push(Value::Function { label: reader.head as u32 + 5 + 5 }),
             Op::LoadNull => stack.push(Value::Null),
-            Op::Ret => reader.head = call_stack.pop().unwrap(),
+            Op::Ret => {
+                reader.head = call_stack.pop().unwrap();
+                variable_stacks.pop().unwrap();
+            }
             Op::StoreField(field) => {
                 let value = stack.pop().unwrap();
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {

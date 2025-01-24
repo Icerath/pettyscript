@@ -31,8 +31,6 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::Eq => println!("EQ"),
             Op::Index => println!("INDEX"),
             Op::Less => println!("LESS"),
-            Op::AddStackPtr(offset) => println!("ADD_STACK_PTR  {offset}"),
-            Op::SubStackPtr(offset) => println!("SUB_STACK_PTR {offset}"),
             Op::Jump(label) => println!("JUMP x{label:x}"),
             Op::CJump(label) => println!("CJUMP x{label:x}"),
             Op::CreateFunction => println!("CREATE_FUNCTION"),
