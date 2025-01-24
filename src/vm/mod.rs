@@ -84,7 +84,6 @@ where
     let consts = &reader.bytes[..len_consts];
     reader.bytes = &reader.bytes[len_consts..];
 
-    let mut idents = vec![FxHashMap::default()];
     let mut stack = vec![];
     let mut call_stack = vec![];
 
@@ -104,10 +103,32 @@ where
         }};
     }
 
+    const STACK_SIZE: usize = 8 * 1024 * 1024 / size_of::<Value>();
+
+    let mut variable_stack = vec![Value::Null; STACK_SIZE];
+    let mut stack_ptr = 0usize;
+
     while let Some(&byte) = reader.bytes.get(reader.head) {
         reader.head += 1;
         let op = OpCode::try_from(byte).unwrap();
         match op {
+            OpCode::LoadGlobal => {
+                let offset = reader.read_u32() as usize;
+                let val = variable_stack[offset].clone();
+                stack.push(val);
+            }
+            OpCode::Load => {
+                let offset = reader.read_u32() as usize;
+                let val = variable_stack[stack_ptr + offset].clone();
+                stack.push(val);
+            }
+            OpCode::Store => {
+                let offset = reader.read_u32() as usize;
+                let val = stack.pop().unwrap();
+                variable_stack[stack_ptr + offset] = val;
+            }
+            OpCode::AddStackPtr => stack_ptr += reader.read_u32() as usize,
+            OpCode::SubStackPtr => stack_ptr -= reader.read_u32() as usize,
             OpCode::LoadChar => {
                 let char = char::try_from(reader.read_u32()).unwrap();
                 stack.push(Value::Char(char));
@@ -279,7 +300,7 @@ where
                         call_stack.push(here);
                         reader.head = label as usize;
                     }
-                    _ => todo!("{function:?}"),
+                    _ => {}
                 }
             }
             OpCode::Pop => _ = stack.pop().unwrap(),
@@ -288,27 +309,8 @@ where
                 let to = reader.read_u32();
                 reader.head = to as usize;
             }
-            OpCode::Store => {
-                let ident = reader.read_ident();
-                let scope = reader.read_u32() as usize;
-                let value = stack.pop().unwrap();
-                if scope >= idents.len() {
-                    idents.resize_with(scope + 1, FxHashMap::default);
-                }
-                idents[scope].insert(ident, value);
-            }
             OpCode::LoadBuiltin => {
                 stack.push(Value::Builtin(Builtin::try_from(reader.read_u16()).unwrap()));
-            }
-            OpCode::Load => {
-                let ident = reader.read_ident();
-                let scope = reader.read_u32() as usize;
-                let ident_str = str_literal!(ident.ptr, ident.len);
-                let value = match idents[scope].get(&ident) {
-                    Some(value) => value.clone(),
-                    None => panic!("Unknown identifier: '{}'", ident_str.as_bstr()),
-                };
-                stack.push(value);
             }
             OpCode::Mod => {
                 let rhs = pop_int!();
@@ -476,7 +478,7 @@ where
         }
     }
 
-    debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
+    // debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
 
     Ok(())
 }

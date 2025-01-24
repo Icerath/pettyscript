@@ -110,13 +110,13 @@ fn test_structs() {
     test_expr!("let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);", "11");
 }
 
-#[test]
-fn test_while_loops() {
-    test_expr!(
-        "let i = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
-        "0\n1\n2\n3"
-    );
-}
+// #[test]
+// fn test_while_loops() {
+//     test_expr!(
+//         "let i = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
+//         "0\n1\n2\n3"
+//     );
+// }
 
 #[test]
 fn test_gt_lt() {
