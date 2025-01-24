@@ -10,7 +10,7 @@ pub struct StrIdent {
     pub len: u32,
 }
 
-#[derive(macros::EnumKind, macros::NumVariants, Clone, Copy, Debug)]
+#[derive(macros::BcRead, macros::EnumKind, macros::NumVariants, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
@@ -47,6 +47,46 @@ pub enum Op {
     Pop,
     Dup,
     IterNext,
+}
+
+trait BcRead: Sized {
+    fn bc_read(bytes: &mut &[u8]) -> Self;
+}
+
+macro_rules! impl_int {
+    ($int: ident) => {
+        impl BcRead for $int {
+            fn bc_read(bytes: &mut &[u8]) -> Self {
+                let size = size_of::<Self>();
+                let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap());
+                *bytes = &bytes[size..];
+                out
+            }
+        }
+    };
+}
+
+macro_rules! impl_from {
+    ($ty: ident, $int: ident) => {
+        impl BcRead for $ty {
+            fn bc_read(bytes: &mut &[u8]) -> Self {
+                Self::try_from($int::bc_read(bytes)).unwrap()
+            }
+        }
+    };
+}
+
+impl_int!(u8);
+impl_int!(u16);
+impl_int!(u32);
+impl_int!(i64);
+impl_from!(Builtin, u16);
+impl_from!(char, u32);
+
+impl BcRead for StrIdent {
+    fn bc_read(bytes: &mut &[u8]) -> Self {
+        Self { ptr: u32::bc_read(bytes), len: u32::bc_read(bytes) }
+    }
 }
 
 #[derive(Default)]

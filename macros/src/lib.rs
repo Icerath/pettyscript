@@ -4,6 +4,59 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Fields, Ident, ItemEnum};
 
+#[proc_macro_derive(BcRead)]
+pub fn bc_read_derive(input: TokenStream) -> TokenStream {
+    let enum_ = parse_macro_input!(input as ItemEnum);
+    let ident = enum_.ident;
+
+    let mut match_stmt = quote! {};
+    let mut size_impl = quote! {};
+    for variant in enum_.variants {
+        let variant_ident = variant.ident;
+
+        let mut body = quote! {};
+        let mut size = quote! { 0 };
+        let branch = match variant.fields {
+            Fields::Unit => quote! { OpCode::#variant_ident => Self::#variant_ident, },
+            Fields::Named(fields) => {
+                for field in fields.named {
+                    let ident = field.ident;
+                    let ty = field.ty;
+                    body.extend(quote! { #ident : #ty::bc_read(&mut bytes), });
+                    size.extend(quote! { + size_of::<#ty>() });
+                }
+                quote! { OpCode::#variant_ident => Self::#variant_ident { #body }, }
+            }
+            Fields::Unnamed(fields) => {
+                for field in fields.unnamed {
+                    let ty = field.ty;
+                    body.extend(quote! { #ty::bc_read(&mut bytes), });
+                    size.extend(quote! { + size_of::<#ty>() });
+                }
+                quote! { OpCode::#variant_ident => Self::#variant_ident(#body), }
+            }
+        };
+        size_impl.extend(quote! { OpCode::#variant_ident => #size, });
+        match_stmt.extend(branch);
+    }
+
+    quote! {
+        impl #ident {
+            pub fn bc_read(mut bytes: &[u8]) -> Self {
+                match OpCode::try_from(u8::bc_read(&mut bytes)).unwrap() {
+                    #match_stmt
+                }
+            }
+            pub fn size(&self) -> usize {
+                match OpCode::from(*self) {
+                    #size_impl
+                }
+            }
+        }
+    }
+    .into()
+}
+
 #[proc_macro_derive(AllVariants)]
 pub fn all_variants_derive(input: TokenStream) -> TokenStream {
     let enum_ = parse_macro_input!(input as ItemEnum);

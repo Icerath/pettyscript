@@ -8,7 +8,7 @@ use std::{
 use bstr::ByteSlice;
 use rustc_hash::FxHashMap;
 
-use crate::bytecode::{OpCode, StrIdent, VERSION};
+use crate::bytecode::{Op, StrIdent, VERSION};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -76,9 +76,9 @@ where
     const { assert!(size_of::<Option<Value>>() == 16) };
 
     let mut reader = BytecodeReader::new(bytecode);
-    let version = reader.read_u32();
+    let version = u32::from_le_bytes(*reader.read::<4>());
     assert_eq!(version, VERSION);
-    let len_consts = reader.read_u32() as usize;
+    let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
     reader.bytes = &reader.bytes[reader.head..];
     reader.head = 0;
     let consts = &reader.bytes[..len_consts];
@@ -108,48 +108,38 @@ where
     let mut variable_stack = vec![Value::Null; STACK_SIZE];
     let mut stack_ptr = 0usize;
 
-    while let Some(&byte) = reader.bytes.get(reader.head) {
-        reader.head += 1;
-        let op = OpCode::try_from(byte).unwrap();
+    while reader.head < reader.bytes.len() {
+        let op = Op::bc_read(&reader.bytes[reader.head..]);
+        reader.head += 1 + op.size();
         match op {
-            OpCode::LoadGlobal => {
-                let offset = reader.read_u32() as usize;
-                let val = variable_stack[offset].clone();
+            Op::LoadGlobal(offset) => {
+                let val = variable_stack[offset as usize].clone();
                 stack.push(val);
             }
-            OpCode::Load => {
-                let offset = reader.read_u32() as usize;
-                let val = variable_stack[stack_ptr + offset].clone();
+            Op::Load(offset) => {
+                let val = variable_stack[stack_ptr + offset as usize].clone();
                 stack.push(val);
             }
-            OpCode::Store => {
-                let offset = reader.read_u32() as usize;
+            Op::Store(offset) => {
                 let val = stack.pop().unwrap();
-                variable_stack[stack_ptr + offset] = val;
+                variable_stack[stack_ptr + offset as usize] = val;
             }
-            OpCode::AddStackPtr => stack_ptr += reader.read_u32() as usize,
-            OpCode::SubStackPtr => stack_ptr -= reader.read_u32() as usize,
-            OpCode::LoadChar => {
-                let char = char::try_from(reader.read_u32()).unwrap();
-                stack.push(Value::Char(char));
-            }
-            OpCode::LoadInt => stack.push(Value::Int(i64::from_le_bytes(*reader.read::<8>()))),
-            OpCode::LoadString => {
-                let ptr = reader.read_u32();
-                let len = reader.read_u32();
-                stack.push(Value::StringLiteral { ptr, len });
-            }
-            OpCode::Range => {
+            Op::AddStackPtr(offset) => stack_ptr += offset as usize,
+            Op::SubStackPtr(offset) => stack_ptr -= offset as usize,
+            Op::LoadChar(char) => stack.push(Value::Char(char)),
+            Op::LoadInt(int) => stack.push(Value::Int(int)),
+            Op::LoadString { ptr, len } => stack.push(Value::StringLiteral { ptr, len }),
+            Op::Range => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
                 stack.push(Value::Range(Box::new([start, end])));
             }
-            OpCode::RangeInclusive => {
+            Op::RangeInclusive => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
                 stack.push(Value::RangeInclusive(Box::new([start, end])));
             }
-            OpCode::IterNext => {
+            Op::IterNext => {
                 let last = stack.last_mut().unwrap();
                 match last {
                     Value::RangeInclusive(range) => {
@@ -175,16 +165,13 @@ where
                     _ => unimplemented!("{last:?}"),
                 }
             }
-            OpCode::CJump => {
+            Op::CJump(label) => {
                 let Value::Bool(bool) = stack.pop().unwrap() else { unimplemented!() };
-                let label = reader.read_u32();
                 if !bool {
                     reader.head = label as usize;
                 }
             }
-            OpCode::FnCall => {
-                let numargs = reader.read::<1>()[0];
-
+            Op::FnCall { numargs } => {
                 let function = stack.pop().unwrap();
                 match function {
                     Value::Builtin(builtin) => match builtin {
@@ -303,21 +290,16 @@ where
                     _ => {}
                 }
             }
-            OpCode::Pop => _ = stack.pop().unwrap(),
-            OpCode::Dup => stack.push(stack.last().unwrap().clone()),
-            OpCode::Jump => {
-                let to = reader.read_u32();
-                reader.head = to as usize;
-            }
-            OpCode::LoadBuiltin => {
-                stack.push(Value::Builtin(Builtin::try_from(reader.read_u16()).unwrap()));
-            }
-            OpCode::Mod => {
+            Op::Pop => _ = stack.pop().unwrap(),
+            Op::Dup => stack.push(stack.last().unwrap().clone()),
+            Op::Jump(label) => reader.head = label as usize,
+            Op::LoadBuiltin(builtin) => stack.push(Value::Builtin(builtin)),
+            Op::Mod => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs % rhs));
             }
-            OpCode::Eq => {
+            Op::Eq => {
                 let rhs = stack.pop().unwrap();
                 let is_eq = match stack.pop().unwrap() {
                     Value::Null => rhs == Value::Null,
@@ -366,51 +348,43 @@ where
                 };
                 stack.push(Value::Bool(is_eq));
             }
-            OpCode::Add => {
+            Op::Add => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs + rhs));
             }
-            OpCode::LoadTrue => stack.push(Value::Bool(true)),
-            OpCode::LoadFalse => stack.push(Value::Bool(false)),
-            OpCode::CreateFunction => {
-                let label = reader.read_u32();
-                stack.push(Value::Function { label });
-            }
-            OpCode::LoadNull => stack.push(Value::Null),
-            OpCode::Ret => reader.head = call_stack.pop().unwrap(),
-            OpCode::StoreField => {
-                let field = reader.read_ident();
+            Op::LoadTrue => stack.push(Value::Bool(true)),
+            Op::LoadFalse => stack.push(Value::Bool(false)),
+            Op::CreateFunction { label } => stack.push(Value::Function { label }),
+            Op::LoadNull => stack.push(Value::Null),
+            Op::Ret => reader.head = call_stack.pop().unwrap(),
+            Op::StoreField(field) => {
                 let value = stack.pop().unwrap();
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {
                     unimplemented!("{:?}", stack.last().unwrap())
                 };
                 fields.borrow_mut().insert(field, value);
             }
-            OpCode::StoreEnumVariant => {
-                let variant = reader.read_ident();
+            Op::StoreEnumVariant(variant) => {
                 let Value::Struct { fields } = stack.last_mut().unwrap() else { panic!() };
                 fields.borrow_mut().insert(variant, Value::EnumVariant { name: variant, key: 0 });
             }
-            OpCode::EmptyStruct => {
-                stack.push(Value::Struct { fields: Rc::default() });
-            }
-            OpCode::LoadField => {
-                let ident = reader.read_ident();
+            Op::EmptyStruct => stack.push(Value::Struct { fields: Rc::default() }),
+            Op::LoadField(field) => {
                 let fields = match stack.pop().unwrap() {
                     Value::Struct { fields } => fields,
                     other => panic!("{other:?}"),
                 };
-                let value = match fields.borrow().get(&ident) {
+                let value = match fields.borrow().get(&field) {
                     Some(value) => value.clone(),
                     None => panic!(
                         "struct does not contain field: {:?}",
-                        str_literal!(ident.ptr, ident.len).as_bstr()
+                        str_literal!(field.ptr, field.len).as_bstr()
                     ),
                 };
                 stack.push(value);
             }
-            OpCode::Index => {
+            Op::Index => {
                 let rhs = stack.pop().unwrap();
                 let lhs = stack.pop().unwrap();
                 let value = match lhs {
@@ -445,7 +419,7 @@ where
                 };
                 stack.push(value);
             }
-            OpCode::Not => {
+            Op::Not => {
                 let bool = match stack.pop().unwrap() {
                     Value::Null => false,
                     Value::Bool(bool) => bool,
@@ -453,7 +427,7 @@ where
                 };
                 stack.push(Value::Bool(!bool));
             }
-            OpCode::Less => {
+            Op::Less => {
                 let rhs = stack.pop().unwrap();
                 let is_less = match stack.pop().unwrap() {
                     Value::Int(lhs) => match rhs {
@@ -464,7 +438,7 @@ where
                 };
                 stack.push(Value::Bool(is_less));
             }
-            OpCode::Greater => {
+            Op::Greater => {
                 let rhs = stack.pop().unwrap();
                 let is_greater = match stack.pop().unwrap() {
                     Value::Int(lhs) => match rhs {
@@ -537,11 +511,6 @@ pub struct BytecodeReader<'a> {
 }
 
 impl<'a> BytecodeReader<'a> {
-    pub fn read_ident(&mut self) -> StrIdent {
-        let ptr = self.read_u32();
-        let len = self.read_u32();
-        StrIdent { ptr, len }
-    }
     pub fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, head: 0 }
     }
@@ -550,13 +519,5 @@ impl<'a> BytecodeReader<'a> {
         let bytes = self.bytes[self.head..self.head + N].try_into().unwrap();
         self.head += N;
         bytes
-    }
-
-    pub fn read_u32(&mut self) -> u32 {
-        u32::from_le_bytes(*self.read::<4>())
-    }
-
-    pub fn read_u16(&mut self) -> u16 {
-        u16::from_le_bytes(*self.read::<2>())
     }
 }
