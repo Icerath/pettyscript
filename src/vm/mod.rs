@@ -1,6 +1,6 @@
 use core::fmt;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     io::{self, Write},
     rc::Rc,
 };
@@ -24,8 +24,8 @@ pub enum Value {
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     String(Rc<Box<str>>),
-    Range(Box<[i64; 2]>),
-    RangeInclusive(Box<[i64; 2]>),
+    Range(Rc<[Cell<i64>; 2]>),
+    RangeInclusive(Rc<[Cell<i64>; 2]>),
     Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
 }
 
@@ -92,32 +92,32 @@ where
             Op::Range => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
-                stack.push(Value::Range(Box::new([start, end])));
+                stack.push(Value::Range(Rc::new([Cell::new(start), Cell::new(end)])));
             }
             Op::RangeInclusive => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
-                stack.push(Value::RangeInclusive(Box::new([start, end])));
+                stack.push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
             }
             Op::IterNext => {
-                let last = stack.last_mut().unwrap();
+                let last = stack.last().unwrap();
                 match last {
                     Value::RangeInclusive(range) => {
-                        let [start, end] = **range;
-                        if start <= end {
-                            range[0] += 1;
-                            stack.push(Value::Int(start));
+                        let [start, end] = &*range.clone();
+                        if start.get() <= end.get() {
+                            stack.push(Value::Int(start.get()));
                             stack.push(Value::Bool(true));
+                            start.set(start.get() + 1);
                         } else {
                             stack.push(Value::Bool(false));
                         }
                     }
                     Value::Range(range) => {
-                        let [start, end] = **range;
-                        if start < end {
-                            range[0] += 1;
-                            stack.push(Value::Int(start));
+                        let [start, end] = &*range.clone();
+                        if start.get() < end.get() {
+                            stack.push(Value::Int(start.get()));
                             stack.push(Value::Bool(true));
+                            start.set(start.get() + 1);
                         } else {
                             stack.push(Value::Bool(false));
                         }
@@ -355,8 +355,10 @@ where
                         Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                         Value::RangeInclusive(_) => todo!(),
                         Value::Range(range) => {
-                            let [start, end] = *range;
-                            Value::String(Rc::new(str[start as usize..end as usize].into()))
+                            let [start, end] = &*range;
+                            Value::String(Rc::new(
+                                str[start.get() as usize..end.get() as usize].into(),
+                            ))
                         }
                         _ => panic!("{rhs:?}"),
                     },
@@ -366,8 +368,8 @@ where
                             Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                             Value::RangeInclusive(_) => todo!(),
                             Value::Range(range) => {
-                                let range_start: u32 = range[0].try_into().unwrap();
-                                let range_len: u32 = range[1].try_into().unwrap();
+                                let range_start: u32 = range[0].get().try_into().unwrap();
+                                let range_len: u32 = range[1].get().try_into().unwrap();
                                 let new = &str[range_start as usize..range_len as usize];
                                 let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
                                 Value::StringLiteral {
@@ -453,9 +455,9 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Builtin(function) => write!(f, "Function::{function:?}"),
             Value::Int(int) => write!(f, "{int}"),
-            Value::Range(range) => write!(f, "{}..{}", &range[0], &range[1]),
+            Value::Range(range) => write!(f, "{}..{}", range[0].get(), range[1].get()),
             Value::RangeInclusive(range) => {
-                write!(f, "{}..={}", &range[0], &range[1])
+                write!(f, "{}..={}", range[0].get(), range[1].get())
             }
             Value::StringLiteral { ptr, len } => {
                 let ptr = *ptr as usize;
