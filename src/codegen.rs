@@ -332,7 +332,12 @@ impl Codegen {
                     self.builder.insert(Op::ArrayPush);
                 }
             }
-            _ => todo!("{expr:?}"),
+            Expr::Unary { op, expr } => {
+                self.expr(expr);
+                match op {
+                    UnaryOp::Not => self.builder.insert(Op::Not),
+                }
+            }
         }
     }
 

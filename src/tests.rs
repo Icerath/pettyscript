@@ -130,6 +130,12 @@ fn test_while_loops() {
 }
 
 #[test]
+fn test_unary() {
+    test_expr!("println(!false)", "true");
+    // test_expr!("println(-123712)", "-123712");
+}
+
+#[test]
 fn test_array_literals() {
     test_expr!("println([])", "[]");
     test_expr!(r#"println([1, 2, 3, "Go!"])"#, r#"[1, 2, 3, Go!]"#);

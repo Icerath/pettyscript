@@ -483,10 +483,13 @@ impl<'a> Parser<'a> {
 
     fn parse_unary_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
         match self.peek()? {
-            Token::Bang => Ok(Expr::Unary {
-                op: UnaryOp::Not,
-                expr: Box::new(self.parse_expr(0, allow_struct_init)?),
-            }),
+            Token::Bang => {
+                self.skip();
+                Ok(Expr::Unary {
+                    op: UnaryOp::Not,
+                    expr: Box::new(self.parse_expr(0, allow_struct_init)?),
+                })
+            }
             Token::LBracket => self.parse_list_expr().map(Expr::Array),
             _ => self.parse_paren_expr(),
         }
