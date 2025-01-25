@@ -9,13 +9,13 @@ use crate::{
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::default();
 
-    codegen.scopes.push(FxHashMap::default());
+    codegen.scopes.push(FunctionScope::default());
     codegen.insert_builtins();
     for node in ast {
         codegen.r#gen(node);
     }
 
-    if let Some(&offset) = codegen.scopes.last().unwrap().get("main") {
+    if let Some(&offset) = codegen.scopes.last().unwrap().variables.get("main") {
         codegen.builder.insert(Op::Load(offset));
         codegen.builder.insert(Op::FnCall { numargs: 0 });
         codegen.builder.insert(Op::Pop);
@@ -26,8 +26,14 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
 }
 
 #[derive(Default)]
+struct FunctionScope {
+    variables: FxHashMap<&'static str, u32>,
+    nfor_loops: usize,
+}
+
+#[derive(Default)]
 struct Codegen {
-    scopes: Vec<FxHashMap<&'static str, u32>>,
+    scopes: Vec<FunctionScope>,
     builder: BytecodeBuilder,
     continue_label: Option<u32>,
     break_label: Option<u32>,
@@ -47,8 +53,8 @@ impl Codegen {
     }
 
     fn write_ident_offset(&mut self, ident: &'static str) -> u32 {
-        let offset = self.scopes.last().unwrap().len() as u32;
-        let newly_inserted = self.scopes.last_mut().unwrap().insert(ident, offset);
+        let offset = self.scopes.last().unwrap().variables.len() as u32;
+        let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, offset);
         assert!(newly_inserted.is_none());
         offset
     }
@@ -77,7 +83,7 @@ impl Codegen {
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 
-                self.scopes.push(FxHashMap::default());
+                self.scopes.push(FunctionScope::default());
 
                 for param in params {
                     let offset = self.write_ident_offset(param);
@@ -160,9 +166,13 @@ impl Codegen {
                 let offset = self.write_ident_offset(ident);
                 self.builder.insert(Op::Store(offset));
 
+                self.scopes.last_mut().unwrap().nfor_loops += 1;
+
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
                 }
+
+                self.scopes.last_mut().unwrap().nfor_loops -= 1;
 
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
@@ -204,7 +214,9 @@ impl Codegen {
                 } else {
                     self.builder.insert(Op::LoadNull);
                 }
-                // TODO: remove for loop iterators.
+                for _ in 0..self.scopes.last().unwrap().nfor_loops {
+                    self.builder.insert(Op::Pop);
+                }
                 self.builder.insert(Op::Ret);
             }
             _ => todo!("{node:?}"),
@@ -212,17 +224,17 @@ impl Codegen {
     }
 
     fn store(&mut self, ident: &'static str) {
-        match self.scopes.last().unwrap().get(ident) {
+        match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => self.builder.insert(Op::Store(offset)),
             None => panic!(),
         };
     }
 
     fn load(&mut self, ident: &'static str) {
-        match self.scopes.last().unwrap().get(ident) {
+        match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => self.builder.insert(Op::Load(offset)),
             None => {
-                let offset = *self.scopes.first().unwrap().get(ident).unwrap();
+                let offset = *self.scopes.first().unwrap().variables.get(ident).unwrap();
                 self.builder.insert(Op::LoadGlobal(offset));
             }
         }
