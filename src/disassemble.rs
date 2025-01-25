@@ -27,6 +27,8 @@ pub fn disassemble(bytecode: &[u8]) {
         print!("x{offset:x}: ");
         match op {
             Op::Add => println!("ADD"),
+            Op::CreateArray => println!("CREATE_ARRAY"),
+            Op::ArrayPush => println!("ARRAY_PUSH"),
             Op::Dup => println!("DUP"),
             Op::Eq => println!("EQ"),
             Op::Index => println!("INDEX"),

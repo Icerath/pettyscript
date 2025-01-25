@@ -139,11 +139,13 @@ pub enum Expr {
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Expr]> },
     InitStruct { r#struct: Box<Expr>, fields: Box<[StructInitField]> },
+    Array(Box<[Expr]>),
 }
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Array(values) => f.debug_tuple("Array").field(values).finish(),
             Self::Index { expr, index } => {
                 f.debug_struct("Index").field("expr", expr).field("index", index).finish()
             }
@@ -485,8 +487,24 @@ impl<'a> Parser<'a> {
                 op: UnaryOp::Not,
                 expr: Box::new(self.parse_expr(0, allow_struct_init)?),
             }),
+            Token::LBracket => self.parse_list_expr().map(Expr::Array),
             _ => self.parse_paren_expr(),
         }
+    }
+
+    fn parse_list_expr(&mut self) -> Result<Box<[Expr]>> {
+        self.expect_token(Token::LBracket)?;
+
+        let mut values = vec![];
+        while self.peek()? != Token::RBracket {
+            let expr = self.parse_root_expr()?;
+            values.push(expr);
+            if self.peek()? == Token::Comma {
+                self.skip()
+            }
+        }
+        self.skip();
+        Ok(values.into())
     }
 
     fn parse_paren_expr(&mut self) -> Result<Expr> {

@@ -1,4 +1,4 @@
-use core::fmt;
+use core::{fmt, panic};
 use std::{
     cell::{Cell, RefCell},
     io::{self, Write},
@@ -13,6 +13,7 @@ use crate::{
     bytecode::{Op, StrIdent, VERSION},
 };
 
+// TODO: Remove Rc<Refcell> with indexes
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Null,
@@ -24,6 +25,7 @@ pub enum Value {
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     String(Rc<Box<str>>),
+    Array(Rc<RefCell<Vec<Value>>>),
     Range(Rc<[Cell<i64>; 2]>),
     RangeInclusive(Rc<[Cell<i64>; 2]>),
     Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
@@ -74,6 +76,13 @@ where
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         match op {
+            Op::ArrayPush => {
+                let value = stack.pop().unwrap();
+                let arr = stack.last_mut().unwrap();
+                let Value::Array(arr) = arr else { panic!() };
+                arr.borrow_mut().push(value);
+            }
+            Op::CreateArray => stack.push(Value::Array(Rc::default())),
             Op::LoadGlobal(offset) => stack.push(variable_stacks[0][offset as usize].clone()),
             Op::Load(offset) => {
                 stack.push(variable_stacks.last().unwrap()[offset as usize].clone())
@@ -466,6 +475,13 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 write!(f, "{str}")
             }
             Value::String(str) => write!(f, "{str}"),
+            Value::Array(values) => {
+                let mut debug_list = f.debug_list();
+                for value in &*values.borrow() {
+                    debug_list.entry(&format_args!("{}", DisplayValue { value, ..*self }));
+                }
+                debug_list.finish()
+            }
         }
     }
 }

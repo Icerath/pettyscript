@@ -325,6 +325,13 @@ impl Codegen {
                     self.builder.insert(Op::StoreField(ident));
                 }
             }
+            Expr::Array(array) => {
+                self.builder.insert(Op::CreateArray);
+                for expr in array {
+                    self.expr(expr);
+                    self.builder.insert(Op::ArrayPush);
+                }
+            }
             _ => todo!("{expr:?}"),
         }
     }

@@ -30,6 +30,8 @@ pub enum Op {
     Index,
     StoreEnumVariant(StrIdent),
     CreateFunction,
+    CreateArray,
+    ArrayPush,
     LoadTrue,
     LoadFalse,
     LoadChar(char),
