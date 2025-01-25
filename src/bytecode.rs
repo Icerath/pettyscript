@@ -183,6 +183,6 @@ impl TryFrom<u8> for OpCode {
         if value as usize >= Op::VARIANT_COUNT {
             return Err(());
         }
-        unsafe { std::mem::transmute(value) }
+        Ok(unsafe { std::mem::transmute::<u8, Self>(value) })
     }
 }
