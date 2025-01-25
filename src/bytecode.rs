@@ -4,7 +4,7 @@ use crate::builtints::Builtin;
 
 pub const VERSION: u32 = 0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StrIdent {
     pub ptr: u32,
     pub len: u32,

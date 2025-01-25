@@ -1,4 +1,6 @@
-#[derive(macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq)]
+#[derive(
+    macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[repr(u16)]
 pub enum Builtin {
     Println,
@@ -11,11 +13,15 @@ pub enum Builtin {
     Exit,
     ArrayPush,
     ArrayPop,
+    CreateMap,
+    InsertMap,
 }
 
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
+            Self::CreateMap => "create_map",
+            Self::InsertMap => "insert_map",
             Self::ArrayPush => "array_push",
             Self::ArrayPop => "array_pop",
             Self::Println => "println",

@@ -1,12 +1,12 @@
 use core::{fmt, panic};
 use std::{
     cell::{Cell, RefCell},
+    collections::BTreeMap,
     io::{self, Write},
     rc::Rc,
 };
 
 use bstr::ByteSlice;
-use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::Builtin,
@@ -14,7 +14,8 @@ use crate::{
 };
 
 // TODO: Remove Rc<Refcell> with indexes
-#[derive(Debug, Clone, PartialEq)]
+// TODO: Replace BTreeMap with HashMap
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -26,9 +27,10 @@ pub enum Value {
     StringLiteral { ptr: u32, len: u32 },
     String(Rc<Box<str>>),
     Array(Rc<RefCell<Vec<Value>>>),
+    Map(Rc<RefCell<BTreeMap<Value, Value>>>),
     Range(Rc<[Cell<i64>; 2]>),
     RangeInclusive(Rc<[Cell<i64>; 2]>),
-    Struct { fields: Rc<RefCell<FxHashMap<StrIdent, Value>>> },
+    Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -144,6 +146,14 @@ where
                 let function = stack.pop().unwrap();
                 match function {
                     Value::Builtin(builtin) => match builtin {
+                        Builtin::CreateMap => stack.push(Value::Map(Rc::default())),
+                        Builtin::InsertMap => {
+                            let value = stack.pop().unwrap();
+                            let key = stack.pop().unwrap();
+                            let Value::Map(map) = stack.pop().unwrap() else { panic!() };
+                            map.borrow_mut().insert(key, value);
+                            stack.push(Value::Null);
+                        }
                         Builtin::ArrayPush => {
                             assert_eq!(numargs, 2);
                             let value = stack.pop().unwrap();
@@ -460,9 +470,27 @@ struct DisplayValue<'a, 'b> {
     value: &'b Value,
 }
 
+impl fmt::Debug for DisplayValue<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
 impl fmt::Display for DisplayValue<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
+            Value::Map(map) => {
+                let mut debug_map = f.debug_map();
+
+                for (key, value) in &*map.borrow() {
+                    debug_map.entry(
+                        &DisplayValue { value: key, ..*self },
+                        &DisplayValue { value, ..*self },
+                    );
+                }
+
+                debug_map.finish()
+            }
             Value::EnumVariant { name: StrIdent { ptr, len }, .. } => {
                 write!(f, "{}", self.consts[*ptr as usize..*ptr as usize + *len as usize].as_bstr())
             }

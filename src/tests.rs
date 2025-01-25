@@ -136,6 +136,14 @@ fn test_unary() {
 }
 
 #[test]
+fn test_maps() {
+    test_expr!(
+        r#"let hi = create_map(); insert_map(hi, "Bob", 32); insert_map(hi, "Alice", 34); println(hi)"#,
+        "{Bob: 32, Alice: 34}"
+    );
+}
+
+#[test]
 fn test_array_literals() {
     test_expr!("println([])", "[]");
     test_expr!(r#"println([1, 2, 3, "Go!"])"#, r#"[1, 2, 3, Go!]"#);
