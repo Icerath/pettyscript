@@ -144,6 +144,21 @@ where
                 let function = stack.pop().unwrap();
                 match function {
                     Value::Builtin(builtin) => match builtin {
+                        Builtin::ArrayPush => {
+                            assert_eq!(numargs, 2);
+                            let value = stack.pop().unwrap();
+                            let Value::Array(arr) = stack.pop().unwrap() else { panic!() };
+                            arr.borrow_mut().push(value);
+                            stack.push(Value::Null);
+                        }
+                        Builtin::ArrayPop => {
+                            assert_eq!(numargs, 1);
+                            let Value::Array(arr) = stack.pop().unwrap() else { panic!() };
+                            let Some(value) = arr.borrow_mut().pop() else {
+                                panic!("Tried to pop from empty array");
+                            };
+                            stack.push(value);
+                        }
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();

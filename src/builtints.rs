@@ -9,11 +9,15 @@ pub enum Builtin {
     IsDigit,
     IsAlphabetical,
     Exit,
+    ArrayPush,
+    ArrayPop,
 }
 
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
+            Self::ArrayPush => "array_push",
+            Self::ArrayPop => "array_pop",
             Self::Println => "println",
             Self::ReadFile => "read_file",
             Self::StartsWith => "starts_with",
