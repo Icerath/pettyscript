@@ -4,18 +4,8 @@ use logos::Logos;
 
 use crate::intern::intern;
 
-#[derive(Default, Debug, Clone, PartialEq, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    FromIntErr(#[from] std::num::ParseIntError),
-    #[default]
-    #[error("Unknown")]
-    Unknown,
-}
-
 #[derive(Debug, Logos, Clone, Copy, PartialEq, macros::EnumKind)]
 #[enum_kind(TokenKind)]
-#[logos(error = Error)]
 #[logos(skip "//[^\n]*\n")]
 #[logos(skip "[ \t\r\n]")]
 #[rustfmt::skip]
@@ -69,8 +59,8 @@ pub enum Token {
     // Literals
     #[regex("'[^']'", |lex| lex.slice()[1..].chars().next().unwrap())]
     Char(char),
-    #[regex(r"\d[\d_]*", |lex| lex.slice().parse())]
-    Int(i128),
+    #[regex(r"\d[\d_]*", parse_int)]
+    Int(i64),
     #[regex(r#""[^"]*""#, string_escape)]
     String(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
@@ -78,6 +68,18 @@ pub enum Token {
 }
 
 type Lexer<'a> = logos::Lexer<'a, Token>;
+
+fn parse_int(str: &mut Lexer) -> Option<i64> {
+    let mut sum = 0;
+    for c in str.slice().bytes() {
+        match c {
+            b'0'..=b'9' => sum = sum * 10 + (c - b'0') as i64,
+            b'_' => {}
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
 
 fn string_escape(lex: &mut Lexer) -> &'static str {
     // TODO: Impl proper string escaping

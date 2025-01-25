@@ -246,7 +246,7 @@ impl Codegen {
                 Literal::Bool(true) => self.builder.insert(Op::LoadTrue),
                 Literal::Bool(false) => self.builder.insert(Op::LoadFalse),
                 Literal::Char(char) => self.builder.insert(Op::LoadChar(*char)),
-                Literal::Int(int) => self.builder.insert(Op::LoadInt(*int as _)),
+                Literal::Int(int) => self.builder.insert(Op::LoadInt(*int)),
                 Literal::String(string) => {
                     let [ptr, len] = self.builder.insert_string(string);
                     self.builder.insert(Op::LoadString { ptr, len });

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use logos::{Lexer, Logos};
-use miette::{Context, Error, IntoDiagnostic, LabeledSpan, Result};
+use miette::{Context, Error, LabeledSpan, Result};
 
 use crate::lexer::{Token, TokenKind};
 
@@ -204,7 +204,7 @@ impl fmt::Debug for Literal {
 
 pub enum Literal {
     Bool(bool),
-    Int(i128),
+    Int(i64),
     Char(char),
     String(&'static str),
     Ident(&'static str),
@@ -729,7 +729,7 @@ impl<'a> Parser<'a> {
     }
 
     fn bump(&mut self) -> Result<Token> {
-        self.lexer.next().context("Lexer Error")?.into_diagnostic()
+        self.lexer.next().context("Lexer Error")?.map_err(|_| miette::miette!("Lexer Error"))
     }
 
     fn skip(&mut self) {
