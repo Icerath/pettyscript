@@ -257,6 +257,7 @@ impl TryFrom<TokenKind> for BinOp {
 #[derive(Debug)]
 pub enum UnaryOp {
     Not,
+    Neg,
 }
 
 pub struct ForLoop {
@@ -483,6 +484,13 @@ impl<'a> Parser<'a> {
 
     fn parse_unary_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
         match self.peek()? {
+            Token::Minus => {
+                self.skip();
+                Ok(Expr::Unary {
+                    op: UnaryOp::Neg,
+                    expr: Box::new(self.parse_expr(0, allow_struct_init)?),
+                })
+            }
             Token::Bang => {
                 self.skip();
                 Ok(Expr::Unary {

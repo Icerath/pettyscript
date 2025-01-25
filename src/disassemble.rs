@@ -26,6 +26,7 @@ pub fn disassemble(bytecode: &[u8]) {
         reader.head += 1 + op.size();
         print!("x{offset:x}: ");
         match op {
+            Op::Neg => println!("NEG"),
             Op::Add => println!("ADD"),
             Op::CreateArray => println!("CREATE_ARRAY"),
             Op::ArrayPush => println!("ARRAY_PUSH"),

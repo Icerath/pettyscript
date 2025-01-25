@@ -416,6 +416,10 @@ where
                 };
                 stack.push(Value::Bool(!bool));
             }
+            Op::Neg => {
+                let int = pop_int!();
+                stack.push(Value::Int(-int));
+            }
             Op::Less => {
                 let rhs = stack.pop().unwrap();
                 let is_less = match stack.pop().unwrap() {

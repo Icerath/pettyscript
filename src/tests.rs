@@ -132,7 +132,7 @@ fn test_while_loops() {
 #[test]
 fn test_unary() {
     test_expr!("println(!false)", "true");
-    // test_expr!("println(-123712)", "-123712");
+    test_expr!("println(-123712)", "-123712");
 }
 
 #[test]

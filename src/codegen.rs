@@ -336,6 +336,7 @@ impl Codegen {
                 self.expr(expr);
                 match op {
                     UnaryOp::Not => self.builder.insert(Op::Not),
+                    UnaryOp::Neg => self.builder.insert(Op::Neg),
                 }
             }
         }

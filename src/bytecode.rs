@@ -20,6 +20,7 @@ pub enum Op {
     EmptyStruct,
     Ret,
     FnCall { numargs: u8 },
+    Neg,
     Not,
     Mod,
     Eq,
