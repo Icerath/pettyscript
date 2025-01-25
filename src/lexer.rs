@@ -60,6 +60,9 @@ pub enum Token {
     #[regex("'[^']'", |lex| lex.slice()[1..].chars().next().unwrap())]
     Char(char),
     #[regex(r"\d[\d_]*", parse_int)]
+    #[regex(r"0[bB][01_]+", parse_binary_int)]
+    #[regex(r"0[xX][\da-fA-F_]+", parse_hex_int)]
+    #[regex(r"0[oO][0-7_]+", parse_octal_int)]
     Int(i64),
     #[regex(r#""[^"]*""#, string_escape)]
     String(S),
@@ -68,6 +71,44 @@ pub enum Token {
 }
 
 type Lexer<'a> = logos::Lexer<'a, Token>;
+
+fn parse_hex_int(str: &mut Lexer) -> Option<i64> {
+    let mut sum = 0;
+    for c in str.slice()[2..].bytes() {
+        match c {
+            b'0'..=b'9' => sum = sum * 16 + (c - b'0') as i64,
+            b'a'..=b'f' => sum = sum * 16 + (c - b'a' + 10) as i64,
+            b'A'..=b'F' => sum = sum * 16 + (c - b'A' + 10) as i64,
+            b'_' => {}
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
+
+fn parse_octal_int(str: &mut Lexer) -> Option<i64> {
+    let mut sum = 0;
+    for c in str.slice()[2..].bytes() {
+        match c {
+            b'0'..=b'7' => sum = sum * 8 + (c - b'0') as i64,
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
+
+fn parse_binary_int(str: &mut Lexer) -> Option<i64> {
+    let mut sum = 0;
+    for c in str.slice()[2..].bytes() {
+        match c {
+            b'0' => sum *= 2,
+            b'1' => sum = sum * 2 + 1,
+            b'_' => {}
+            _ => return None,
+        }
+    }
+    Some(sum)
+}
 
 fn parse_int(str: &mut Lexer) -> Option<i64> {
     let mut sum = 0;

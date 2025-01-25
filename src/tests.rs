@@ -48,7 +48,7 @@ fn test_lexer_example() {
 }
 
 macro_rules! test_expr {
-    ($expr: literal, $expected: literal) => {
+    ($expr: literal, $expected: expr) => {
         let ast = parse(concat!($expr, ";")).unwrap();
         let bytecode = codegen::codegen(&ast);
         let output = exec_vm(&bytecode);
@@ -111,6 +111,14 @@ fn test_structs() {
     test_expr!("let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
     test_expr!("let lexer = Lexer { len: 10 }; println(1 < lexer.len);", "true");
     test_expr!("let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);", "11");
+}
+
+#[test]
+fn test_int_literals() {
+    test_expr!("println(0x1)", "1");
+    test_expr!("println(0x18a968bc945df)", 0x18a968bc945dfu64.to_string());
+    test_expr!("println(0b0110101011101001)", 0b0110101011101001.to_string());
+    test_expr!("println(0o172364123752317)", 0o172364123752317u64.to_string());
 }
 
 #[test]
