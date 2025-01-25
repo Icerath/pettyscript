@@ -414,6 +414,10 @@ where
                             _ => panic!("{rhs:?}"),
                         }
                     }
+                    Value::Array(arr) => {
+                        let Value::Int(rhs) = rhs else { panic!() };
+                        arr.borrow()[rhs as usize].clone()
+                    }
                     _ => todo!("{lhs:?}"),
                 };
                 stack.push(value);

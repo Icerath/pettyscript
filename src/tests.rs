@@ -130,6 +130,11 @@ fn test_while_loops() {
 }
 
 #[test]
+fn test_list_index() {
+    test_expr!("println([1][0])", "1");
+}
+
+#[test]
 fn test_unary() {
     test_expr!("println(!false)", "true");
     test_expr!("println(-123712)", "-123712");
