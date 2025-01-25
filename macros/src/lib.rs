@@ -2,7 +2,56 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Fields, Ident, ItemEnum};
+use syn::{parse_macro_input, spanned::Spanned, Fields, Ident, ItemEnum};
+
+#[proc_macro_derive(BcWrite)]
+pub fn bc_write_derive(input: TokenStream) -> TokenStream {
+    let enum_ = parse_macro_input!(input as ItemEnum);
+    let ident = enum_.ident;
+
+    let mut match_stmt = quote! {};
+    for variant in enum_.variants {
+        let variant_ident = variant.ident;
+
+        let branch = match variant.fields {
+            Fields::Unit => quote! { Op::#variant_ident => {} },
+            Fields::Named(fields) => {
+                let mut body = quote! {};
+                let mut branch = quote! {};
+
+                for field in fields.named {
+                    let ident = field.ident;
+                    branch.extend(quote! { #ident , });
+                    body.extend(quote! { #ident.bc_write(&mut buf); });
+                }
+                quote! { Op::#variant_ident  { #branch } => { #body } }
+            }
+            Fields::Unnamed(fields) => {
+                let mut body = quote! {};
+                let mut branch = quote! {};
+
+                for (i, field) in fields.unnamed.iter().enumerate() {
+                    let ident = Ident::new(&format!("_{i}"), field.span());
+                    branch.extend(quote! { #ident , });
+                    body.extend(quote! { #ident.bc_write(&mut buf); });
+                }
+                quote! { Op::#variant_ident ( #branch ) => { # body } }
+            }
+        };
+        match_stmt.extend(branch);
+    }
+
+    quote! {
+        impl #ident {
+            pub fn bc_write(&self, mut buf: &mut Vec<u8>) {
+                match self {
+                    #match_stmt
+                }
+            }
+        }
+    }
+    .into()
+}
 
 #[proc_macro_derive(BcRead)]
 pub fn bc_read_derive(input: TokenStream) -> TokenStream {

@@ -10,12 +10,13 @@ pub struct StrIdent {
     pub len: u32,
 }
 
-#[derive(macros::BcRead, macros::EnumKind, macros::NumVariants, Clone, Copy, Debug)]
+use macros::*;
+#[derive(BcRead, BcWrite, EnumKind, NumVariants, Clone, Copy, Debug)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
-    Less,
     Greater,
+    Less,
     EmptyStruct,
     Ret,
     FnCall { numargs: u8 },
@@ -49,6 +50,9 @@ pub enum Op {
 trait BcRead: Sized {
     fn bc_read(bytes: &mut &[u8]) -> Self;
 }
+trait BcWrite {
+    fn bc_write(&self, buf: &mut Vec<u8>);
+}
 
 macro_rules! impl_int {
     ($int: ident) => {
@@ -60,6 +64,11 @@ macro_rules! impl_int {
                 out
             }
         }
+        impl BcWrite for $int {
+            fn bc_write(&self, bytes: &mut Vec<u8>) {
+                bytes.extend(self.to_le_bytes());
+            }
+        }
     };
 }
 
@@ -68,6 +77,11 @@ macro_rules! impl_from {
         impl BcRead for $ty {
             fn bc_read(bytes: &mut &[u8]) -> Self {
                 Self::try_from($int::bc_read(bytes)).unwrap()
+            }
+        }
+        impl BcWrite for $ty {
+            fn bc_write(&self, bytes: &mut Vec<u8>) {
+                (*self as $int).bc_write(bytes);
             }
         }
     };
@@ -83,6 +97,13 @@ impl_from!(char, u32);
 impl BcRead for StrIdent {
     fn bc_read(bytes: &mut &[u8]) -> Self {
         Self { ptr: u32::bc_read(bytes), len: u32::bc_read(bytes) }
+    }
+}
+
+impl BcWrite for StrIdent {
+    fn bc_write(&self, buf: &mut Vec<u8>) {
+        self.ptr.bc_write(buf);
+        self.len.bc_write(buf);
     }
 }
 
@@ -108,40 +129,15 @@ impl BytecodeBuilder {
     }
 
     pub fn insert(&mut self, instruction: Op) {
-        use Op as I;
-
         const { assert!(size_of::<Op>() == 16) };
         const { assert!(size_of::<OpCode>() == 1) };
 
-        let op = OpCode::from(instruction);
-        self.instruction_data.push(op as u8);
-
+        self.instruction_data.push(OpCode::from(instruction) as u8);
         match instruction {
-            I::StoreEnumVariant(name) => {
-                self.instruction_data.extend(name.ptr.to_le_bytes());
-                self.instruction_data.extend(name.len.to_le_bytes());
-            }
-            I::FnCall { numargs } => self.instruction_data.push(numargs),
-            I::Store(offset) | I::Load(offset) | I::LoadGlobal(offset) => {
-                self.instruction_data.extend(offset.to_le_bytes());
-            }
-            I::StoreField(field) | I::LoadField(field) => {
-                let StrIdent { ptr, len } = field;
-                self.instruction_data.extend(ptr.to_le_bytes());
-                self.instruction_data.extend(len.to_le_bytes());
-            }
-            I::CJump(label) | I::Jump(label) => {
-                self.jumps.push(self.instruction_data.len());
-                self.instruction_data.extend(label.to_le_bytes());
-            }
-            I::LoadChar(char) => self.instruction_data.extend((char as u32).to_le_bytes()),
-            I::LoadInt(int) => self.instruction_data.extend(int.to_le_bytes()),
-            I::LoadString { ptr, len } => {
-                self.instruction_data.extend(ptr.to_le_bytes());
-                self.instruction_data.extend(len.to_le_bytes());
-            }
+            Op::CJump(_) | Op::Jump(_) => self.jumps.push(self.instruction_data.len()),
             _ => {}
         }
+        instruction.bc_write(&mut self.instruction_data);
     }
 
     pub fn insert_identifer(&mut self, ident: &'static str) -> StrIdent {
