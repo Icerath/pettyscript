@@ -142,35 +142,36 @@ where
                     reader.head = label as usize;
                 }
             }
-            Op::FnCall { numargs } => {
+            Op::FnCall { numargs } => 'fn_call: {
                 let function = stack.pop().unwrap();
-                match function {
+                let value = match function {
                     Value::Builtin(builtin) => match builtin {
-                        Builtin::CreateMap => stack.push(Value::Map(Rc::default())),
+                        Builtin::CreateMap => Value::Map(Rc::default()),
                         Builtin::InsertMap => {
                             let value = stack.pop().unwrap();
                             let key = stack.pop().unwrap();
                             let Value::Map(map) = stack.pop().unwrap() else { panic!() };
                             map.borrow_mut().insert(key, value);
-                            stack.push(Value::Null);
+                            Value::Null
                         }
                         Builtin::GetMap => {
                             let key = stack.pop().unwrap();
                             let Value::Map(map) = stack.pop().unwrap() else { panic!() };
-                            stack.push(map.borrow().get(&key).unwrap().clone());
+                            let value = map.borrow().get(&key).unwrap().clone();
+                            value
                         }
                         Builtin::RemoveMap => {
                             let key = stack.pop().unwrap();
                             let Value::Map(map) = stack.pop().unwrap() else { panic!() };
                             let previous = map.borrow_mut().remove(&key);
-                            stack.push(previous.unwrap_or(Value::Null));
+                            previous.unwrap_or(Value::Null)
                         }
                         Builtin::ArrayPush => {
                             assert_eq!(numargs, 2);
                             let value = stack.pop().unwrap();
                             let Value::Array(arr) = stack.pop().unwrap() else { panic!() };
                             arr.borrow_mut().push(value);
-                            stack.push(Value::Null);
+                            Value::Null
                         }
                         Builtin::ArrayPop => {
                             assert_eq!(numargs, 1);
@@ -178,13 +179,13 @@ where
                             let Some(value) = arr.borrow_mut().pop() else {
                                 panic!("Tried to pop from empty array");
                             };
-                            stack.push(value);
+                            value
                         }
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
                             writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
-                            stack.push(Value::Null);
+                            Value::Null
                         }
                         Builtin::ReadFile => {
                             assert_eq!(numargs, 1);
@@ -196,7 +197,7 @@ where
                                 Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
                                 val => panic!("{val:?}"),
                             };
-                            stack.push(Value::String(Rc::new(string.into())));
+                            Value::String(Rc::new(string.into()))
                         }
                         Builtin::StartsWith => {
                             assert_eq!(numargs, 2);
@@ -218,7 +219,7 @@ where
                                 Value::String(ref str) => str,
                                 val => panic!("{val:?}"),
                             };
-                            stack.push(Value::Bool(lhs.starts_with(rhs)));
+                            Value::Bool(lhs.starts_with(rhs))
                         }
                         Builtin::StrLen => {
                             assert_eq!(numargs, 1);
@@ -228,12 +229,12 @@ where
                                 val => panic!("{val:?}"),
                             };
 
-                            stack.push(Value::Int(len as i64));
+                            Value::Int(len as i64)
                         }
                         Builtin::Trim => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
-                            let value = match value {
+                            match value {
                                 Value::StringLiteral { ptr, len } => {
                                     let str = str_literal!(ptr, len).to_str().unwrap();
                                     let new = str.trim();
@@ -245,8 +246,7 @@ where
                                 }
                                 Value::String(ref str) => Value::String(Rc::new(str.trim().into())),
                                 val => panic!("{val:?}"),
-                            };
-                            stack.push(value);
+                            }
                         }
                         Builtin::IsAlphabetical => 'block: {
                             assert_eq!(numargs, 1);
@@ -257,12 +257,11 @@ where
                                 }
                                 Value::String(ref str) => str,
                                 Value::Char(char) => {
-                                    stack.push(Value::Bool(char.is_alphabetic()));
-                                    break 'block;
+                                    break 'block Value::Bool(char.is_alphabetic());
                                 }
                                 val => panic!("{val:?}"),
                             };
-                            stack.push(Value::Bool(str.chars().all(|c| c.is_alphabetic())))
+                            Value::Bool(str.chars().all(|c| c.is_alphabetic()))
                         }
                         Builtin::IsDigit => 'block: {
                             assert_eq!(numargs, 1);
@@ -273,12 +272,11 @@ where
                                 }
                                 Value::String(ref str) => str,
                                 Value::Char(char) => {
-                                    stack.push(Value::Bool(char.is_ascii_digit()));
-                                    break 'block;
+                                    break 'block Value::Bool(char.is_ascii_digit());
                                 }
                                 val => panic!("{val:?}"),
                             };
-                            stack.push(Value::Bool(str.chars().all(|c| c.is_ascii_digit())))
+                            Value::Bool(str.chars().all(|c| c.is_ascii_digit()))
                         }
                         Builtin::Exit => {
                             assert!(numargs <= 1);
@@ -292,9 +290,11 @@ where
                         let here = reader.head;
                         call_stack.push(here);
                         reader.head = label as usize;
+                        break 'fn_call;
                     }
-                    _ => {}
-                }
+                    _ => todo!(),
+                };
+                stack.push(value);
             }
             Op::Pop => _ = stack.pop().unwrap(),
             Op::Dup => stack.push(stack.last().unwrap().clone()),
