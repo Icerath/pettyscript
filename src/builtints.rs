@@ -15,6 +15,8 @@ pub enum Builtin {
     ArrayPop,
     CreateMap,
     InsertMap,
+    GetMap,
+    RemoveMap,
 }
 
 impl Builtin {
@@ -22,6 +24,8 @@ impl Builtin {
         match self {
             Self::CreateMap => "create_map",
             Self::InsertMap => "insert_map",
+            Self::GetMap => "get_map",
+            Self::RemoveMap => "remove_map",
             Self::ArrayPush => "array_push",
             Self::ArrayPop => "array_pop",
             Self::Println => "println",

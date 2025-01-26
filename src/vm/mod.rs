@@ -154,6 +154,17 @@ where
                             map.borrow_mut().insert(key, value);
                             stack.push(Value::Null);
                         }
+                        Builtin::GetMap => {
+                            let key = stack.pop().unwrap();
+                            let Value::Map(map) = stack.pop().unwrap() else { panic!() };
+                            stack.push(map.borrow().get(&key).unwrap().clone());
+                        }
+                        Builtin::RemoveMap => {
+                            let key = stack.pop().unwrap();
+                            let Value::Map(map) = stack.pop().unwrap() else { panic!() };
+                            let previous = map.borrow_mut().remove(&key);
+                            stack.push(previous.unwrap_or(Value::Null));
+                        }
                         Builtin::ArrayPush => {
                             assert_eq!(numargs, 2);
                             let value = stack.pop().unwrap();

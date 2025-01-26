@@ -146,6 +146,14 @@ fn test_maps() {
         r#"let hi = create_map(); insert_map(hi, "Bob", 32); insert_map(hi, "Alice", 34); println(hi)"#,
         "{Bob: 32, Alice: 34}"
     );
+    test_expr!(
+        r#"let hi = create_map(); insert_map(hi, "Bob", 32); println(remove_map(hi, "Bob")); println(hi); println(remove_map(hi, "Bob"));"#,
+        "32\n{}\nnull"
+    );
+    test_expr!(
+        r#"let hi = create_map(); insert_map(hi, "Bob", 32); println(get_map(hi, "Bob"));"#,
+        "32"
+    );
 }
 
 #[test]
