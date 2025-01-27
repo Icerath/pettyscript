@@ -25,13 +25,18 @@ pub enum Value {
     Builtin(Builtin),
     MethodBuiltin(MethodBuiltin),
     Function { label: u32 },
-    StringLiteral { ptr: u32, len: u32 },
-    String(Rc<Box<str>>),
+    String(PettyStr),
     Array(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<BTreeMap<Value, Value>>>),
     Range(Rc<[Cell<i64>; 2]>),
     RangeInclusive(Rc<[Cell<i64>; 2]>),
     Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PettyStr {
+    Literal { ptr: u32, len: u32 },
+    String(Rc<Box<str>>),
 }
 
 pub fn execute_bytecode(bytecode: &[u8]) {
@@ -100,7 +105,9 @@ where
             }
             Op::LoadChar(char) => stack.push(Value::Char(char)),
             Op::LoadInt(int) => stack.push(Value::Int(int)),
-            Op::LoadString { ptr, len } => stack.push(Value::StringLiteral { ptr, len }),
+            Op::LoadString { ptr, len } => {
+                stack.push(Value::String(PettyStr::Literal { ptr, len }))
+            }
             Op::Range => {
                 let Value::Int(end) = stack.pop().unwrap() else { unimplemented!() };
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
@@ -190,46 +197,43 @@ where
                         }
                         Builtin::ReadFile => {
                             assert_eq!(numargs, 1);
-                            let string = match stack.pop().unwrap() {
-                                Value::StringLiteral { ptr, len } => {
+                            let Value::String(str) = stack.pop().unwrap() else { panic!() };
+                            let string = match str {
+                                PettyStr::Literal { ptr, len } => {
                                     let str = str_literal!(ptr, len).to_str().unwrap();
                                     std::fs::read_to_string(str).unwrap()
                                 }
-                                Value::String(str) => std::fs::read_to_string(&**str).unwrap(),
-                                val => panic!("{val:?}"),
+                                PettyStr::String(str) => std::fs::read_to_string(&**str).unwrap(),
                             };
-                            Value::String(Rc::new(string.into()))
+                            Value::String(PettyStr::String(Rc::new(string.into())))
                         }
                         Builtin::StartsWith => {
                             assert_eq!(numargs, 2);
-                            let rhs = stack.pop().unwrap();
-                            let lhs = stack.pop().unwrap();
+                            let Value::String(rhs) = stack.pop().unwrap() else { panic!() };
+                            let Value::String(lhs) = stack.pop().unwrap() else { panic!() };
 
                             let rhs = match rhs {
-                                Value::StringLiteral { ptr, len } => {
+                                PettyStr::Literal { ptr, len } => {
                                     std::str::from_utf8(str_literal!(ptr, len)).unwrap()
                                 }
-                                Value::String(ref str) => str,
-                                val => panic!("{val:?}"),
+                                PettyStr::String(ref str) => str,
                             };
-
                             let lhs = match lhs {
-                                Value::StringLiteral { ptr, len } => {
+                                PettyStr::Literal { ptr, len } => {
                                     std::str::from_utf8(str_literal!(ptr, len)).unwrap()
                                 }
-                                Value::String(ref str) => str,
-                                val => panic!("{val:?}"),
+                                PettyStr::String(ref str) => str,
                             };
                             Value::Bool(lhs.starts_with(rhs))
                         }
                         Builtin::IsAlphabetical => 'block: {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
-                            let str = match value {
-                                Value::StringLiteral { ptr, len } => {
-                                    str_literal!(ptr, len).to_str().unwrap()
+                            let str = match &value {
+                                Value::String(PettyStr::Literal { ptr, len }) => {
+                                    str_literal!(*ptr, *len).to_str().unwrap()
                                 }
-                                Value::String(ref str) => str,
+                                Value::String(PettyStr::String(str)) => str,
                                 Value::Char(char) => {
                                     break 'block Value::Bool(char.is_alphabetic());
                                 }
@@ -240,11 +244,11 @@ where
                         Builtin::IsDigit => 'block: {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
-                            let str = match value {
-                                Value::StringLiteral { ptr, len } => {
-                                    str_literal!(ptr, len).to_str().unwrap()
+                            let str = match &value {
+                                Value::String(PettyStr::Literal { ptr, len }) => {
+                                    str_literal!(*ptr, *len).to_str().unwrap()
                                 }
-                                Value::String(ref str) => str,
+                                Value::String(PettyStr::String(str)) => str,
                                 Value::Char(char) => {
                                     break 'block Value::Bool(char.is_ascii_digit());
                                 }
@@ -267,7 +271,9 @@ where
                         break 'fn_call;
                     }
                     Value::MethodBuiltin(method) => match method {
-                        MethodBuiltin::StrTrim { trimmed } => Value::String(trimmed),
+                        MethodBuiltin::StrTrim { trimmed } => {
+                            Value::String(PettyStr::String(trimmed))
+                        }
                     },
                     _ => todo!(),
                 };
@@ -295,35 +301,35 @@ where
                         Value::Int(rhs) => lhs == rhs,
                         _ => panic!(),
                     },
-                    Value::StringLiteral { ptr, len } => match rhs {
+                    Value::String(PettyStr::Literal { ptr, len }) => match rhs {
                         Value::Null => false,
                         Value::Char(rhs) => str_char_eq(str_literal!(ptr, len), rhs),
-                        Value::StringLiteral { ptr: rhs_ptr, len: rhs_len } => {
+                        Value::String(PettyStr::Literal { ptr: rhs_ptr, len: rhs_len }) => {
                             ptr == rhs_ptr && len == rhs_len
                         }
-                        Value::String(rhs) => {
+                        Value::String(PettyStr::String(rhs)) => {
                             let lhs = str_literal!(ptr, len);
                             lhs == rhs.as_bytes()
                         }
                         _ => panic!(),
                     },
-                    Value::String(lhs) => match rhs {
+                    Value::String(PettyStr::String(lhs)) => match rhs {
                         Value::Null => false,
                         Value::Char(rhs) => str_char_eq(lhs.as_bytes(), rhs),
-                        Value::StringLiteral { ptr, len } => {
+                        Value::String(PettyStr::Literal { ptr, len }) => {
                             let rhs = str_literal!(ptr, len);
                             lhs.as_bytes() == rhs
                         }
-                        Value::String(rhs) => lhs == rhs,
+                        Value::String(PettyStr::String(rhs)) => lhs == rhs,
                         _ => panic!(),
                     },
                     Value::Char(lhs) => match rhs {
                         Value::Null => false,
                         Value::Char(rhs) => lhs == rhs,
-                        Value::StringLiteral { ptr, len } => {
+                        Value::String(PettyStr::Literal { ptr, len }) => {
                             str_char_eq(str_literal!(ptr, len), lhs)
                         }
-                        Value::String(rhs) => str_char_eq(rhs.as_bytes(), lhs),
+                        Value::String(PettyStr::String(rhs)) => str_char_eq(rhs.as_bytes(), lhs),
                         _ => panic!(),
                     },
                     val => todo!("{val:?}"),
@@ -365,8 +371,10 @@ where
                             str_literal!(field.ptr, field.len).as_bstr()
                         ),
                     },
-                    Value::String(str) => load_str_field(str.as_bytes(), field_str),
-                    Value::StringLiteral { ptr, len } => {
+                    Value::String(PettyStr::String(str)) => {
+                        load_str_field(str.as_bytes(), field_str)
+                    }
+                    Value::String(PettyStr::Literal { ptr, len }) => {
                         load_str_field(str_literal!(ptr, len), field_str)
                     }
                     other => panic!("{other:?}"),
@@ -377,18 +385,18 @@ where
                 let rhs = stack.pop().unwrap();
                 let lhs = stack.pop().unwrap();
                 let value = match lhs {
-                    Value::String(str) => match rhs {
+                    Value::String(PettyStr::String(str)) => match rhs {
                         Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                         Value::RangeInclusive(_) => todo!(),
                         Value::Range(range) => {
                             let [start, end] = &*range;
-                            Value::String(Rc::new(
+                            Value::String(PettyStr::String(Rc::new(
                                 str[start.get() as usize..end.get() as usize].into(),
-                            ))
+                            )))
                         }
                         _ => panic!("{rhs:?}"),
                     },
-                    Value::StringLiteral { ptr, len } => {
+                    Value::String(PettyStr::Literal { ptr, len }) => {
                         let str = &str_literal!(ptr, len);
                         match rhs {
                             Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
@@ -398,10 +406,10 @@ where
                                 let range_len: u32 = range[1].get().try_into().unwrap();
                                 let new = &str[range_start as usize..range_len as usize];
                                 let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
-                                Value::StringLiteral {
+                                Value::String(PettyStr::Literal {
                                     ptr: ptr + ptr_diff as u32,
                                     len: new.len() as u32,
-                                }
+                                })
                             }
                             _ => panic!("{rhs:?}"),
                         }
@@ -523,13 +531,13 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::RangeInclusive(range) => {
                 write!(f, "{}..={}", range[0].get(), range[1].get())
             }
-            Value::StringLiteral { ptr, len } => {
+            Value::String(PettyStr::Literal { ptr, len }) => {
                 let ptr = *ptr as usize;
                 let len = *len as usize;
                 let str = std::str::from_utf8(&self.consts[ptr..ptr + len]).unwrap();
                 write!(f, "{str}")
             }
-            Value::String(str) => write!(f, "{str}"),
+            Value::String(PettyStr::String(str)) => write!(f, "{str}"),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();
                 for value in &*values.borrow() {
