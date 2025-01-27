@@ -172,7 +172,7 @@ fn test_gt_lt() {
 
 #[test]
 fn test_str_len() {
-    test_expr!("println(str_len(\"123456789\"))", "9");
+    test_expr!("println(\"123456789\".len)", "9");
 }
 
 #[test]

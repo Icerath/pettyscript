@@ -221,16 +221,6 @@ where
                             };
                             Value::Bool(lhs.starts_with(rhs))
                         }
-                        Builtin::StrLen => {
-                            assert_eq!(numargs, 1);
-                            let len = match stack.pop().unwrap() {
-                                Value::StringLiteral { len, .. } => len,
-                                Value::String(ref str) => str.len() as u32,
-                                val => panic!("{val:?}"),
-                            };
-
-                            Value::Int(len as i64)
-                        }
                         Builtin::Trim => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
@@ -379,16 +369,20 @@ where
             }
             Op::EmptyStruct => stack.push(Value::Struct { fields: Rc::default() }),
             Op::LoadField(field) => {
-                let fields = match stack.pop().unwrap() {
-                    Value::Struct { fields } => fields,
+                let field_str = str_literal!(field.ptr, field.len);
+                let value = match stack.pop().unwrap() {
+                    Value::Struct { fields } => match fields.borrow().get(&field) {
+                        Some(value) => value.clone(),
+                        None => panic!(
+                            "struct does not contain field: {:?}",
+                            str_literal!(field.ptr, field.len).as_bstr()
+                        ),
+                    },
+                    Value::String(str) => load_str_field(str.as_bytes(), field_str),
+                    Value::StringLiteral { ptr, len } => {
+                        load_str_field(str_literal!(ptr, len), field_str)
+                    }
                     other => panic!("{other:?}"),
-                };
-                let value = match fields.borrow().get(&field) {
-                    Some(value) => value.clone(),
-                    None => panic!(
-                        "struct does not contain field: {:?}",
-                        str_literal!(field.ptr, field.len).as_bstr()
-                    ),
                 };
                 stack.push(value);
             }
@@ -473,6 +467,13 @@ where
     debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
 
     Ok(())
+}
+
+fn load_str_field(str: &[u8], field: &[u8]) -> Value {
+    match field {
+        b"len" => Value::Int(str.len() as i64),
+        _ => panic!("str does not contain field: {}", field.as_bstr()),
+    }
 }
 
 fn str_char_eq(str: &[u8], char: char) -> bool {
