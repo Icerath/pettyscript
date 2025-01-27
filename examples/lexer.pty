@@ -106,8 +106,8 @@ fn lexer_next(lexer) {
         else if first_char == '&' { token = Token.Ampersand; }
         else if first_char == '=' { token = Token.Eq; }
         // Literals
-        else if is_digit(first_char) || first_char == '_' {
-            while is_digit(lexer.remaining[skip]) {
+        else if first_char.is_digit() || first_char == '_' {
+            while lexer.remaining[skip].is_digit() {
                 skip = skip + 1;
             }
             token = Token.Int;
@@ -122,8 +122,8 @@ fn lexer_next(lexer) {
             }
             skip = skip + 1;
             token = Token.String;
-        } else if is_alphabetical(first_char) {
-            while is_alphabetical(lexer.remaining[skip]) {
+        } else if first_char.is_alphabetic() {
+            while lexer.remaining[skip].is_alphabetic() {
                 skip = skip + 1;
             }
             token = Token.Ident;

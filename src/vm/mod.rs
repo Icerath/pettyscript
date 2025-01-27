@@ -1,4 +1,4 @@
-use core::{fmt, panic};
+use core::fmt;
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
@@ -208,36 +208,6 @@ where
                             };
                             Value::String(PettyStr::String(Rc::new(string.into())))
                         }
-                        Builtin::IsAlphabetical => 'block: {
-                            assert_eq!(numargs, 1);
-                            let value = stack.pop().unwrap();
-                            let str = match &value {
-                                Value::String(PettyStr::Literal { ptr, len }) => {
-                                    str_literal!(*ptr, *len).to_str().unwrap()
-                                }
-                                Value::String(PettyStr::String(str)) => str,
-                                Value::Char(char) => {
-                                    break 'block Value::Bool(char.is_alphabetic());
-                                }
-                                val => panic!("{val:?}"),
-                            };
-                            Value::Bool(str.chars().all(|c| c.is_alphabetic()))
-                        }
-                        Builtin::IsDigit => 'block: {
-                            assert_eq!(numargs, 1);
-                            let value = stack.pop().unwrap();
-                            let str = match &value {
-                                Value::String(PettyStr::Literal { ptr, len }) => {
-                                    str_literal!(*ptr, *len).to_str().unwrap()
-                                }
-                                Value::String(PettyStr::String(str)) => str,
-                                Value::Char(char) => {
-                                    break 'block Value::Bool(char.is_ascii_digit());
-                                }
-                                val => panic!("{val:?}"),
-                            };
-                            Value::Bool(str.chars().all(|c| c.is_ascii_digit()))
-                        }
                         Builtin::Exit => {
                             assert!(numargs <= 1);
                             let int = if numargs == 1 { pop_int!() as i32 } else { 0 };
@@ -253,10 +223,26 @@ where
                         break 'fn_call;
                     }
                     Value::MethodBuiltin(method) => match method {
+                        MethodBuiltin::CharIsAlphabetic(char) => Value::Bool(char.is_alphabetic()),
+                        MethodBuiltin::CharIsDigit(char) => Value::Bool(char.is_digit(10)),
                         MethodBuiltin::StrTrim { trimmed } => {
                             Value::String(PettyStr::String(trimmed))
                         }
-                        MethodBuiltin::StrStartsWith { str } => {
+                        MethodBuiltin::StrIsAlphabetic(str) => {
+                            let str = match &str {
+                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
+                            };
+                            Value::Bool(str.iter().all(|c| c.is_ascii_alphabetic()))
+                        }
+                        MethodBuiltin::StrIsDigit(str) => {
+                            let str = match &str {
+                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
+                            };
+                            Value::Bool(str.iter().all(|c| c.is_ascii_digit()))
+                        }
+                        MethodBuiltin::StrStartsWith(str) => {
                             assert_eq!(numargs, 1);
                             let Value::String(arg) = stack.pop().unwrap() else { panic!() };
                             let arg = match &arg {
@@ -366,6 +352,7 @@ where
                         ),
                     },
                     Value::String(str) => load_str_field(consts, str, field),
+                    Value::Char(char) => load_char_field(consts, char, field),
                     other => panic!("{other:?}"),
                 };
                 stack.push(value);
@@ -453,6 +440,15 @@ where
     Ok(())
 }
 
+fn load_char_field(consts: &[u8], char: char, field: StrIdent) -> Value {
+    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
+    Value::MethodBuiltin(match (field, char) {
+        (b"is_digit", char) => MethodBuiltin::CharIsDigit(char),
+        (b"is_alphabetic", char) => MethodBuiltin::CharIsAlphabetic(char),
+        _ => panic!("char does not contain fiekd: {}", field.as_bstr()),
+    })
+}
+
 fn load_str_field(consts: &[u8], string: PettyStr, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
     let str = match &string {
@@ -465,7 +461,9 @@ fn load_str_field(consts: &[u8], string: PettyStr, field: StrIdent) -> Value {
             let trimmed = Rc::new(std::str::from_utf8(str).unwrap().trim().into());
             MethodBuiltin::StrTrim { trimmed }
         }
-        (b"starts_with", str) => MethodBuiltin::StrStartsWith { str },
+        (b"starts_with", str) => MethodBuiltin::StrStartsWith(str),
+        (b"is_digit", str) => MethodBuiltin::StrIsDigit(str),
+        (b"is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
         _ => panic!("str does not contain field: {}", field.as_bstr()),
     })
 }

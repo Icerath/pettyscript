@@ -9,8 +9,6 @@ use crate::vm::PettyStr;
 pub enum Builtin {
     Println,
     ReadFile,
-    IsDigit,
-    IsAlphabetical,
     Exit,
     ArrayPush,
     ArrayPop,
@@ -23,7 +21,11 @@ pub enum Builtin {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MethodBuiltin {
     StrTrim { trimmed: Rc<Box<str>> },
-    StrStartsWith { str: PettyStr },
+    StrStartsWith(PettyStr),
+    StrIsDigit(PettyStr),
+    StrIsAlphabetic(PettyStr),
+    CharIsDigit(char),
+    CharIsAlphabetic(char),
 }
 
 impl Builtin {
@@ -37,8 +39,6 @@ impl Builtin {
             Self::ArrayPop => "array_pop",
             Self::Println => "println",
             Self::ReadFile => "read_file",
-            Self::IsDigit => "is_digit",
-            Self::IsAlphabetical => "is_alphabetical",
             Self::Exit => "exit",
         }
     }
