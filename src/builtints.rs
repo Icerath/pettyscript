@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::vm::PettyStr;
+
 #[derive(
     macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
 )]
@@ -7,7 +9,6 @@ use std::rc::Rc;
 pub enum Builtin {
     Println,
     ReadFile,
-    StartsWith,
     IsDigit,
     IsAlphabetical,
     Exit,
@@ -22,6 +23,7 @@ pub enum Builtin {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MethodBuiltin {
     StrTrim { trimmed: Rc<Box<str>> },
+    StrStartsWith { str: PettyStr },
 }
 
 impl Builtin {
@@ -35,7 +37,6 @@ impl Builtin {
             Self::ArrayPop => "array_pop",
             Self::Println => "println",
             Self::ReadFile => "read_file",
-            Self::StartsWith => "starts_with",
             Self::IsDigit => "is_digit",
             Self::IsAlphabetical => "is_alphabetical",
             Self::Exit => "exit",
