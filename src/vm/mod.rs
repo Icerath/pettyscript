@@ -224,7 +224,7 @@ where
                     }
                     Value::MethodBuiltin(method) => match method {
                         MethodBuiltin::CharIsAlphabetic(char) => Value::Bool(char.is_alphabetic()),
-                        MethodBuiltin::CharIsDigit(char) => Value::Bool(char.is_digit(10)),
+                        MethodBuiltin::CharIsDigit(char) => Value::Bool(char.is_ascii_digit()),
                         MethodBuiltin::StrTrim { trimmed } => {
                             Value::String(PettyStr::String(trimmed))
                         }
