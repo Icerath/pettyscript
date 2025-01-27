@@ -9,7 +9,7 @@ use std::{
 use bstr::ByteSlice;
 
 use crate::{
-    builtints::Builtin,
+    builtints::{Builtin, MethodBuiltin},
     bytecode::{Op, StrIdent, VERSION},
 };
 
@@ -23,6 +23,7 @@ pub enum Value {
     Char(char),
     Int(i64),
     Builtin(Builtin),
+    MethodBuiltin(MethodBuiltin),
     Function { label: u32 },
     StringLiteral { ptr: u32, len: u32 },
     String(Rc<Box<str>>),
@@ -221,23 +222,6 @@ where
                             };
                             Value::Bool(lhs.starts_with(rhs))
                         }
-                        Builtin::Trim => {
-                            assert_eq!(numargs, 1);
-                            let value = stack.pop().unwrap();
-                            match value {
-                                Value::StringLiteral { ptr, len } => {
-                                    let str = str_literal!(ptr, len).to_str().unwrap();
-                                    let new = str.trim();
-                                    let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
-                                    Value::StringLiteral {
-                                        ptr: ptr + ptr_diff as u32,
-                                        len: new.len() as u32,
-                                    }
-                                }
-                                Value::String(ref str) => Value::String(Rc::new(str.trim().into())),
-                                val => panic!("{val:?}"),
-                            }
-                        }
                         Builtin::IsAlphabetical => 'block: {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
@@ -282,6 +266,9 @@ where
                         reader.head = label as usize;
                         break 'fn_call;
                     }
+                    Value::MethodBuiltin(method) => match method {
+                        MethodBuiltin::StrTrim { trimmed } => Value::String(trimmed),
+                    },
                     _ => todo!(),
                 };
                 stack.push(value);
@@ -472,6 +459,10 @@ where
 fn load_str_field(str: &[u8], field: &[u8]) -> Value {
     match field {
         b"len" => Value::Int(str.len() as i64),
+        b"trim" => {
+            let trimmed = Rc::new(std::str::from_utf8(str).unwrap().trim().into());
+            Value::MethodBuiltin(MethodBuiltin::StrTrim { trimmed })
+        }
         _ => panic!("str does not contain field: {}", field.as_bstr()),
     }
 }
@@ -526,6 +517,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Null => write!(f, "null"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Builtin(function) => write!(f, "Function::{function:?}"),
+            Value::MethodBuiltin(method) => write!(f, "method: {method:?}"),
             Value::Int(int) => write!(f, "{int}"),
             Value::Range(range) => write!(f, "{}..{}", range[0].get(), range[1].get()),
             Value::RangeInclusive(range) => {

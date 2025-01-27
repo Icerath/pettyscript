@@ -177,7 +177,7 @@ fn test_str_len() {
 
 #[test]
 fn test_trim() {
-    test_expr!(r#"println(trim("  \n   Hello, World!\n  "))"#, "Hello, World!");
+    test_expr!(r#"println("  \n   Hello, World!\n  ".trim())"#, "Hello, World!");
 }
 
 #[test]

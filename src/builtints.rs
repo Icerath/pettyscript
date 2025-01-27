@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(
     macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
 )]
@@ -6,7 +8,6 @@ pub enum Builtin {
     Println,
     ReadFile,
     StartsWith,
-    Trim,
     IsDigit,
     IsAlphabetical,
     Exit,
@@ -16,6 +17,11 @@ pub enum Builtin {
     InsertMap,
     GetMap,
     RemoveMap,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MethodBuiltin {
+    StrTrim { trimmed: Rc<Box<str>> },
 }
 
 impl Builtin {
@@ -30,7 +36,6 @@ impl Builtin {
             Self::Println => "println",
             Self::ReadFile => "read_file",
             Self::StartsWith => "starts_with",
-            Self::Trim => "trim",
             Self::IsDigit => "is_digit",
             Self::IsAlphabetical => "is_alphabetical",
             Self::Exit => "exit",

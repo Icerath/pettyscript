@@ -50,7 +50,7 @@ enum Token {
 }
 
 fn lexer_next(lexer) {
-    lexer.remaining = trim(lexer.remaining);
+    lexer.remaining = lexer.remaining.trim();
     const first_char = lexer.remaining[0];
     let token;
 
