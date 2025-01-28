@@ -48,7 +48,7 @@ pub enum Type {
 #[derive(Default)]
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
-    types: FxHashMap<&'static str, Option<Type>>,
+    var_types: FxHashMap<&'static str, Option<Type>>,
     nfor_loops: usize,
 }
 
@@ -77,7 +77,7 @@ impl Codegen {
     fn write_ident_offset(&mut self, ident: &'static str, ty: Option<Type>) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
         let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, offset);
-        self.scopes.last_mut().unwrap().types.insert(ident, ty);
+        self.scopes.last_mut().unwrap().var_types.insert(ident, ty);
         assert!(newly_inserted.is_none());
         offset
     }
@@ -267,11 +267,11 @@ impl Codegen {
     }
 
     fn load_type(&self, ident: &'static str) -> Option<&Type> {
-        match self.scopes.last().unwrap().types.get(ident) {
+        match self.scopes.last().unwrap().var_types.get(ident) {
             Some(ty) => ty.as_ref(),
             None => {
                 let scope = self.scopes.first().unwrap();
-                scope.types.get(ident).unwrap().as_ref()
+                scope.var_types.get(ident).unwrap().as_ref()
             }
         }
     }
@@ -280,14 +280,14 @@ impl Codegen {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => {
                 self.builder.insert(Op::Load(offset));
-                self.scopes.last().unwrap().types.get(ident).unwrap().clone()
+                self.scopes.last().unwrap().var_types.get(ident).unwrap().clone()
             }
             None => {
                 let scope = self.scopes.first().unwrap();
                 let offset =
                     *scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
                 self.builder.insert(Op::LoadGlobal(offset));
-                scope.types.get(ident).unwrap().clone()
+                scope.var_types.get(ident).unwrap().clone()
             }
         }
     }
