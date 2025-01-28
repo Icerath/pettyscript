@@ -150,8 +150,15 @@ impl Codegen {
                 let ty = match expr {
                     Some(expr) => self.expr(expr),
                     None => {
-                        self.builder.insert(Op::LoadNull);
-                        Some(Type::Null)
+                        let expected = expected.clone().unwrap();
+                        let op = match expected {
+                            Type::Null => Op::LoadNull,
+                            Type::Int => Op::LoadInt(0),
+                            Type::Str => Op::LoadString { ptr: 0, len: 0 },
+                            _ => todo!("{expected:?}"),
+                        };
+                        self.builder.insert(op);
+                        Some(expected)
                     }
                 };
                 if let (Some(ty), Some(expected)) = (&ty, &expected) {

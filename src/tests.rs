@@ -180,7 +180,7 @@ fn test_trim() {
 
 #[test]
 fn test_late_initialization() {
-    test_expr!(r#"let tok; tok = "a"; println(tok);"#, "a");
+    test_expr!(r#"let tok: str; tok = "a"; println(tok);"#, "a");
 }
 
 #[test]
