@@ -108,7 +108,7 @@ impl fmt::Debug for Enum {
 
 pub struct Function {
     pub ident: &'static str,
-    pub params: Box<[&'static str]>,
+    pub params: Box<[(&'static str, &'static str)]>,
     pub body: Block,
 }
 
@@ -677,7 +677,7 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::Fn)?;
         let ident = self.parse_ident()?;
         self.expect_token(Token::LParen)?;
-        let params = self.parse_separated_idents(TokenKind::RParen)?;
+        let params = self.parse_separated_ident_pairs(TokenKind::RParen)?;
         self.expect_token(Token::RParen)?;
         let body = self.parse_block()?;
         Ok(Function { ident, params, body })

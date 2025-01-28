@@ -110,7 +110,7 @@ impl Codegen {
                 self.scopes.push(FunctionScope::default());
 
                 for param in params {
-                    let offset = self.write_ident_offset(param, None);
+                    let offset = self.write_ident_offset(param.0, None);
                     self.builder.insert(Op::Store(offset));
                 }
                 for stmt in &body.stmts {
