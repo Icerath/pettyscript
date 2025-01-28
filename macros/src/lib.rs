@@ -171,11 +171,17 @@ pub fn enumkind_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             #new_variants
         }
 
-        impl From<#enum_ident> for #new_ident {
-            fn from(from: #enum_ident) -> #new_ident {
+        impl From<&#enum_ident> for #new_ident {
+            fn from(from: &#enum_ident) -> #new_ident {
                 match from {
                     #from_branches
                 }
+            }
+        }
+
+        impl From<#enum_ident> for #new_ident {
+            fn from(from: #enum_ident) -> #new_ident {
+                Self::from(&from)
             }
         }
     }

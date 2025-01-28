@@ -4,7 +4,7 @@ use logos::Logos;
 
 use crate::intern::intern;
 
-#[derive(Debug, Logos, Clone, Copy, PartialEq, macros::EnumKind)]
+#[derive(Debug, Logos, Clone, PartialEq, macros::EnumKind)]
 #[enum_kind(TokenKind)]
 #[logos(skip "//[^\n]*\n")]
 #[logos(skip "[ \t\r\n]")]
@@ -132,7 +132,7 @@ fn string_escape(lex: &mut Lexer) -> &'static str {
 type S = &'static str;
 
 impl Token {
-    pub fn kind(self) -> TokenKind {
+    pub fn kind(&self) -> TokenKind {
         TokenKind::from(self)
     }
 }
