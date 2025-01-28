@@ -138,7 +138,14 @@ impl Codegen {
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
-                    self.expr(expr);
+                    let ty = self.expr(expr);
+                    let expected = self.load_type(root);
+                    if let (Some(ty), Some(expected)) = (ty, expected) {
+                        // FIXME: Special case null until explicit types are properly supported to allow late initialization.
+                        if *expected != Type::Null && *expected != ty {
+                            panic!("Type Error: expected {expected:?}, Got: {ty:?}");
+                        }
+                    }
                     self.store(root);
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
@@ -257,6 +264,16 @@ impl Codegen {
             Some(&offset) => self.builder.insert(Op::Store(offset)),
             None => panic!(),
         };
+    }
+
+    fn load_type(&self, ident: &'static str) -> Option<&Type> {
+        match self.scopes.last().unwrap().types.get(ident) {
+            Some(ty) => ty.as_ref(),
+            None => {
+                let scope = self.scopes.first().unwrap();
+                scope.types.get(ident).unwrap().as_ref()
+            }
+        }
     }
 
     fn load(&mut self, ident: &'static str) -> Option<Type> {
