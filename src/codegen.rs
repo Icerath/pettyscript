@@ -44,6 +44,7 @@ pub enum Type {
     Str,
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
     Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
+    Map,
     Function(Rc<FnSig>),
 }
 
@@ -63,9 +64,19 @@ struct Codegen {
     break_label: Option<u32>,
 }
 
+fn builtin_type(builtin: Builtin) -> Option<Type> {
+    Some(Type::Function(Rc::new(match builtin {
+        Builtin::CreateMap => FnSig { ret: Type::Map, args: [].into() },
+        Builtin::Exit => FnSig { ret: Type::Null, args: [].into() }, // FIXME: Return never type.
+        Builtin::Println => return None, // FIXME: println will take a str when fstrs are supported.
+        Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },
+    })))
+}
+
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
+            self.scopes.last_mut().unwrap().var_types.insert(builtin.name(), builtin_type(builtin));
             // TODO: each buitlin should have a type.
             self.write_ident_offset(builtin.name(), None);
         }
