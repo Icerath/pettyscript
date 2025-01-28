@@ -139,7 +139,7 @@ impl Codegen {
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
                     let ty = self.expr(expr);
-                    let expected = self.load_type(root);
+                    let expected = self.load_var_type(root);
                     if let (Some(ty), Some(expected)) = (ty, expected) {
                         // FIXME: Special case null until explicit types are properly supported to allow late initialization.
                         if *expected != Type::Null && *expected != ty {
@@ -266,7 +266,7 @@ impl Codegen {
         };
     }
 
-    fn load_type(&self, ident: &'static str) -> Option<&Type> {
+    fn load_var_type(&self, ident: &'static str) -> Option<&Type> {
         match self.scopes.last().unwrap().var_types.get(ident) {
             Some(ty) => ty.as_ref(),
             None => {
