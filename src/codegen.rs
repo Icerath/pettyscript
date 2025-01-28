@@ -39,7 +39,6 @@ pub enum Type {
     Bool,
     Char,
     Int,
-    StrLiteral,
     Str,
     Struct(&'static str),
     Function(Rc<FnSig>),
@@ -49,6 +48,7 @@ pub enum Type {
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
     var_types: FxHashMap<&'static str, Option<Type>>,
+    named_types: FxHashMap<&'static str, Type>,
     nfor_loops: usize,
 }
 
@@ -66,6 +66,13 @@ impl Codegen {
             // TODO: each buitlin should have a type.
             self.write_ident_offset(builtin.name(), None);
         }
+        let mut scope = self.scopes.first_mut().unwrap();
+        // FIXME: Should these types be inserted into the interner?
+        scope.named_types.insert("int", Type::Int);
+        scope.named_types.insert("str", Type::Str);
+        scope.named_types.insert("bool", Type::Bool);
+        scope.named_types.insert("char", Type::Char);
+        scope.named_types.insert("null", Type::Null);
     }
 
     fn gen_block(&mut self, ast: &[Stmt]) {
@@ -124,8 +131,10 @@ impl Codegen {
 
                 self.builder.insert_label(function_end);
             }
-            Stmt::Let(VarDecl { ident, typ: _, expr })
-            | Stmt::Const(VarDecl { ident, typ: _, expr }) => {
+            Stmt::Let(VarDecl { ident, typ, expr }) | Stmt::Const(VarDecl { ident, typ, expr }) => {
+                let expected = typ.map(|typ| {
+                    self.load_name_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
+                });
                 let ty = match expr {
                     Some(expr) => self.expr(expr),
                     None => {
@@ -133,6 +142,9 @@ impl Codegen {
                         Some(Type::Null)
                     }
                 };
+                if let (Some(ty), Some(expected)) = (&ty, &expected) {
+                    assert_eq!(ty, expected);
+                }
                 let offset = self.write_ident_offset(ident, ty);
                 self.builder.insert(Op::Store(offset));
             }
@@ -276,6 +288,13 @@ impl Codegen {
         }
     }
 
+    fn load_name_type(&self, type_name: &'static str) -> Option<Type> {
+        match self.scopes.last().unwrap().named_types.get(type_name) {
+            Some(typ) => Some(typ.clone()),
+            None => self.scopes.first().unwrap().named_types.get(type_name).cloned(),
+        }
+    }
+
     fn load(&mut self, ident: &'static str) -> Option<Type> {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => {
@@ -314,7 +333,7 @@ impl Codegen {
                 Literal::String(string) => {
                     let [ptr, len] = self.builder.insert_string(string);
                     self.builder.insert(Op::LoadString { ptr, len });
-                    Type::StrLiteral
+                    Type::Str
                 }
                 Literal::Ident(ident) => return self.load(ident),
             },
