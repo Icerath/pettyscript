@@ -500,7 +500,11 @@ impl Codegen {
                 return None;
             }
             Expr::InitStruct { ident, fields } => {
-                let _ = ident;
+                let Type::Struct { name, fields: type_fields } =
+                    self.load_name_type(ident).unwrap()
+                else {
+                    panic!()
+                };
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
                     let ty = match expr {

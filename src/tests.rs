@@ -102,16 +102,22 @@ fn test_enum_variants() {
 
 #[test]
 fn test_structs() {
-    test_expr!("Point { x: 0, y: 0 }", "");
+    test_expr!("struct Point {x:int,y:int} Point { x: 0, y: 0 }", "");
     test_expr!(
-        "let lexer = Lexer { str: \"abc\" }; lexer.str = lexer.str[0..2]; println(lexer.str)",
+        "struct Lexer {str:str} let lexer = Lexer { str: \"abc\" }; lexer.str = lexer.str[0..2]; println(lexer.str)",
         "ab"
     );
-    test_expr!("println(A { str: 1 })", "{ str: 1 }");
-    test_expr!("println((A { name: \"Bob\" }).name)", "Bob");
-    test_expr!("let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
-    test_expr!("let lexer = Lexer { len: 10 }; println(1 < lexer.len);", "true");
-    test_expr!("let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);", "11");
+    test_expr!("struct A {str:int} println(A { str: 1 })", "{ str: 1 }");
+    test_expr!("struct A {str:int} println((A { name: \"Bob\" }).name)", "Bob");
+    test_expr!("struct Lexer {len:int}let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
+    test_expr!(
+        "struct Lexer{len:int} let lexer = Lexer { len: 10 }; println(1 < lexer.len);",
+        "true"
+    );
+    test_expr!(
+        "struct Lexer{len:int} let lexer = Lexer { len: 10 }; lexer.len = 11; println(lexer.len);",
+        "11"
+    );
 }
 
 #[test]
