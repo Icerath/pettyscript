@@ -46,6 +46,7 @@ pub enum Type {
 #[derive(Default)]
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
+    types: FxHashMap<&'static str, Option<Type>>,
     nfor_loops: usize,
 }
 
@@ -60,7 +61,8 @@ struct Codegen {
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            self.write_ident_offset(builtin.name());
+            // TODO: each buitlin should have a type.
+            self.write_ident_offset(builtin.name(), None);
         }
     }
 
@@ -70,9 +72,10 @@ impl Codegen {
         }
     }
 
-    fn write_ident_offset(&mut self, ident: &'static str) -> u32 {
+    fn write_ident_offset(&mut self, ident: &'static str, ty: Option<Type>) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
         let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, offset);
+        self.scopes.last_mut().unwrap().types.insert(ident, ty);
         assert!(newly_inserted.is_none());
         offset
     }
@@ -87,7 +90,8 @@ impl Codegen {
                     let variant = self.builder.insert_identifer(variant);
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
-                let offset = self.write_ident_offset(ident);
+
+                let offset = self.write_ident_offset(ident, None);
                 self.builder.insert(Op::Store(offset));
             }
 
@@ -95,7 +99,7 @@ impl Codegen {
                 let function_start = self.builder.create_label();
                 let function_end = self.builder.create_label();
 
-                let offset = self.write_ident_offset(ident);
+                let offset = self.write_ident_offset(ident, None);
                 self.builder.insert(Op::CreateFunction);
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
@@ -104,7 +108,7 @@ impl Codegen {
                 self.scopes.push(FunctionScope::default());
 
                 for param in params {
-                    let offset = self.write_ident_offset(param);
+                    let offset = self.write_ident_offset(param, None);
                     self.builder.insert(Op::Store(offset));
                 }
                 for stmt in &body.stmts {
@@ -118,14 +122,14 @@ impl Codegen {
                 self.builder.insert_label(function_end);
             }
             Stmt::Let(VarDecl { ident, expr }) | Stmt::Const(VarDecl { ident, expr }) => {
-                match expr {
+                let ty = match expr {
                     Some(expr) => self.expr(expr),
                     None => {
                         self.builder.insert(Op::LoadNull);
                         Some(Type::Null)
                     }
                 };
-                let offset = self.write_ident_offset(ident);
+                let offset = self.write_ident_offset(ident, ty);
                 self.builder.insert(Op::Store(offset));
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
@@ -184,7 +188,7 @@ impl Codegen {
                 self.builder.insert(Op::IterNext);
                 self.builder.insert(Op::CJump(end_label));
 
-                let offset = self.write_ident_offset(ident);
+                let offset = self.write_ident_offset(ident, None);
                 self.builder.insert(Op::Store(offset));
 
                 self.scopes.last_mut().unwrap().nfor_loops += 1;
