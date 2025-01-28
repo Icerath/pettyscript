@@ -11,10 +11,11 @@ pub struct StrIdent {
 }
 
 use macros::*;
-#[derive(BcRead, BcWrite, EnumKind, NumVariants, Clone, Copy, Debug)]
+#[derive(BcRead, BcWrite, EnumKind, NumVariants, Clone, Copy, Debug, PartialEq)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
+    AddInt,
     Greater,
     Less,
     EmptyStruct,

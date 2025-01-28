@@ -342,14 +342,22 @@ impl Codegen {
                     };
                     let lhs_ty = self.expr(&exprs[0]);
                     let rhs_ty = self.expr(&exprs[1]);
-                    self.builder.insert(op);
-                    let (lhs_ty, rhs_ty) = (lhs_ty?, rhs_ty?);
-                    match (lhs_ty, rhs_ty, op) {
+                    let Some((lhs_ty, rhs_ty)) = lhs_ty.and_then(|l| rhs_ty.map(|r| (l, r))) else {
+                        self.builder.insert(op);
+                        return None;
+                    };
+                    let typ = match (lhs_ty, rhs_ty, op) {
                         (_, _, Op::Eq) => Some(Type::Bool),
                         // FIXME: This catchall might have false positives
                         (lhs, rhs, _) if lhs == rhs => Some(lhs),
                         (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
+                    };
+                    if op == Op::Add && typ == Some(Type::Int) {
+                        self.builder.insert(Op::AddInt);
+                    } else {
+                        self.builder.insert(op);
                     }
+                    typ
                 };
             }
             Expr::FnCall { function, args } => {

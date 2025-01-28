@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
+    hint::unreachable_unchecked,
     io::{self, Write},
     rc::Rc,
 };
@@ -320,6 +321,11 @@ where
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs + rhs));
             }
+            Op::AddInt => unsafe {
+                let Value::Int(lhs) = stack.pop().unwrap() else { unreachable_unchecked() };
+                let Value::Int(rhs) = stack.pop().unwrap() else { unreachable_unchecked() };
+                stack.push(Value::Int(lhs + rhs));
+            },
             Op::LoadTrue => stack.push(Value::Bool(true)),
             Op::LoadFalse => stack.push(Value::Bool(false)),
             Op::CreateFunction => stack.push(Value::Function { label: reader.head as u32 + 5 + 5 }),
