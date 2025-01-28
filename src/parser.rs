@@ -138,7 +138,7 @@ pub enum Expr {
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Expr]> },
-    InitStruct { r#struct: Box<Expr>, fields: Box<[StructInitField]> },
+    InitStruct { ident: &'static str, fields: Box<[StructInitField]> },
     Array(Box<[Expr]>),
 }
 
@@ -154,11 +154,9 @@ impl fmt::Debug for Expr {
                 .field("expr", expr)
                 .field("field", &format_args!("{}", field))
                 .finish(),
-            Self::InitStruct { r#struct, fields } => f
-                .debug_struct("InitStruct")
-                .field("struct", r#struct)
-                .field("fields", fields)
-                .finish(),
+            Self::InitStruct { ident, fields } => {
+                f.debug_struct("InitStruct").field("ident", ident).field("fields", fields).finish()
+            }
             Self::Literal(literal) => fmt::Debug::fmt(literal, f),
             Self::Binary { op, exprs } => f
                 .debug_struct("BinaryExpr")
@@ -439,47 +437,51 @@ impl<'a> Parser<'a> {
         if !allow_struct_init {
             return Ok(expr);
         }
+        let Token::LBrace = self.peek()? else { return Ok(expr) };
+        let Expr::Literal(Literal::Ident(ident)) = expr else {
+            // This is actually an error, but it is better handled later.
+            return Ok(expr);
+        };
+        self.parse_struct_init(ident)
+    }
 
-        if let Token::LBrace = self.peek()? {
-            self.skip();
-            let mut fields = vec![];
-            while self.peek()? != Token::RBrace {
-                let ident = self.parse_ident()?;
-                if self.peek()? == Token::RBrace {
-                    fields.push(StructInitField { ident, expr: None });
-                    break;
-                }
-                let expr = match self.bump()? {
-                    Token::Comma => None,
-                    Token::Colon => {
-                        let expr = self.parse_root_expr()?;
-                        match self.peek()? {
-                            Token::Comma => self.skip(),
-                            Token::RBrace => {}
-                            got => {
-                                // TODO: Better error placement
-                                self.skip();
-                                return Err(self.expect_failed(
-                                    got.kind(),
-                                    &[TokenKind::Comma, TokenKind::LBrace],
-                                ));
-                            }
-                        }
-                        Some(expr)
-                    }
-                    got => {
-                        return Err(
-                            self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])
-                        )
-                    }
-                };
-                fields.push(StructInitField { ident, expr });
+    fn parse_struct_init(&mut self, ident: &'static str) -> Result<Expr> {
+        self.expect_token(Token::LBrace)?;
+        let mut fields = vec![];
+        while self.peek()? != Token::RBrace {
+            let ident = self.parse_ident()?;
+            if self.peek()? == Token::RBrace {
+                fields.push(StructInitField { ident, expr: None });
+                break;
             }
-            self.skip();
-            expr = Expr::InitStruct { r#struct: Box::new(expr), fields: fields.into() }
+            let expr = match self.bump()? {
+                Token::Comma => None,
+                Token::Colon => {
+                    let expr = self.parse_root_expr()?;
+                    match self.peek()? {
+                        Token::Comma => self.skip(),
+                        Token::RBrace => {}
+                        got => {
+                            // TODO: Better error placement
+                            self.skip();
+                            return Err(self.expect_failed(
+                                got.kind(),
+                                &[TokenKind::Comma, TokenKind::LBrace],
+                            ));
+                        }
+                    }
+                    Some(expr)
+                }
+                got => {
+                    return Err(
+                        self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])
+                    )
+                }
+            };
+            fields.push(StructInitField { ident, expr });
         }
-
-        Ok(expr)
+        self.skip();
+        Ok(Expr::InitStruct { ident, fields: fields.into() })
     }
 
     fn parse_unary_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {

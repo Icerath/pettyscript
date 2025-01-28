@@ -319,8 +319,8 @@ impl Codegen {
                 self.expr(index);
                 self.builder.insert(Op::Index);
             }
-            Expr::InitStruct { r#struct, fields } => {
-                let _ = r#struct;
+            Expr::InitStruct { ident, fields } => {
+                let _ = ident;
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
                     match expr {
