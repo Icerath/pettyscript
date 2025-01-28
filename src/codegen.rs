@@ -234,7 +234,13 @@ impl Codegen {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => self.builder.insert(Op::Load(offset)),
             None => {
-                let offset = *self.scopes.first().unwrap().variables.get(ident).unwrap();
+                let offset = *self
+                    .scopes
+                    .first()
+                    .unwrap()
+                    .variables
+                    .get(ident)
+                    .unwrap_or_else(|| panic!("Unknown ident: {ident}"));
                 self.builder.insert(Op::LoadGlobal(offset));
             }
         }

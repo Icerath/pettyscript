@@ -143,17 +143,14 @@ fn test_unary() {
 #[test]
 fn test_maps() {
     test_expr!(
-        r#"let hi = create_map(); insert_map(hi, "Bob", 32); insert_map(hi, "Alice", 34); println(hi)"#,
+        r#"let hi = create_map(); hi.insert("Bob", 32); hi.insert("Alice", 34); println(hi)"#,
         "{Bob: 32, Alice: 34}"
     );
     test_expr!(
-        r#"let hi = create_map(); insert_map(hi, "Bob", 32); println(remove_map(hi, "Bob")); println(hi); println(remove_map(hi, "Bob"));"#,
+        r#"let hi = create_map(); hi.insert("Bob", 32); println(hi.get("Bob")); hi.remove("Bob"); println(hi); println(hi.get("Bob"));"#,
         "32\n{}\nnull"
     );
-    test_expr!(
-        r#"let hi = create_map(); insert_map(hi, "Bob", 32); println(get_map(hi, "Bob"));"#,
-        "32"
-    );
+    test_expr!(r#"let hi = create_map(); hi.insert("Bob", 32); println(hi.get("Bob"));"#, "32");
 }
 
 #[test]

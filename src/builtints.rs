@@ -1,6 +1,6 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
-use crate::vm::PettyStr;
+use crate::vm::{PettyMap, PettyStr};
 
 #[derive(
     macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
@@ -13,9 +13,6 @@ pub enum Builtin {
     ArrayPush,
     ArrayPop,
     CreateMap,
-    InsertMap,
-    GetMap,
-    RemoveMap,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,15 +23,15 @@ pub enum MethodBuiltin {
     StrIsAlphabetic(PettyStr),
     CharIsDigit(char),
     CharIsAlphabetic(char),
+    MapGet(Rc<RefCell<PettyMap>>),
+    MapInsert(Rc<RefCell<PettyMap>>),
+    MapRemove(Rc<RefCell<PettyMap>>),
 }
 
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
             Self::CreateMap => "create_map",
-            Self::InsertMap => "insert_map",
-            Self::GetMap => "get_map",
-            Self::RemoveMap => "remove_map",
             Self::ArrayPush => "array_push",
             Self::ArrayPop => "array_pop",
             Self::Println => "println",
