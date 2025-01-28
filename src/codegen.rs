@@ -30,7 +30,7 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
 #[derive(Debug, PartialEq)]
 pub struct FnSig {
     ret: Type,
-    args: [Type],
+    args: Box<[Type]>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -123,6 +123,15 @@ impl Codegen {
                 let function_start = self.builder.create_label();
                 let function_end = self.builder.create_label();
 
+                let ret = ret_type.map_or(Type::Null, |typ| self.load_name_type(typ).unwrap());
+                let mut args = vec![];
+                for (_ident, typ) in params {
+                    let typ = self.load_name_type(typ).unwrap();
+                    args.push(typ);
+                }
+                let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));
+
+                self.scopes.last_mut().unwrap().var_types.insert(ident, Some(typ));
                 let offset = self.write_ident_offset(ident, None);
                 self.builder.insert(Op::CreateFunction);
                 self.builder.insert(Op::Store(offset));
