@@ -69,7 +69,7 @@ impl Codegen {
             // TODO: each buitlin should have a type.
             self.write_ident_offset(builtin.name(), None);
         }
-        let mut scope = self.scopes.first_mut().unwrap();
+        let scope = self.scopes.first_mut().unwrap();
         // FIXME: Should these types be inserted into the interner?
         scope.named_types.insert("int", Type::Int);
         scope.named_types.insert("str", Type::Str);
