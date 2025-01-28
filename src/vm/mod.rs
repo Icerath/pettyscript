@@ -442,9 +442,9 @@ where
 
 fn load_char_field(consts: &[u8], char: char, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::MethodBuiltin(match (field, char) {
-        (b"is_digit", char) => MethodBuiltin::CharIsDigit(char),
-        (b"is_alphabetic", char) => MethodBuiltin::CharIsAlphabetic(char),
+    Value::MethodBuiltin(match field {
+        b"is_digit" => MethodBuiltin::CharIsDigit(char),
+        b"is_alphabetic" => MethodBuiltin::CharIsAlphabetic(char),
         _ => panic!("char does not contain field: {}", field.as_bstr()),
     })
 }
