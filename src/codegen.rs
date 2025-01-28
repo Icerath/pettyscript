@@ -269,7 +269,11 @@ impl Codegen {
                 self.break_label = prev_break;
             }
             Stmt::IfChain(IfChain { first, else_ifs, r#else }) => {
-                self.expr(&first.condition);
+                let typ = self.expr(&first.condition);
+                match typ {
+                    Some(Type::Bool) | None => {}
+                    Some(other) => panic!("Cannot use type {other:?} in if stmts"),
+                }
                 let final_end_label = self.builder.create_label();
                 let mut next_label = self.builder.create_label();
                 self.builder.insert(Op::CJump(next_label));
@@ -277,7 +281,11 @@ impl Codegen {
                 self.builder.insert(Op::Jump(final_end_label));
                 for elseif in else_ifs {
                     self.builder.insert_label(next_label);
-                    self.expr(&elseif.condition);
+                    let typ = self.expr(&elseif.condition);
+                    match typ {
+                        Some(Type::Bool) | None => {}
+                        Some(other) => panic!("Cannot use type {other:?} in if stmts"),
+                    }
                     next_label = self.builder.create_label();
                     self.builder.insert(Op::CJump(next_label));
                     self.gen_block(&elseif.body.stmts);
