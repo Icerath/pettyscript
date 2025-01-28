@@ -49,7 +49,7 @@ enum Token {
     Ident,
 }
 
-fn lexer_next(lexer: Lexer) {
+fn lexer_next(lexer: Lexer) -> Token {
     lexer.remaining = lexer.remaining.trim();
     const first_char = lexer.remaining[0];
     let token;

@@ -38,6 +38,7 @@ pub enum Token {
     #[token("!=")] BangEq,
     #[token("..")] Range,
     #[token("..=")] RangeInclusive,
+    #[token("->")] ThinArrow,
     // Keywords
     #[token("or")] #[token("||")] Or,
     #[token("and")] #[token("&&")] And,
@@ -139,6 +140,7 @@ impl Token {
 impl TokenKind {
     pub fn repr(self) -> &'static str {
         match self {
+            Self::ThinArrow => "->",
             Self::True => "true",
             Self::False => "false",
             Self::Or => "or",
