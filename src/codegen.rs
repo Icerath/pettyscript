@@ -211,7 +211,12 @@ impl Codegen {
                 let prev_break = self.break_label.replace(end_label);
 
                 self.builder.insert_label(start_label);
-                self.expr(expr);
+                let typ = self.expr(expr);
+                match typ {
+                    Some(Type::Bool) => {}
+                    Some(other) => panic!("Cannot use type: {other:?} in while loop"),
+                    None => {}
+                }
                 self.builder.insert(Op::CJump(end_label));
                 self.gen_block(&body.stmts);
                 self.builder.insert(Op::Jump(start_label));
