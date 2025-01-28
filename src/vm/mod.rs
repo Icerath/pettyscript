@@ -516,10 +516,10 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 let mut debug_map = f.debug_map();
 
                 for (key, value) in &*map.borrow() {
-                    debug_map.entry(
-                        &DisplayValue { value: key, ..*self },
-                        &DisplayValue { value, ..*self },
-                    );
+                    debug_map.entry(&DisplayValue { value: key, ..*self }, &DisplayValue {
+                        value,
+                        ..*self
+                    });
                 }
 
                 debug_map.finish()

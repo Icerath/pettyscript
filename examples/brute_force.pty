@@ -1,0 +1,7 @@
+let sum = 0;
+for i in 0..10000 {
+    for j in 0..10000 {
+        sum = sum + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1;
+    }
+}
+println(sum);

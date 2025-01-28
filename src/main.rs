@@ -9,10 +9,11 @@ mod parser;
 mod tests;
 mod vm;
 
+use std::path::PathBuf;
+
 use clap::Parser;
 use disassemble::disassemble;
 use parser::parse;
-use std::path::PathBuf;
 
 #[derive(clap::Parser)]
 struct Args {

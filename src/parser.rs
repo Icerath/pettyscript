@@ -465,10 +465,10 @@ impl<'a> Parser<'a> {
                         got => {
                             // TODO: Better error placement
                             self.skip();
-                            return Err(self.expect_failed(
-                                got.kind(),
-                                &[TokenKind::Comma, TokenKind::LBrace],
-                            ));
+                            return Err(self.expect_failed(got.kind(), &[
+                                TokenKind::Comma,
+                                TokenKind::LBrace,
+                            ]));
                         }
                     }
                     Some(expr)
@@ -476,7 +476,7 @@ impl<'a> Parser<'a> {
                 got => {
                     return Err(
                         self.expect_failed(got.kind(), &[TokenKind::Colon, TokenKind::Comma])
-                    )
+                    );
                 }
             };
             fields.push(StructInitField { ident, expr });
@@ -540,10 +540,12 @@ impl<'a> Parser<'a> {
             Token::True => Literal::Bool(true),
             Token::False => Literal::Bool(false),
             got => {
-                return Err(self.expect_failed(
-                    got.kind(),
-                    &[TokenKind::Int, TokenKind::Char, TokenKind::String, TokenKind::Ident],
-                ));
+                return Err(self.expect_failed(got.kind(), &[
+                    TokenKind::Int,
+                    TokenKind::Char,
+                    TokenKind::String,
+                    TokenKind::Ident,
+                ]));
             }
         })
     }
@@ -623,7 +625,7 @@ impl<'a> Parser<'a> {
             Token::Semicolon => return Ok(VarDecl { ident, typ, expr: None }),
             Token::Eq => self.parse_root_expr()?,
             got => {
-                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]))
+                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]));
             }
         };
         self.expect_semicolon()?;

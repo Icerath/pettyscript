@@ -41,6 +41,7 @@ impl Builtin {
 
 impl TryFrom<u16> for Builtin {
     type Error = u16;
+
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         if value as usize >= Self::VARIANT_COUNT {
             return Err(value);

@@ -1,8 +1,9 @@
+use bstr::ByteSlice;
+
 use crate::{
     bytecode::{Op, VERSION},
     vm::BytecodeReader,
 };
-use bstr::ByteSlice;
 
 pub fn disassemble(bytecode: &[u8]) {
     let mut reader = BytecodeReader::new(bytecode);

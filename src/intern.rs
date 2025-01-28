@@ -1,6 +1,7 @@
+use std::sync::RwLock;
+
 use hashbrown::HashSet;
 use rustc_hash::FxBuildHasher;
-use std::sync::RwLock;
 
 // FIXME: use std::collection::HashSet when const HashSet::with_hasher is stabilized.
 static MAP: RwLock<HashSet<&'static str, FxBuildHasher>> =

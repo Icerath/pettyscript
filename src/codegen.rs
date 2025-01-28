@@ -82,7 +82,7 @@ impl Codegen {
         offset
     }
 
-    fn gen(&mut self, node: &Stmt) {
+    fn r#gen(&mut self, node: &Stmt) {
         match node {
             Stmt::Struct(_) => {}
             Stmt::Enum(Enum { ident, variants }) => {
