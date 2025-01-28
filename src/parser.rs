@@ -80,7 +80,7 @@ pub enum AssignSegment {
 
 pub struct Struct {
     pub ident: &'static str,
-    pub fields: Box<[&'static str]>,
+    pub fields: Box<[(&'static str, Option<&'static str>)]>,
 }
 
 impl fmt::Debug for Struct {
@@ -657,7 +657,7 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::Struct)?;
         let ident = self.parse_ident()?;
         self.expect_token(Token::LBrace)?;
-        let fields = self.parse_separated_idents(TokenKind::RBrace)?;
+        let fields = self.parse_separated_ident_pairs(TokenKind::RBrace)?;
         self.expect_token(Token::RBrace)?;
         Ok(Struct { ident, fields })
     }
@@ -686,6 +686,28 @@ impl<'a> Parser<'a> {
         while self.peek()?.kind() != terminator {
             let ident = self.parse_ident()?;
             params.push(ident);
+            if self.peek()?.kind() == terminator {
+                break;
+            }
+            self.expect_token(Token::Comma)?;
+        }
+        Ok(params.into())
+    }
+
+    fn parse_separated_ident_pairs(
+        &mut self,
+        terminator: TokenKind,
+    ) -> Result<Box<[(&'static str, Option<&'static str>)]>> {
+        let mut params = vec![];
+        while self.peek()?.kind() != terminator {
+            let ident = self.parse_ident()?;
+            let typ = if self.peek()? == Token::Colon {
+                self.skip();
+                Some(self.parse_ident()?)
+            } else {
+                None
+            };
+            params.push((ident, typ));
             if self.peek()?.kind() == terminator {
                 break;
             }
