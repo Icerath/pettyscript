@@ -507,7 +507,7 @@ impl Codegen {
                 };
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
-                    assert!(type_fields.get(ident).is_some());
+                    assert!(type_fields.contains_key(ident));
                     let typ = match expr {
                         Some(expr) => self.expr(expr),
                         None => self.load(ident),
