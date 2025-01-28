@@ -36,6 +36,8 @@ pub struct FnSig {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Null,
+    Range,
+    RangeInclusive,
     Bool,
     Char,
     Int,
@@ -404,6 +406,9 @@ impl Codegen {
                     };
                     let typ = match (lhs_ty, rhs_ty, op) {
                         (_, _, Op::Eq) => Some(Type::Bool),
+                        (Type::Int, Type::Int, Op::Range) => Some(Type::Range),
+                        (Type::Int, Type::Int, Op::RangeInclusive) => Some(Type::RangeInclusive),
+                        (_, _, Op::Range | Op::RangeInclusive) => panic!(),
                         // FIXME: This catchall might have false positives
                         (lhs, rhs, _) if lhs == rhs => Some(lhs),
                         (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
