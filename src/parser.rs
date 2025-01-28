@@ -61,6 +61,7 @@ pub struct Return(pub Option<Expr>);
 
 pub struct VarDecl {
     pub ident: &'static str,
+    pub typ: Option<&'static str>,
     pub expr: Option<Expr>,
 }
 
@@ -612,15 +613,21 @@ impl<'a> Parser<'a> {
 
     fn parse_var_decl(&mut self) -> Result<VarDecl> {
         let ident = self.parse_ident()?;
+        let typ = if self.peek()? == Token::Colon {
+            self.skip();
+            Some(self.parse_ident()?)
+        } else {
+            None
+        };
         let expr = match self.bump()? {
-            Token::Semicolon => return Ok(VarDecl { ident, expr: None }),
+            Token::Semicolon => return Ok(VarDecl { ident, typ, expr: None }),
             Token::Eq => self.parse_root_expr()?,
             got => {
                 return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]))
             }
         };
         self.expect_semicolon()?;
-        Ok(VarDecl { ident, expr: Some(expr) })
+        Ok(VarDecl { ident, typ, expr: Some(expr) })
     }
 
     fn parse_assignment(&mut self) -> Result<Assign> {

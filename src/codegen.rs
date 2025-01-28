@@ -121,7 +121,8 @@ impl Codegen {
 
                 self.builder.insert_label(function_end);
             }
-            Stmt::Let(VarDecl { ident, expr }) | Stmt::Const(VarDecl { ident, expr }) => {
+            Stmt::Let(VarDecl { ident, typ: _, expr })
+            | Stmt::Const(VarDecl { ident, typ: _, expr }) => {
                 let ty = match expr {
                     Some(expr) => self.expr(expr),
                     None => {

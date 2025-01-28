@@ -124,7 +124,7 @@ fn test_int_literals() {
 #[test]
 fn test_while_loops() {
     test_expr!(
-        "let i = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
+        "let i: int = 0; while true { if i == 4 { break; } println(i); i = i + 1; }",
         "0\n1\n2\n3"
     );
 }
