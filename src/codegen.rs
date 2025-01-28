@@ -423,7 +423,7 @@ impl Codegen {
                         return None;
                     };
                     let typ = match (lhs_ty, rhs_ty, op) {
-                        (_, _, Op::Eq) => Some(Type::Bool),
+                        (_, _, Op::Eq | Op::Less | Op::Greater) => Some(Type::Bool),
                         (Type::Int, Type::Int, Op::Range) => Some(Type::Range),
                         (Type::Int, Type::Int, Op::RangeInclusive) => Some(Type::RangeInclusive),
                         (_, _, Op::Range | Op::RangeInclusive) => panic!(),
