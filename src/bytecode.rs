@@ -15,9 +15,7 @@ use macros::*;
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
-    FStrStart,
-    FStrConcat,
-    FStrFinish,
+    BuildFstr { num_segments: u16 },
     AddInt,
     Greater,
     Less,

@@ -402,19 +402,15 @@ impl Codegen {
                     Type::Str
                 }
                 Literal::FString(fstring) => {
-                    self.builder.insert(Op::FStrStart);
                     for (str, expr) in &fstring.segments {
                         let [ptr, len] = self.builder.insert_string(str);
                         self.builder.insert(Op::LoadString { ptr, len });
-                        self.builder.insert(Op::FStrConcat);
                         self.expr(expr);
-                        self.builder.insert(Op::FStrConcat);
                     }
                     let [ptr, len] = self.builder.insert_string(fstring.remaining);
                     self.builder.insert(Op::LoadString { ptr, len });
-                    self.builder.insert(Op::FStrConcat);
-                    self.builder.insert(Op::FStrFinish);
-
+                    self.builder
+                        .insert(Op::BuildFstr { num_segments: fstring.segments.len() as u16 });
                     Type::Str
                 }
                 Literal::Ident(ident) => return self.load(ident),

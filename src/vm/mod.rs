@@ -48,9 +48,6 @@ pub fn execute_bytecode(bytecode: &[u8]) {
     execute_bytecode_with(stdout, bytecode).unwrap();
 }
 
-#[derive(Default)]
-struct FStrBuilder(String);
-
 pub fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
 where
     W: Write,
@@ -88,35 +85,37 @@ where
         }};
     }
 
-    let mut fstr_stack = vec![];
-
     while reader.head < reader.bytes.len() {
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         match op {
-            Op::FStrStart => fstr_stack.push(FStrBuilder::default()),
-            Op::FStrConcat => {
-                let value = stack.pop().unwrap();
-                // TODO: Handle all types properly
+            Op::BuildFstr { num_segments } => {
+                let mut builder = String::new();
+                let remaining = stack.pop().unwrap();
+                for _ in 0..num_segments {
+                    let value = stack.pop().unwrap();
+                    let Value::String(PettyStr::Literal { ptr, len }) = stack.pop().unwrap() else {
+                        panic!()
+                    };
+                    builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
 
-                let builder = &mut fstr_stack.last_mut().unwrap().0;
-                match value {
-                    Value::Int(x) => _ = write!(builder, "{x}"),
-                    Value::String(str) => {
-                        let str_ref = match str {
-                            PettyStr::Literal { ptr, len } => {
-                                str_literal!(ptr, len).as_bstr().to_str().unwrap()
-                            }
-                            PettyStr::String(ref str) => str,
-                        };
-                        builder.push_str(str_ref);
+                    match value {
+                        Value::Int(x) => _ = write!(builder, "{x}"),
+                        Value::String(str) => {
+                            let str_ref = match str {
+                                PettyStr::Literal { ptr, len } => {
+                                    str_literal!(ptr, len).as_bstr().to_str().unwrap()
+                                }
+                                PettyStr::String(ref str) => str,
+                            };
+                            builder.push_str(str_ref);
+                        }
+                        other => todo!("{other:?}"),
                     }
-                    other => todo!("{other:?}"),
                 }
-            }
-            Op::FStrFinish => {
-                let FStrBuilder(string) = fstr_stack.pop().unwrap();
-                stack.push(Value::String(PettyStr::String(Rc::new(string.into()))));
+                let Value::String(PettyStr::Literal { ptr, len }) = remaining else { panic!() };
+                builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
+                stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
             }
 
             Op::ArrayPush => {
