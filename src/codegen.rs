@@ -457,12 +457,24 @@ impl Codegen {
                 };
             }
             Expr::FnCall { function, args } => {
+                let mut arg_types = vec![];
                 for arg in args {
-                    self.expr(arg);
+                    arg_types.push(self.expr(arg));
                 }
-                self.expr(function);
+                let typ = self.expr(function);
+                let ret_type = match typ {
+                    Some(Type::Function(fn_type)) => {
+                        assert_eq!(fn_type.args.len(), arg_types.len());
+                        for (arg_ty, param_ty) in arg_types.iter().zip(&fn_type.args) {
+                            assert_eq!(arg_ty.as_ref(), Some(param_ty));
+                        }
+                        Some(fn_type.ret.clone())
+                    }
+                    Some(other) => panic!("Cannot call {other:?}"),
+                    None => None,
+                };
                 self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
-                return None;
+                return ret_type;
             }
             Expr::FieldAccess { expr, field } => {
                 self.expr(expr);
