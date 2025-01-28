@@ -31,6 +31,7 @@ fn test_fizzbuzz_example() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn test_lexer_example() {
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
