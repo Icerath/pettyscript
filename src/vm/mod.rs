@@ -148,6 +148,30 @@ where
                     _ => unimplemented!("{last:?}"),
                 }
             }
+            Op::IterRange => unsafe {
+                let Value::Range(range) = stack.last().unwrap() else { unreachable_unchecked() };
+                let [start, end] = &*range.clone();
+                if start.get() < end.get() {
+                    stack.push(Value::Int(start.get()));
+                    stack.push(Value::Bool(true));
+                    start.set(start.get() + 1);
+                } else {
+                    stack.push(Value::Bool(false));
+                }
+            },
+            Op::IterRangeInclusive => unsafe {
+                let Value::RangeInclusive(range) = stack.last().unwrap() else {
+                    unreachable_unchecked()
+                };
+                let [start, end] = &*range.clone();
+                if start.get() <= end.get() {
+                    stack.push(Value::Int(start.get()));
+                    stack.push(Value::Bool(true));
+                    start.set(start.get() + 1);
+                } else {
+                    stack.push(Value::Bool(false));
+                }
+            },
             Op::CJump(label) => {
                 let Value::Bool(bool) = stack.pop().unwrap() else { unimplemented!() };
                 if !bool {

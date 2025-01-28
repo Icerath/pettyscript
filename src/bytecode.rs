@@ -49,6 +49,8 @@ pub enum Op {
     Pop,
     Dup,
     IterNext,
+    IterRange,
+    IterRangeInclusive,
 }
 
 trait BcRead: Sized {

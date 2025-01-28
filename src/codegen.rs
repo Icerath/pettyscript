@@ -227,11 +227,24 @@ impl Codegen {
                 let prev_continue = self.continue_label.replace(start_label);
                 let prev_break = self.break_label.replace(end_label);
 
-                self.expr(iter);
+                let iter = self.expr(iter);
+                let ident_typ = match &iter {
+                    Some(Type::Range | Type::RangeInclusive) => Some(Type::Int),
+                    None => None,
+                    _ => panic!(),
+                };
+
                 self.builder.insert_label(start_label);
-                self.builder.insert(Op::IterNext);
+                let iter_op = match iter {
+                    Some(Type::Range) => Op::IterRange,
+                    Some(Type::RangeInclusive) => Op::IterRangeInclusive,
+                    Some(typ) => panic!("{typ:?}"),
+                    None => Op::IterNext,
+                };
+                self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
 
+                self.scopes.last_mut().unwrap().var_types.insert(ident, ident_typ);
                 let offset = self.write_ident_offset(ident, None);
                 self.builder.insert(Op::Store(offset));
 
