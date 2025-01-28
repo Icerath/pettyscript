@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     builtints::Builtin,
@@ -40,7 +40,8 @@ pub enum Type {
     Char,
     Int,
     Str,
-    Struct(&'static str),
+    Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
+    Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
     Function(Rc<FnSig>),
 }
 
@@ -91,8 +92,19 @@ impl Codegen {
 
     fn r#gen(&mut self, node: &Stmt) {
         match node {
-            Stmt::Struct(_) => {}
+            Stmt::Struct(r#struct) => {
+                let mut fields = FxHashMap::default();
+                for &(field, typ) in &r#struct.fields {
+                    fields.insert(field, self.load_name_type(typ).unwrap());
+                }
+                let typ = Type::Struct { name: r#struct.ident, fields: Rc::new(fields) };
+                self.scopes.last_mut().unwrap().named_types.insert(r#struct.ident, typ);
+            }
             Stmt::Enum(Enum { ident, variants }) => {
+                let typ =
+                    Type::Enum { name: ident, fields: Rc::new(variants.iter().copied().collect()) };
+                self.scopes.last_mut().unwrap().named_types.insert(ident, typ);
+
                 self.builder.insert(Op::EmptyStruct);
 
                 for variant in variants {
