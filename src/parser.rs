@@ -254,7 +254,7 @@ impl TryFrom<TokenKind> for BinOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum UnaryOp {
     Not,
     Neg,

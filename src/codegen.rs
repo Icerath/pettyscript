@@ -476,12 +476,20 @@ impl Codegen {
                 return None;
             }
             Expr::Unary { op, expr } => {
-                self.expr(expr);
+                let typ = self.expr(expr);
+                if let Some(typ) = &typ {
+                    if *op == UnaryOp::Not && *typ != Type::Bool {
+                        panic!("Cannot use ! operator on {typ:?}");
+                    }
+                    if *op == UnaryOp::Neg && *typ != Type::Int {
+                        panic!("Cannot use - operator on {typ:?}");
+                    }
+                }
                 match op {
                     UnaryOp::Not => self.builder.insert(Op::Not),
                     UnaryOp::Neg => self.builder.insert(Op::Neg),
                 }
-                return None;
+                return typ;
             }
         };
         Some(ty)
