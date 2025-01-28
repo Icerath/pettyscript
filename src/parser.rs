@@ -80,7 +80,7 @@ pub enum AssignSegment {
 
 pub struct Struct {
     pub ident: &'static str,
-    pub fields: Box<[(&'static str, Option<&'static str>)]>,
+    pub fields: Box<[(&'static str, &'static str)]>,
 }
 
 impl fmt::Debug for Struct {
@@ -699,16 +699,12 @@ impl<'a> Parser<'a> {
     fn parse_separated_ident_pairs(
         &mut self,
         terminator: TokenKind,
-    ) -> Result<Box<[(&'static str, Option<&'static str>)]>> {
+    ) -> Result<Box<[(&'static str, &'static str)]>> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
             let ident = self.parse_ident()?;
-            let typ = if self.peek()? == Token::Colon {
-                self.skip();
-                Some(self.parse_ident()?)
-            } else {
-                None
-            };
+            self.expect_token(Token::Colon)?;
+            let typ = self.parse_ident()?;
             params.push((ident, typ));
             if self.peek()?.kind() == terminator {
                 break;
