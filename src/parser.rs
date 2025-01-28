@@ -616,21 +616,25 @@ impl<'a> Parser<'a> {
 
     fn parse_var_decl(&mut self) -> Result<VarDecl> {
         let ident = self.parse_ident()?;
-        let typ = if self.peek()? == Token::Colon {
+        if self.peek()? == Token::Colon {
             self.skip();
-            Some(self.parse_ident()?)
-        } else {
-            None
-        };
-        let expr = match self.bump()? {
-            Token::Semicolon => return Ok(VarDecl { ident, typ, expr: None }),
-            Token::Eq => self.parse_root_expr()?,
-            got => {
-                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]));
-            }
-        };
+            let typ = self.parse_ident()?;
+            let expr = match self.bump()? {
+                Token::Semicolon => return Ok(VarDecl { ident, typ: Some(typ), expr: None }),
+                Token::Eq => self.parse_root_expr()?,
+                got => {
+                    return Err(
+                        self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq])
+                    );
+                }
+            };
+            self.expect_semicolon()?;
+            return Ok(VarDecl { ident, typ: Some(typ), expr: Some(expr) });
+        }
+        self.expect_any(&[TokenKind::Eq, TokenKind::Colon])?;
+        let expr = self.parse_root_expr()?;
         self.expect_semicolon()?;
-        Ok(VarDecl { ident, typ, expr: Some(expr) })
+        Ok(VarDecl { ident, typ: None, expr: Some(expr) })
     }
 
     fn parse_assignment(&mut self) -> Result<Assign> {
