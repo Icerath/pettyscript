@@ -130,7 +130,6 @@ impl Codegen {
             }
 
             Stmt::Function(Function { ident, params, ret_type, body }) => {
-                let _ = ret_type;
                 let function_start = self.builder.create_label();
                 let function_end = self.builder.create_label();
 
