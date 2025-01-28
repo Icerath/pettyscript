@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
+    fmt::Write as _,
     hint::unreachable_unchecked,
     io::{self, Write},
     rc::Rc,
@@ -47,6 +48,9 @@ pub fn execute_bytecode(bytecode: &[u8]) {
     execute_bytecode_with(stdout, bytecode).unwrap();
 }
 
+#[derive(Default)]
+struct FStrBuilder(String);
+
 pub fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
 where
     W: Write,
@@ -84,10 +88,37 @@ where
         }};
     }
 
+    let mut fstr_stack = vec![];
+
     while reader.head < reader.bytes.len() {
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         match op {
+            Op::FStrStart => fstr_stack.push(FStrBuilder::default()),
+            Op::FStrConcat => {
+                let value = stack.pop().unwrap();
+                // TODO: Handle all types properly
+
+                let builder = &mut fstr_stack.last_mut().unwrap().0;
+                match value {
+                    Value::Int(x) => _ = write!(builder, "{x}"),
+                    Value::String(str) => {
+                        let str_ref = match str {
+                            PettyStr::Literal { ptr, len } => {
+                                str_literal!(ptr, len).as_bstr().to_str().unwrap()
+                            }
+                            PettyStr::String(ref str) => str,
+                        };
+                        builder.push_str(str_ref);
+                    }
+                    other => todo!("{other:?}"),
+                }
+            }
+            Op::FStrFinish => {
+                let FStrBuilder(string) = fstr_stack.pop().unwrap();
+                stack.push(Value::String(PettyStr::String(Rc::new(string.into()))));
+            }
+
             Op::ArrayPush => {
                 let value = stack.pop().unwrap();
                 let arr = stack.last_mut().unwrap();

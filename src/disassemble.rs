@@ -27,6 +27,9 @@ pub fn disassemble(bytecode: &[u8]) {
         reader.head += 1 + op.size();
         print!("x{offset:x}: ");
         match op {
+            Op::FStrStart => println!("FSTR_START"),
+            Op::FStrConcat => println!("FSTR_CONCAT"),
+            Op::FStrFinish => println!("FSTR_FINISH"),
             Op::AddInt => println!("ADD_INT"),
             Op::Neg => println!("NEG"),
             Op::Add => println!("ADD"),

@@ -3,7 +3,10 @@ use std::fmt;
 use logos::{Lexer, Logos};
 use miette::{Context, Error, LabeledSpan, Result};
 
-use crate::lexer::{Token, TokenKind};
+use crate::{
+    intern::intern,
+    lexer::{Token, TokenKind},
+};
 
 pub fn parse(src: &str) -> Result<Box<[Stmt]>> {
     Parser::new(src).parse_root()
@@ -198,6 +201,7 @@ impl fmt::Debug for Literal {
             Self::Char(char) => write!(f, "Char({char:?})"),
             Self::String(str) => write!(f, "String({str:?})"),
             Self::Ident(ident) => write!(f, "Ident({ident})"),
+            Self::FString(str) => write!(f, "FString({str:?})"),
         }
     }
 }
@@ -207,7 +211,14 @@ pub enum Literal {
     Int(i64),
     Char(char),
     String(&'static str),
+    FString(FString),
     Ident(&'static str),
+}
+
+#[derive(Debug)]
+pub struct FString {
+    pub segments: Box<[(&'static str, Expr)]>,
+    pub remaining: &'static str,
 }
 
 #[derive(Debug, PartialEq)]
@@ -538,6 +549,7 @@ impl<'a> Parser<'a> {
             Token::Char(char) => Literal::Char(char),
             Token::Ident(ident) => Literal::Ident(ident),
             Token::String(str) => Literal::String(str),
+            Token::FString(str) => return self.parse_fstring(str).map(Literal::FString),
             Token::True => Literal::Bool(true),
             Token::False => Literal::Bool(false),
             got => {
@@ -549,6 +561,28 @@ impl<'a> Parser<'a> {
                 ]));
             }
         })
+    }
+
+    fn parse_fstring(&mut self, str: &str) -> Result<FString> {
+        // FIXME: Better error and unicode.
+        let mut i = 0;
+        let mut section_start = 0;
+        let mut segments = vec![];
+        while i < str.len() {
+            if str.as_bytes()[i] == b'{' {
+                let end = str[i + 1..].find('}').unwrap();
+                let expr_str = &str[i + 1..i + 1 + end];
+                // FIXME: Handle EOF correctly to avoid this.
+                let expr = Parser::new(&(expr_str.to_string() + ";")).parse_root_expr()?;
+                let section = intern(&str[section_start..i]);
+                i += end;
+                section_start = i + 2;
+                segments.push((section, expr));
+            }
+            i += 1;
+        }
+        let remaining = intern(&str[section_start..i]);
+        Ok(FString { segments: segments.into(), remaining })
     }
 
     fn parse_for_loop(&mut self) -> Result<ForLoop> {
@@ -782,7 +816,7 @@ impl<'a> Parser<'a> {
     }
 
     fn bump(&mut self) -> Result<Token> {
-        self.lexer.next().context("Lexer Error")?.map_err(|_| miette::miette!("Lexer Error"))
+        self.lexer.next().context("EOF Error")?.map_err(|_| miette::miette!("Lexer Error"))
     }
 
     fn skip(&mut self) {

@@ -401,6 +401,22 @@ impl Codegen {
                     self.builder.insert(Op::LoadString { ptr, len });
                     Type::Str
                 }
+                Literal::FString(fstring) => {
+                    self.builder.insert(Op::FStrStart);
+                    for (str, expr) in &fstring.segments {
+                        let [ptr, len] = self.builder.insert_string(str);
+                        self.builder.insert(Op::LoadString { ptr, len });
+                        self.builder.insert(Op::FStrConcat);
+                        self.expr(expr);
+                        self.builder.insert(Op::FStrConcat);
+                    }
+                    let [ptr, len] = self.builder.insert_string(fstring.remaining);
+                    self.builder.insert(Op::LoadString { ptr, len });
+                    self.builder.insert(Op::FStrConcat);
+                    self.builder.insert(Op::FStrFinish);
+
+                    Type::Str
+                }
                 Literal::Ident(ident) => return self.load(ident),
             },
             Expr::Binary { op, exprs } => {

@@ -65,8 +65,10 @@ pub enum Token {
     #[regex(r"0[xX][\da-fA-F_]+", parse_hex_int)]
     #[regex(r"0[oO][0-7_]+", parse_octal_int)]
     Int(i64),
-    #[regex(r#""[^"]*""#, string_escape)]
+    #[regex(r#""[^"]*""#, |s| raw_string_escape(&s.slice()[1..s.slice().len()-1]))]
     String(S),
+    #[regex(r#"f"[^"]*""#, |s| raw_string_escape(&s.slice()[2..s.slice().len()-1]))]
+    FString(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
 }
@@ -123,9 +125,9 @@ fn parse_int(str: &mut Lexer) -> Option<i64> {
     Some(sum)
 }
 
-fn string_escape(lex: &mut Lexer) -> &'static str {
+fn raw_string_escape(lex: &str) -> &'static str {
     // TODO: Impl proper string escaping
-    intern(&lex.slice()[1..lex.slice().len() - 1].replace(r"\n", "\n"))
+    intern(&lex.replace(r"\n", "\n"))
 }
 
 // avoid Logos' special case for &str
@@ -185,6 +187,7 @@ impl TokenKind {
             Self::Star => "*",
             Self::Char => "char",
             Self::String => "string",
+            Self::FString => "fstring",
             Self::Struct => "struct",
             Self::Enum => "enum",
             Self::Let => "let",
