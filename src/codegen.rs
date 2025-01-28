@@ -25,6 +25,22 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     codegen.finish()
 }
 
+pub struct FnSig {
+    ret: Type,
+    args: [Type],
+}
+
+pub enum Type {
+    Null,
+    Bool,
+    Char,
+    Int,
+    StrLiteral,
+    Str,
+    Struct(&'static str),
+    Function(Box<FnSig>),
+}
+
 #[derive(Default)]
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
@@ -102,8 +118,11 @@ impl Codegen {
             Stmt::Let(VarDecl { ident, expr }) | Stmt::Const(VarDecl { ident, expr }) => {
                 match expr {
                     Some(expr) => self.expr(expr),
-                    None => self.builder.insert(Op::LoadNull),
-                }
+                    None => {
+                        self.builder.insert(Op::LoadNull);
+                        Some(Type::Null)
+                    }
+                };
                 let offset = self.write_ident_offset(ident);
                 self.builder.insert(Op::Store(offset));
             }
@@ -230,7 +249,7 @@ impl Codegen {
         };
     }
 
-    fn load(&mut self, ident: &'static str) {
+    fn load(&mut self, ident: &'static str) -> Option<Type> {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => self.builder.insert(Op::Load(offset)),
             None => {
@@ -244,63 +263,80 @@ impl Codegen {
                 self.builder.insert(Op::LoadGlobal(offset));
             }
         }
+        None
     }
 
-    fn expr(&mut self, expr: &Expr) {
-        match expr {
+    fn expr(&mut self, expr: &Expr) -> Option<Type> {
+        let ty = match expr {
             Expr::Literal(literal) => match literal {
-                Literal::Bool(true) => self.builder.insert(Op::LoadTrue),
-                Literal::Bool(false) => self.builder.insert(Op::LoadFalse),
-                Literal::Char(char) => self.builder.insert(Op::LoadChar(*char)),
-                Literal::Int(int) => self.builder.insert(Op::LoadInt(*int)),
+                Literal::Bool(true) => {
+                    self.builder.insert(Op::LoadTrue);
+                    Type::Bool
+                }
+                Literal::Bool(false) => {
+                    self.builder.insert(Op::LoadFalse);
+                    Type::Bool
+                }
+                Literal::Char(char) => {
+                    self.builder.insert(Op::LoadChar(*char));
+                    Type::Char
+                }
+                Literal::Int(int) => {
+                    self.builder.insert(Op::LoadInt(*int));
+                    Type::Int
+                }
                 Literal::String(string) => {
                     let [ptr, len] = self.builder.insert_string(string);
                     self.builder.insert(Op::LoadString { ptr, len });
+                    Type::StrLiteral
                 }
-                Literal::Ident(ident) => self.load(ident),
+                Literal::Ident(ident) => return self.load(ident),
             },
-            Expr::Binary { op, exprs } => 'block: {
-                let op = match op {
-                    BinOp::Range => Op::Range,
-                    BinOp::RangeInclusive => Op::RangeInclusive,
-                    BinOp::Eq => Op::Eq,
-                    BinOp::Mod => Op::Mod,
-                    BinOp::Add => Op::Add,
-                    BinOp::Less => Op::Less,
-                    BinOp::Greater => Op::Greater,
-                    BinOp::Neq => {
-                        self.expr(&exprs[0]);
-                        self.expr(&exprs[1]);
-                        self.builder.insert(Op::Eq);
-                        self.builder.insert(Op::Not);
-                        break 'block;
-                    }
-                    BinOp::And => {
-                        let end_label = self.builder.create_label();
-                        self.expr(&exprs[0]);
-                        self.builder.insert(Op::Dup);
-                        self.builder.insert(Op::CJump(end_label));
-                        self.builder.insert(Op::Pop);
-                        self.expr(&exprs[1]);
-                        self.builder.insert_label(end_label);
-                        break 'block;
-                    }
-                    BinOp::Or => {
-                        let end_label = self.builder.create_label();
-                        self.expr(&exprs[0]);
-                        self.builder.insert(Op::Dup);
-                        self.builder.insert(Op::Not);
-                        self.builder.insert(Op::CJump(end_label));
-                        self.builder.insert(Op::Pop);
-                        self.expr(&exprs[1]);
-                        self.builder.insert_label(end_label);
-                        break 'block;
-                    }
-                    _ => todo!("{op:?}"),
+            Expr::Binary { op, exprs } => {
+                return 'block: {
+                    let op = match op {
+                        BinOp::Range => Op::Range,
+                        BinOp::RangeInclusive => Op::RangeInclusive,
+                        BinOp::Eq => Op::Eq,
+                        BinOp::Mod => Op::Mod,
+                        BinOp::Add => Op::Add,
+                        BinOp::Less => Op::Less,
+                        BinOp::Greater => Op::Greater,
+                        BinOp::Neq => {
+                            self.expr(&exprs[0]);
+                            self.expr(&exprs[1]);
+                            self.builder.insert(Op::Eq);
+                            self.builder.insert(Op::Not);
+                            break 'block None;
+                        }
+                        BinOp::And => {
+                            let end_label = self.builder.create_label();
+                            self.expr(&exprs[0]);
+                            self.builder.insert(Op::Dup);
+                            self.builder.insert(Op::CJump(end_label));
+                            self.builder.insert(Op::Pop);
+                            self.expr(&exprs[1]);
+                            self.builder.insert_label(end_label);
+                            break 'block None;
+                        }
+                        BinOp::Or => {
+                            let end_label = self.builder.create_label();
+                            self.expr(&exprs[0]);
+                            self.builder.insert(Op::Dup);
+                            self.builder.insert(Op::Not);
+                            self.builder.insert(Op::CJump(end_label));
+                            self.builder.insert(Op::Pop);
+                            self.expr(&exprs[1]);
+                            self.builder.insert_label(end_label);
+                            break 'block None;
+                        }
+                        _ => todo!("{op:?}"),
+                    };
+                    self.expr(&exprs[0]);
+                    self.expr(&exprs[1]);
+                    self.builder.insert(op);
+                    None
                 };
-                self.expr(&exprs[0]);
-                self.expr(&exprs[1]);
-                self.builder.insert(op);
             }
             Expr::FnCall { function, args } => {
                 for arg in args {
@@ -308,28 +344,32 @@ impl Codegen {
                 }
                 self.expr(function);
                 self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
+                return None;
             }
             Expr::FieldAccess { expr, field } => {
                 self.expr(expr);
                 let field = self.builder.insert_identifer(field);
                 self.builder.insert(Op::LoadField(field));
+                return None;
             }
             Expr::Index { expr, index } => {
                 self.expr(expr);
                 self.expr(index);
                 self.builder.insert(Op::Index);
+                return None;
             }
             Expr::InitStruct { ident, fields } => {
                 let _ = ident;
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
-                    match expr {
+                    let ty = match expr {
                         Some(expr) => self.expr(expr),
                         None => self.load(ident),
-                    }
+                    };
                     let ident = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::StoreField(ident));
                 }
+                return None;
             }
             Expr::Array(array) => {
                 self.builder.insert(Op::CreateArray);
@@ -337,6 +377,7 @@ impl Codegen {
                     self.expr(expr);
                     self.builder.insert(Op::ArrayPush);
                 }
+                return None;
             }
             Expr::Unary { op, expr } => {
                 self.expr(expr);
@@ -344,8 +385,10 @@ impl Codegen {
                     UnaryOp::Not => self.builder.insert(Op::Not),
                     UnaryOp::Neg => self.builder.insert(Op::Neg),
                 }
+                return None;
             }
-        }
+        };
+        Some(ty)
     }
 
     fn finish(self) -> Vec<u8> {
