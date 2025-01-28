@@ -445,7 +445,7 @@ fn load_char_field(consts: &[u8], char: char, field: StrIdent) -> Value {
     Value::MethodBuiltin(match (field, char) {
         (b"is_digit", char) => MethodBuiltin::CharIsDigit(char),
         (b"is_alphabetic", char) => MethodBuiltin::CharIsAlphabetic(char),
-        _ => panic!("char does not contain fiekd: {}", field.as_bstr()),
+        _ => panic!("char does not contain field: {}", field.as_bstr()),
     })
 }
 
