@@ -157,8 +157,8 @@ fn test_maps() {
 fn test_array_literals() {
     test_expr!("println([])", "[]");
     test_expr!(r#"println([1, 2, 3, "Go!"])"#, r#"[1, 2, 3, Go!]"#);
-    test_expr!("let arr = []; array_push(arr, 1); println(arr)", "[1]");
-    test_expr!("let arr = [1]; println(array_pop(arr)); println(arr);", "1\n[]");
+    test_expr!("let arr = []; arr.push(1); println(arr)", "[1]");
+    test_expr!("let arr = [1]; println(arr.pop()); println(arr);", "1\n[]");
 }
 
 #[test]

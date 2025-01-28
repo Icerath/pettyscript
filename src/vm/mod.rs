@@ -158,21 +158,6 @@ where
                 let value = match function {
                     Value::Builtin(builtin) => match builtin {
                         Builtin::CreateMap => Value::Map(Rc::default()),
-                        Builtin::ArrayPush => {
-                            assert_eq!(numargs, 2);
-                            let value = stack.pop().unwrap();
-                            let Value::Array(arr) = stack.pop().unwrap() else { panic!() };
-                            arr.borrow_mut().push(value);
-                            Value::Null
-                        }
-                        Builtin::ArrayPop => {
-                            assert_eq!(numargs, 1);
-                            let Value::Array(arr) = stack.pop().unwrap() else { panic!() };
-                            let Some(value) = arr.borrow_mut().pop() else {
-                                panic!("Tried to pop from empty array");
-                            };
-                            value
-                        }
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let value = stack.pop().unwrap();
@@ -256,6 +241,17 @@ where
                             let key = stack.pop().unwrap();
                             map.borrow_mut().remove(&key);
                             Value::Null
+                        }
+                        MethodBuiltin::ArrayPush(arr) => {
+                            assert_eq!(numargs, 1);
+                            let value = stack.pop().unwrap();
+                            arr.borrow_mut().push(value);
+                            Value::Null
+                        }
+                        MethodBuiltin::ArrayPop(arr) => {
+                            assert_eq!(numargs, 0);
+                            // TODO: Is this the right output for an empty array?
+                            arr.borrow_mut().pop().unwrap_or(Value::Null)
                         }
                     },
                     _ => todo!(),
@@ -356,6 +352,7 @@ where
                     Value::String(str) => load_str_field(consts, str, field),
                     Value::Char(char) => load_char_field(consts, char, field),
                     Value::Map(map) => load_map_field(consts, map, field),
+                    Value::Array(arr) => load_array_field(consts, arr, field),
                     other => panic!("{other:?}"),
                 };
                 stack.push(value);
@@ -441,6 +438,15 @@ where
     debug_assert!(stack.is_empty(), "last: {:?}\nlen: {}", stack.last(), stack.len());
 
     Ok(())
+}
+
+fn load_array_field(consts: &[u8], arr: Rc<RefCell<Vec<Value>>>, field: StrIdent) -> Value {
+    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
+    Value::MethodBuiltin(match field {
+        b"push" => MethodBuiltin::ArrayPush(arr),
+        b"pop" => MethodBuiltin::ArrayPop(arr),
+        _ => panic!("map does not contain field: {}", field.as_bstr()),
+    })
 }
 
 fn load_map_field(consts: &[u8], map: Rc<RefCell<PettyMap>>, field: StrIdent) -> Value {
