@@ -25,11 +25,13 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     codegen.finish()
 }
 
+#[derive(Debug, PartialEq)]
 pub struct FnSig {
     ret: Type,
     args: [Type],
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Type {
     Null,
     Bool,
@@ -307,7 +309,7 @@ impl Codegen {
                             self.expr(&exprs[1]);
                             self.builder.insert(Op::Eq);
                             self.builder.insert(Op::Not);
-                            break 'block None;
+                            break 'block Some(Type::Bool);
                         }
                         BinOp::And => {
                             let end_label = self.builder.create_label();
@@ -317,7 +319,7 @@ impl Codegen {
                             self.builder.insert(Op::Pop);
                             self.expr(&exprs[1]);
                             self.builder.insert_label(end_label);
-                            break 'block None;
+                            break 'block Some(Type::Bool);
                         }
                         BinOp::Or => {
                             let end_label = self.builder.create_label();
@@ -328,14 +330,20 @@ impl Codegen {
                             self.builder.insert(Op::Pop);
                             self.expr(&exprs[1]);
                             self.builder.insert_label(end_label);
-                            break 'block None;
+                            break 'block Some(Type::Bool);
                         }
                         _ => todo!("{op:?}"),
                     };
-                    self.expr(&exprs[0]);
-                    self.expr(&exprs[1]);
+                    let lhs_ty = self.expr(&exprs[0]);
+                    let rhs_ty = self.expr(&exprs[1]);
                     self.builder.insert(op);
-                    None
+                    let (lhs_ty, rhs_ty) = (lhs_ty?, rhs_ty?);
+                    match (lhs_ty, rhs_ty, op) {
+                        (_, _, Op::Eq) => Some(Type::Bool),
+                        // FIXME: This catchall might have false positives
+                        (lhs, rhs, _) if lhs == rhs => Some(lhs),
+                        (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
+                    }
                 };
             }
             Expr::FnCall { function, args } => {
