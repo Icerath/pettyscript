@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -31,7 +33,7 @@ pub struct FnSig {
     args: [Type],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Null,
     Bool,
@@ -40,7 +42,7 @@ pub enum Type {
     StrLiteral,
     Str,
     Struct(&'static str),
-    Function(Box<FnSig>),
+    Function(Rc<FnSig>),
 }
 
 #[derive(Default)]
@@ -258,19 +260,18 @@ impl Codegen {
 
     fn load(&mut self, ident: &'static str) -> Option<Type> {
         match self.scopes.last().unwrap().variables.get(ident) {
-            Some(&offset) => self.builder.insert(Op::Load(offset)),
+            Some(&offset) => {
+                self.builder.insert(Op::Load(offset));
+                self.scopes.last().unwrap().types.get(ident).unwrap().clone()
+            }
             None => {
-                let offset = *self
-                    .scopes
-                    .first()
-                    .unwrap()
-                    .variables
-                    .get(ident)
-                    .unwrap_or_else(|| panic!("Unknown ident: {ident}"));
+                let scope = self.scopes.first().unwrap();
+                let offset =
+                    *scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
                 self.builder.insert(Op::LoadGlobal(offset));
+                scope.types.get(ident).unwrap().clone()
             }
         }
-        None
     }
 
     fn expr(&mut self, expr: &Expr) -> Option<Type> {
