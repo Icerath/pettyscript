@@ -500,17 +500,21 @@ impl Codegen {
                 return None;
             }
             Expr::InitStruct { ident, fields } => {
-                let Type::Struct { name, fields: type_fields } =
+                let Type::Struct { name: _, fields: type_fields } =
                     self.load_name_type(ident).unwrap()
                 else {
                     panic!()
                 };
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
-                    let ty = match expr {
+                    assert!(type_fields.get(ident).is_some());
+                    let typ = match expr {
                         Some(expr) => self.expr(expr),
                         None => self.load(ident),
                     };
+                    if let Some(typ) = typ {
+                        assert_eq!(type_fields.get(ident).unwrap(), &typ);
+                    }
                     let ident = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::StoreField(ident));
                 }

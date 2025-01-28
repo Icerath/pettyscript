@@ -108,7 +108,7 @@ fn test_structs() {
         "ab"
     );
     test_expr!("struct A {str:int} println(A { str: 1 })", "{ str: 1 }");
-    test_expr!("struct A {str:int} println((A { name: \"Bob\" }).name)", "Bob");
+    test_expr!("struct A {name:str} println((A { name: \"Bob\" }).name)", "Bob");
     test_expr!("struct Lexer {len:int}let lexer = Lexer { len: 10 }; println(lexer.len);", "10");
     test_expr!(
         "struct Lexer{len:int} let lexer = Lexer { len: 10 }; println(1 < lexer.len);",
