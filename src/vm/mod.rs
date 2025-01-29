@@ -320,7 +320,6 @@ where
                         _ => panic!(),
                     },
                     Value::String(PettyStr::Literal { ptr, len }) => match rhs {
-                        Value::Char(rhs) => str_char_eq(str_literal!(ptr, len), rhs),
                         Value::String(PettyStr::Literal { ptr: rhs_ptr, len: rhs_len }) => {
                             (ptr == rhs_ptr && len == rhs_len)
                                 || str_literal!(ptr, len) == str_literal!(rhs_ptr, rhs_len)
@@ -332,7 +331,6 @@ where
                         _ => panic!(),
                     },
                     Value::String(PettyStr::String(lhs)) => match rhs {
-                        Value::Char(rhs) => str_char_eq(&lhs, rhs),
                         Value::String(PettyStr::Literal { ptr, len }) => {
                             let rhs = str_literal!(ptr, len);
                             &**lhs == rhs
@@ -342,10 +340,6 @@ where
                     },
                     Value::Char(lhs) => match rhs {
                         Value::Char(rhs) => lhs == rhs,
-                        Value::String(PettyStr::Literal { ptr, len }) => {
-                            str_char_eq(str_literal!(ptr, len), lhs)
-                        }
-                        Value::String(PettyStr::String(rhs)) => str_char_eq(&rhs, lhs),
                         _ => panic!(),
                     },
                     val => todo!("{val:?}"),
@@ -511,10 +505,6 @@ fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
         ("is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
         _ => panic!("str does not contain field: {}", field),
     }))
-}
-
-fn str_char_eq(str: &str, char: char) -> bool {
-    str.len() == char.len_utf8() && str.chars().next().unwrap() == char
 }
 
 #[derive(Clone, Copy)]
