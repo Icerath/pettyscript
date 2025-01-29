@@ -45,6 +45,7 @@ pub enum Type {
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
     Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
     Map,
+    Array(Rc<Type>),
     Function(Rc<FnSig>),
 }
 
@@ -534,11 +535,17 @@ impl Codegen {
             }
             Expr::Array(array) => {
                 self.builder.insert(Op::CreateArray);
-                for expr in array {
-                    self.expr(expr);
+                let mut array_iter = array.iter();
+                let typ = self
+                    .expr(array_iter.next().unwrap_or_else(|| todo!("Empty array literals")))
+                    .unwrap();
+                self.builder.insert(Op::ArrayPush);
+                for expr in array_iter {
+                    let next_typ = self.expr(expr);
+                    assert_eq!(next_typ.as_ref(), Some(&typ));
                     self.builder.insert(Op::ArrayPush);
                 }
-                return None;
+                Type::Array(Rc::new(typ))
             }
             Expr::Unary { op, expr } => {
                 let typ = self.expr(expr);
@@ -567,7 +574,11 @@ impl Codegen {
                 Type::Int => Type::Char,
                 _ => panic!("Cannot index str with type: {index:?}"),
             },
-            _ => panic!(),
+            Type::Array(of) => match index {
+                Type::Int => (*of).clone(),
+                _ => panic!("Cannot index Array({of:?}) with type: {index:?}"),
+            },
+            _ => panic!("Cannot index {container:?}"),
         })
     }
 
@@ -595,6 +606,13 @@ impl Codegen {
             Type::Struct { name, fields } => match fields.get(field) {
                 Some(field_type) => field_type.clone(),
                 None => panic!("struct {name} does not contain field: {field}"),
+            },
+            Type::Array(of) => match field {
+                "pop" => Type::Function(Rc::new(FnSig { ret: (*of).clone(), args: [].into() })),
+                "push" => {
+                    Type::Function(Rc::new(FnSig { ret: Type::Null, args: [(*of).clone()].into() }))
+                }
+                _ => panic!("type Array({of:?}) does not contain field: {field}"),
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),
         })
