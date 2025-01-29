@@ -516,68 +516,62 @@ impl Codegen {
                 }
                 Literal::Ident(ident) => return self.load(ident),
             },
-            Expr::Binary { op, exprs } => {
-                return 'block: {
-                    let op = match op {
-                        BinOp::Range => Op::Range,
-                        BinOp::RangeInclusive => Op::RangeInclusive,
-                        BinOp::Eq => Op::Eq,
-                        BinOp::Mod => Op::Mod,
-                        BinOp::Add => Op::Add,
-                        BinOp::Less => Op::Less,
-                        BinOp::Greater => Op::Greater,
-                        BinOp::Neq => {
-                            self.expr(&exprs[0]);
-                            self.expr(&exprs[1]);
-                            self.builder.insert(Op::Eq);
-                            self.builder.insert(Op::Not);
-                            break 'block Some(Type::Bool);
-                        }
-                        BinOp::And => {
-                            let end_label = self.builder.create_label();
-                            self.expr(&exprs[0]);
-                            self.builder.insert(Op::Dup);
-                            self.builder.insert(Op::CJump(end_label));
-                            self.builder.insert(Op::Pop);
-                            self.expr(&exprs[1]);
-                            self.builder.insert_label(end_label);
-                            break 'block Some(Type::Bool);
-                        }
-                        BinOp::Or => {
-                            let end_label = self.builder.create_label();
-                            self.expr(&exprs[0]);
-                            self.builder.insert(Op::Dup);
-                            self.builder.insert(Op::Not);
-                            self.builder.insert(Op::CJump(end_label));
-                            self.builder.insert(Op::Pop);
-                            self.expr(&exprs[1]);
-                            self.builder.insert_label(end_label);
-                            break 'block Some(Type::Bool);
-                        }
-                        _ => todo!("{op:?}"),
-                    };
-                    let lhs_ty = self.expr(&exprs[0]);
-                    let rhs_ty = self.expr(&exprs[1]);
-                    let Some((lhs_ty, rhs_ty)) = lhs_ty.and_then(|l| rhs_ty.map(|r| (l, r))) else {
-                        self.builder.insert(op);
-                        return None;
-                    };
-                    let typ = match (lhs_ty, rhs_ty, op) {
-                        (_, _, Op::Eq | Op::Less | Op::Greater) => Some(Type::Bool),
-                        (Type::Int, Type::Int, Op::Range) => Some(Type::Range),
-                        (Type::Int, Type::Int, Op::RangeInclusive) => Some(Type::RangeInclusive),
-                        (_, _, Op::Range | Op::RangeInclusive) => panic!(),
-                        // FIXME: This catchall might have false positives
-                        (lhs, rhs, _) if lhs == rhs => Some(lhs),
-                        (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
-                    };
-                    if op == Op::Add && typ == Some(Type::Int) {
-                        self.builder.insert(Op::AddInt);
-                    } else {
-                        self.builder.insert(op);
+            Expr::Binary { op, exprs } => 'block: {
+                let op = match op {
+                    BinOp::Range => Op::Range,
+                    BinOp::RangeInclusive => Op::RangeInclusive,
+                    BinOp::Eq => Op::Eq,
+                    BinOp::Mod => Op::Mod,
+                    BinOp::Add => Op::Add,
+                    BinOp::Less => Op::Less,
+                    BinOp::Greater => Op::Greater,
+                    BinOp::Neq => {
+                        self.expr(&exprs[0]);
+                        self.expr(&exprs[1]);
+                        self.builder.insert(Op::Eq);
+                        self.builder.insert(Op::Not);
+                        break 'block Type::Bool;
                     }
-                    typ
+                    BinOp::And => {
+                        let end_label = self.builder.create_label();
+                        self.expr(&exprs[0]);
+                        self.builder.insert(Op::Dup);
+                        self.builder.insert(Op::CJump(end_label));
+                        self.builder.insert(Op::Pop);
+                        self.expr(&exprs[1]);
+                        self.builder.insert_label(end_label);
+                        break 'block Type::Bool;
+                    }
+                    BinOp::Or => {
+                        let end_label = self.builder.create_label();
+                        self.expr(&exprs[0]);
+                        self.builder.insert(Op::Dup);
+                        self.builder.insert(Op::Not);
+                        self.builder.insert(Op::CJump(end_label));
+                        self.builder.insert(Op::Pop);
+                        self.expr(&exprs[1]);
+                        self.builder.insert_label(end_label);
+                        break 'block Type::Bool;
+                    }
+                    _ => todo!("{op:?}"),
                 };
+                let lhs_ty = self.expr(&exprs[0]).unwrap();
+                let rhs_ty = self.expr(&exprs[1]).unwrap();
+                let typ = match (lhs_ty, rhs_ty, op) {
+                    (_, _, Op::Eq | Op::Less | Op::Greater) => Type::Bool,
+                    (Type::Int, Type::Int, Op::Range) => Type::Range,
+                    (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
+                    (_, _, Op::Range | Op::RangeInclusive) => panic!(),
+                    // FIXME: This catchall might have false positives
+                    (lhs, rhs, _) if lhs == rhs => lhs,
+                    (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
+                };
+                if op == Op::Add && typ == Type::Int {
+                    self.builder.insert(Op::AddInt);
+                } else {
+                    self.builder.insert(op);
+                }
+                typ
             }
             Expr::FnCall { function, args } => {
                 let mut arg_types = vec![];
