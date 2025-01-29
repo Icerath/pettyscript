@@ -499,10 +499,11 @@ impl Codegen {
                 return ret_type;
             }
             Expr::FieldAccess { expr, field } => {
-                self.expr(expr);
+                let typ = self.expr(expr);
+                let field_type = typ.and_then(|typ| self.field_type(typ, field));
                 let field = self.builder.insert_identifer(field);
                 self.builder.insert(Op::LoadField(field));
-                return None;
+                return field_type;
             }
             Expr::Index { expr, index } => {
                 self.expr(expr);
@@ -557,6 +558,35 @@ impl Codegen {
             }
         };
         Some(ty)
+    }
+
+    fn field_type(&self, typ: Type, field: &str) -> Option<Type> {
+        Some(match typ {
+            Type::Enum { fields, .. } if fields.contains(field) => return None,
+            Type::Str => match field {
+                "len" => Type::Int,
+                "trim" => Type::Function(Rc::new(FnSig { ret: Type::Str, args: [].into() })),
+                "starts_with" => {
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [Type::Str].into() }))
+                }
+                "is_digit" => Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                "is_alphabetic" => {
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() }))
+                }
+                _ => panic!("type str does not contain field: {field}"),
+            },
+            Type::Map => match field {
+                "insert" => return None,
+                "remove" => return None,
+                "get" => return None,
+                _ => panic!("type map does not contain field: {field}"),
+            },
+            Type::Struct { name, fields } => match fields.get(field) {
+                Some(field_type) => field_type.clone(),
+                None => panic!("struct {name} does not contain field: {field}"),
+            },
+            _ => panic!("type {typ:?} does not contain field: {field}"),
+        })
     }
 
     fn finish(self) -> Vec<u8> {
