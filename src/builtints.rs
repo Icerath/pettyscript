@@ -10,7 +10,6 @@ pub enum Builtin {
     Println,
     ReadFile,
     Exit,
-    CreateMap,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -31,7 +30,6 @@ pub enum MethodBuiltin {
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
-            Self::CreateMap => "create_map",
             Self::Println => "println",
             Self::ReadFile => "read_file",
             Self::Exit => "exit",

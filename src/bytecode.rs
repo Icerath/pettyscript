@@ -33,6 +33,8 @@ pub enum Op {
     Index,
     StoreEnumVariant(StrIdent),
     CreateFunction,
+    CreateMap,
+    InsertMap,
     CreateArray,
     ArrayPush,
     LoadTrue,

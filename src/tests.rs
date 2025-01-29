@@ -48,12 +48,12 @@ fn test_lexer_example() {
 }
 
 macro_rules! test_expr {
-    ($expr: literal, $expected: expr) => {
+    ($expr: literal, $expected: expr) => {{
         let ast = parse(concat!($expr, ";")).unwrap();
         let bytecode = codegen::codegen(&ast);
         let output = exec_vm(&bytecode);
         assert_eq!(output, $expected);
-    };
+    }};
 }
 
 #[test]
@@ -168,17 +168,15 @@ fn test_unary() {
 #[test]
 fn test_maps() {
     test_expr!(
-        r#"let hi = create_map(); hi.insert("Bob", 32); hi.insert("Alice", 34); println(f"{hi}")"#,
+        r#"let hi = #{}; hi.insert("Bob", 32); hi.insert("Alice", 34); println(f"{hi}")"#,
         "{Bob: 32, Alice: 34}"
     );
     test_expr!(
-        r#"let hi = create_map(); hi.insert("Bob", 32); println(f"{hi.get("Bob")}"); hi.remove("Bob"); println(f"{hi}"); println(f"{hi.get("Bob")}");"#,
+        r#"let hi = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}"); hi.remove("Bob"); println(f"{hi}"); println(f"{hi.get("Bob")}");"#,
         "32\n{}\nnull"
     );
-    test_expr!(
-        r#"let hi = create_map(); hi.insert("Bob", 32); println(f"{hi.get("Bob")}");"#,
-        "32"
-    );
+    test_expr!(r#"let hi = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}");"#, "32");
+    test_expr!(r#"println(f"{#{ "Bob": 32 }}")"#, "{Bob: 32}");
 }
 
 #[test]

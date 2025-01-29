@@ -196,6 +196,7 @@ impl fmt::Debug for StructInitField {
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Map(entries) => f.debug_struct("Map").field("entries", entries).finish(),
             Self::Bool(bool) => write!(f, "Bool({bool})"),
             Self::Int(int) => write!(f, "Int({int})"),
             Self::Char(char) => write!(f, "Char({char:?})"),
@@ -213,6 +214,7 @@ pub enum Literal {
     String(&'static str),
     FString(FString),
     Ident(&'static str),
+    Map(Box<[[Expr; 2]]>),
 }
 
 #[derive(Debug)]
@@ -552,6 +554,7 @@ impl<'a> Parser<'a> {
             Token::FString(str) => return self.parse_fstring(str).map(Literal::FString),
             Token::True => Literal::Bool(true),
             Token::False => Literal::Bool(false),
+            Token::Hash if self.peek()? == Token::LBrace => self.parse_map_literal()?,
             got => {
                 return Err(self.expect_failed(got.kind(), &[
                     TokenKind::Int,
@@ -561,6 +564,33 @@ impl<'a> Parser<'a> {
                 ]));
             }
         })
+    }
+
+    fn parse_map_literal(&mut self) -> Result<Literal> {
+        // We expect hash too, but it's already parsed by `parse_literal`
+        self.expect_token(Token::LBrace)?;
+        if self.peek()? == Token::RBrace {
+            self.skip();
+            return Ok(Literal::Map([].into()));
+        }
+        let mut entries = vec![];
+        loop {
+            let key = self.parse_root_expr()?;
+            self.expect_token(Token::Colon)?;
+            let value = self.parse_root_expr()?;
+            entries.push([key, value]);
+            match self.peek()? {
+                Token::RBrace => break,
+                Token::Comma => continue,
+                got => {
+                    return Err(
+                        self.expect_failed(got.kind(), &[TokenKind::RBrace, TokenKind::Comma])
+                    );
+                }
+            }
+        }
+        self.skip();
+        Ok(Literal::Map(entries.into()))
     }
 
     fn parse_fstring(&mut self, str: &str) -> Result<FString> {

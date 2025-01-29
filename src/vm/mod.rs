@@ -104,14 +104,20 @@ where
                 builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
                 stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
             }
-
+            Op::CreateMap => stack.push(Value::Map(Rc::default())),
+            Op::InsertMap => {
+                let value = stack.pop().unwrap();
+                let key = stack.pop().unwrap();
+                let Value::Map(map) = stack.last_mut().unwrap() else { panic!() };
+                map.borrow_mut().insert(key, value);
+            }
+            Op::CreateArray => stack.push(Value::Array(Rc::default())),
             Op::ArrayPush => {
                 let value = stack.pop().unwrap();
                 let arr = stack.last_mut().unwrap();
                 let Value::Array(arr) = arr else { panic!() };
                 arr.borrow_mut().push(value);
             }
-            Op::CreateArray => stack.push(Value::Array(Rc::default())),
             Op::LoadGlobal(offset) => stack.push(variable_stacks[0][offset as usize].clone()),
             Op::Load(offset) => {
                 stack.push(variable_stacks.last().unwrap()[offset as usize].clone())
@@ -199,7 +205,6 @@ where
                 let function = stack.pop().unwrap();
                 let value = match function {
                     Value::Builtin(builtin) => match builtin {
-                        Builtin::CreateMap => Value::Map(Rc::default()),
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let Value::String(str) = stack.pop().unwrap() else { panic!() };

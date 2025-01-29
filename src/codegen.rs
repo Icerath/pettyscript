@@ -67,7 +67,6 @@ struct Codegen {
 
 fn builtin_type(builtin: Builtin) -> Option<Type> {
     Some(Type::Function(Rc::new(match builtin {
-        Builtin::CreateMap => FnSig { ret: Type::Map, args: [].into() },
         Builtin::Exit => FnSig { ret: Type::Null, args: [Type::Int].into() }, // FIXME: Return never type.
         Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },
         Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },
@@ -379,6 +378,17 @@ impl Codegen {
     fn expr(&mut self, expr: &Expr) -> Option<Type> {
         let ty = match expr {
             Expr::Literal(literal) => match literal {
+                Literal::Map(map) => {
+                    self.builder.insert(Op::CreateMap);
+                    for entry in map {
+                        let [key, value] = entry;
+                        self.expr(key);
+                        self.expr(value);
+                        self.builder.insert(Op::InsertMap);
+                    }
+
+                    Type::Map
+                }
                 Literal::Bool(true) => {
                     self.builder.insert(Op::LoadTrue);
                     Type::Bool

@@ -39,6 +39,7 @@ pub enum Token {
     #[token("..")] Range,
     #[token("..=")] RangeInclusive,
     #[token("->")] ThinArrow,
+    #[token("#")] Hash,
     // Keywords
     #[token("or")] #[token("||")] Or,
     #[token("and")] #[token("&&")] And,
@@ -185,6 +186,7 @@ impl Token {
 impl TokenKind {
     pub fn repr(self) -> &'static str {
         match self {
+            Self::Hash => "#",
             Self::ThinArrow => "->",
             Self::True => "true",
             Self::False => "false",

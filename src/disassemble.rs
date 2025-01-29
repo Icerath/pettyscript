@@ -31,6 +31,8 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::AddInt => println!("ADD_INT"),
             Op::Neg => println!("NEG"),
             Op::Add => println!("ADD"),
+            Op::CreateMap => println!("CREATE_MAP"),
+            Op::InsertMap => println!("INSERT_MAP"),
             Op::CreateArray => println!("CREATE_ARRAY"),
             Op::ArrayPush => println!("ARRAY_PUSH"),
             Op::Dup => println!("DUP"),
