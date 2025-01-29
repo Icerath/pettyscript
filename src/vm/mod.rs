@@ -46,6 +46,7 @@ pub unsafe fn execute_bytecode(bytecode: &[u8]) {
     unsafe { execute_bytecode_with(stdout, bytecode).unwrap() }
 }
 
+#[expect(unsafe_op_in_unsafe_fn)]
 pub unsafe fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
 where
     W: Write,
@@ -143,7 +144,7 @@ where
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
                 stack.push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
             }
-            Op::IterRange => unsafe {
+            Op::IterRange => {
                 let Value::Range(range) = stack.last().unwrap() else { unreachable_unchecked() };
                 let [start, end] = &*range.clone();
                 if start.get() < end.get() {
@@ -153,8 +154,8 @@ where
                 } else {
                     stack.push(Value::Bool(false));
                 }
-            },
-            Op::IterRangeInclusive => unsafe {
+            }
+            Op::IterRangeInclusive => {
                 let Value::RangeInclusive(range) = stack.last().unwrap() else {
                     unreachable_unchecked()
                 };
@@ -166,13 +167,13 @@ where
                 } else {
                     stack.push(Value::Bool(false));
                 }
-            },
-            Op::CJump(label) => unsafe {
+            }
+            Op::CJump(label) => {
                 let Value::Bool(bool) = stack.pop().unwrap() else { unreachable_unchecked() };
                 if !bool {
                     reader.head = label as usize;
                 }
-            },
+            }
             Op::FnCall { numargs } => 'fn_call: {
                 let function = stack.pop().unwrap();
                 let value = match function {
@@ -180,7 +181,7 @@ where
                         Builtin::Assert => {
                             assert_eq!(numargs, 1);
                             let Value::Bool(bool) = stack.pop().unwrap() else {
-                                unsafe { unreachable_unchecked() }
+                                { unreachable_unchecked() }
                             };
                             assert!(bool, "RUNTIME ASSERTION FAILED");
                             Value::Bool(bool)
@@ -209,11 +210,11 @@ where
                             };
                             Value::String(PettyStr::String(Rc::new(string.into())))
                         }
-                        Builtin::Exit => unsafe {
+                        Builtin::Exit => {
                             assert!(numargs <= 1);
                             let int = if numargs == 1 { pop_int!() as i32 } else { 0 };
                             std::process::exit(int)
-                        },
+                        }
                     },
 
                     Value::Function { label } => {
@@ -294,11 +295,11 @@ where
             Op::Pop => _ = stack.pop().unwrap(),
             Op::Dup => stack.push(stack.last().unwrap().clone()),
             Op::Jump(label) => reader.head = label as usize,
-            Op::Mod => unsafe {
+            Op::Mod => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs % rhs));
-            },
+            }
             Op::Eq => {
                 let rhs = stack.pop().unwrap();
                 let is_eq = match stack.pop().unwrap() {
@@ -350,15 +351,15 @@ where
                 stack.push(Value::Bool(is_eq));
             }
             Op::Add => {
-                let rhs = unsafe { pop_int!() };
-                let lhs = unsafe { pop_int!() };
+                let rhs = { pop_int!() };
+                let lhs = { pop_int!() };
                 stack.push(Value::Int(lhs + rhs));
             }
-            Op::AddInt => unsafe {
+            Op::AddInt => {
                 let Value::Int(lhs) = stack.pop().unwrap() else { unreachable_unchecked() };
                 let Value::Int(rhs) = stack.pop().unwrap() else { unreachable_unchecked() };
                 stack.push(Value::Int(lhs + rhs));
-            },
+            }
             Op::LoadTrue => stack.push(Value::Bool(true)),
             Op::LoadFalse => stack.push(Value::Bool(false)),
             Op::CreateFunction => stack.push(Value::Function { label: reader.head as u32 + 5 + 5 }),
@@ -376,7 +377,7 @@ where
             }
             Op::StoreEnumVariant(variant) => {
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {
-                    unsafe { unreachable_unchecked() }
+                    { unreachable_unchecked() }
                 };
                 fields.borrow_mut().insert(variant, Value::EnumVariant { name: variant, key: 0 });
             }
@@ -385,7 +386,7 @@ where
                 let value = match stack.pop().unwrap() {
                     Value::Struct { fields } => match fields.borrow().get(&field) {
                         Some(value) => value.clone(),
-                        None => unsafe { unreachable_unchecked() },
+                        None => unreachable_unchecked(),
                     },
                     Value::String(str) => load_str_field(consts, str, field),
                     Value::Char(char) => load_char_field(consts, char, field),
@@ -429,31 +430,31 @@ where
                         }
                     }
                     Value::Array(arr) => {
-                        let Value::Int(rhs) = rhs else { unsafe { unreachable_unchecked() } };
+                        let Value::Int(rhs) = rhs else { { unreachable_unchecked() } };
                         arr.borrow()[rhs as usize].clone()
                     }
                     _ => todo!("{lhs:?}"),
                 };
                 stack.push(value);
             }
-            Op::Not => unsafe {
+            Op::Not => {
                 let Value::Bool(bool) = stack.pop().unwrap() else { unreachable_unchecked() };
                 stack.push(Value::Bool(!bool));
-            },
+            }
             Op::Neg => {
-                let int = unsafe { pop_int!() };
+                let int = { pop_int!() };
                 stack.push(Value::Int(-int));
             }
-            Op::Less => unsafe {
+            Op::Less => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Bool(lhs < rhs));
-            },
-            Op::Greater => unsafe {
+            }
+            Op::Greater => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Bool(lhs > rhs));
-            },
+            }
         }
     }
 
