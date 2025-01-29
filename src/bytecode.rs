@@ -17,8 +17,6 @@ pub struct StrIdent {
 pub enum Op {
     BuildFstr { num_segments: u16 },
     AddInt,
-    Greater,
-    Less,
     EmptyStruct,
     Ret,
     FnCall { numargs: u8 },
@@ -26,6 +24,8 @@ pub enum Op {
     Not,
     Mod,
     Eq(EqTag),
+    Greater(EqTag),
+    Less(EqTag),
     Add,
     Range,
     RangeInclusive,

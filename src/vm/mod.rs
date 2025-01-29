@@ -312,6 +312,50 @@ where
                     }
                 }
             }
+            Op::Less(tag) => {
+                let rhs = stack.pop().unwrap();
+                let lhs = stack.pop().unwrap();
+                macro_rules! eq_glue {
+                    ($typ: tt) => {{
+                        #[expect(unsafe_op_in_unsafe_fn)]
+                        let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
+                        #[expect(unsafe_op_in_unsafe_fn)]
+                        let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs < rhs));
+                    }};
+                }
+                match tag {
+                    EqTag::Int => eq_glue!(Int),
+                    EqTag::Bool => eq_glue!(Bool),
+                    EqTag::Char => eq_glue!(Char),
+                    EqTag::Str => {
+                        let Value::String(lhs) = lhs else { unreachable_unchecked() };
+                        let Value::String(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs.as_str(consts) < rhs.as_str(consts)));
+                    }
+                }
+            }
+            Op::Greater(tag) => {
+                let rhs = stack.pop().unwrap();
+                let lhs = stack.pop().unwrap();
+                macro_rules! eq_glue {
+                    ($typ: tt) => {{
+                        let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
+                        let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs > rhs));
+                    }};
+                }
+                match tag {
+                    EqTag::Int => eq_glue!(Int),
+                    EqTag::Bool => eq_glue!(Bool),
+                    EqTag::Char => eq_glue!(Char),
+                    EqTag::Str => {
+                        let Value::String(lhs) = lhs else { unreachable_unchecked() };
+                        let Value::String(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs.as_str(consts) > rhs.as_str(consts)));
+                    }
+                }
+            }
             Op::Add => {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
@@ -407,16 +451,6 @@ where
             Op::Neg => {
                 let int = pop_int!();
                 stack.push(Value::Int(-int));
-            }
-            Op::Less => {
-                let rhs = pop_int!();
-                let lhs = pop_int!();
-                stack.push(Value::Bool(lhs < rhs));
-            }
-            Op::Greater => {
-                let rhs = pop_int!();
-                let lhs = pop_int!();
-                stack.push(Value::Bool(lhs > rhs));
             }
         }
     }
