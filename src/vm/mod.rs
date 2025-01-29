@@ -344,7 +344,8 @@ where
                         Value::Null => false,
                         Value::Char(rhs) => str_char_eq(str_literal!(ptr, len), rhs),
                         Value::String(PettyStr::Literal { ptr: rhs_ptr, len: rhs_len }) => {
-                            ptr == rhs_ptr && len == rhs_len
+                            (ptr == rhs_ptr && len == rhs_len)
+                                || str_literal!(ptr, len) == str_literal!(rhs_ptr, rhs_len)
                         }
                         Value::String(PettyStr::String(rhs)) => {
                             let lhs = str_literal!(ptr, len);
