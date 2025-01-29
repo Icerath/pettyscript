@@ -68,7 +68,7 @@ fn builtin_type(builtin: Builtin) -> Option<Type> {
     Some(Type::Function(Rc::new(match builtin {
         Builtin::CreateMap => FnSig { ret: Type::Map, args: [].into() },
         Builtin::Exit => FnSig { ret: Type::Null, args: [].into() }, // FIXME: Return never type.
-        Builtin::Println => return None, // FIXME: println will take a str when fstrs are supported.
+        Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },
         Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },
     })))
 }
