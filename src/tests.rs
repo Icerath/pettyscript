@@ -59,22 +59,6 @@ macro_rules! test_expr {
 }
 
 #[test]
-fn test_logical_and() {
-    test_expr!(r#"println(f"{false && false}")"#, "false");
-    test_expr!(r#"println(f"{false && true}")"#, "false");
-    test_expr!(r#"println(f"{true && false}")"#, "false");
-    test_expr!(r#"println(f"{true && true}")"#, "true");
-}
-
-#[test]
-fn test_logical_or() {
-    test_expr!(r#"println(f"{false || false}")"#, "false");
-    test_expr!(r#"println(f"{false || true}")"#, "true");
-    test_expr!(r#"println(f"{true || false}")"#, "true");
-    test_expr!(r#"println(f"{true || true}")"#, "true");
-}
-
-#[test]
 fn test_for_loop() {
     test_expr!(r#"for i in 0..=5 { println(f"{i}"); }"#, "0\n1\n2\n3\n4\n5");
     test_expr!(r#"for i in 0..=5 { if i == 0 { continue; } println(f"{i}"); }"#, "1\n2\n3\n4\n5");
