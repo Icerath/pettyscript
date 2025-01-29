@@ -655,8 +655,6 @@ impl Codegen {
             (Type::Int, Type::Int) => true,
             (Type::Char, Type::Char) => true,
             (Type::Str, Type::Str) => true,
-            (Type::Str, Type::Char) => true,
-            (Type::Char, Type::Str) => true,
             _ => false,
         }
     }
