@@ -95,6 +95,7 @@ fn test_fstr() {
     test_expr!(r#"println(f"A"); "#, "A");
     test_expr!(r#"let x = 0; println(f"{x}"); "#, "0");
     test_expr!(r#"let x = 1; let y = 2; println(f"{x + y}"); "#, "3");
+    test_expr!(r#"let x = 1; let y = 2; println(f"{"a" == "a"}"); "#, "true");
 }
 
 #[test]

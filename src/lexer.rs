@@ -67,10 +67,34 @@ pub enum Token {
     Int(i64),
     #[regex(r#""[^"]*""#, |s| raw_string_escape(&s.slice()[1..s.slice().len()-1]))]
     String(S),
-    #[regex(r#"f"[^"]*""#, |s| raw_string_escape(&s.slice()[2..s.slice().len()-1]))]
+    #[token(r#"f""#, lex_fstring)]
     FString(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
+}
+
+fn lex_fstring(lexer: &mut Lexer) -> Option<S> {
+    // TODO: String escaping
+    // TODO: Handle Braces inside substrings.
+    let mut rem = lexer.remainder().chars();
+    loop {
+        let next = rem.next()?;
+        match next {
+            '{' => {}
+            '"' => break,
+            _ => continue,
+        }
+        let mut lbraces = 1;
+        while lbraces != 0 {
+            if rem.next()? == '}' {
+                lbraces -= 1;
+            }
+        }
+    }
+    let chars_eaten = lexer.remainder().len() - rem.as_str().len();
+    let string = intern(&lexer.remainder()[..chars_eaten - 1]);
+    lexer.bump(chars_eaten);
+    Some(string)
 }
 
 type Lexer<'a> = logos::Lexer<'a, Token>;
