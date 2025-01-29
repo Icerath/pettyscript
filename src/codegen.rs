@@ -593,11 +593,11 @@ impl Codegen {
                 return ret_type;
             }
             Expr::FieldAccess { expr, field } => {
-                let typ = self.expr(expr);
-                let field_type = typ.and_then(|typ| self.field_type(typ, field));
+                let typ = self.expr(expr).unwrap();
+                let field_type = self.field_type(typ, field).unwrap();
                 let field = self.builder.insert_identifer(field);
                 self.builder.insert(Op::LoadField(field));
-                return field_type;
+                field_type
             }
             Expr::Index { expr, index } => {
                 let container_typ = self.expr(expr);
