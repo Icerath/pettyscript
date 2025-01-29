@@ -309,17 +309,14 @@ where
                 let is_eq = match stack.pop().unwrap() {
                     Value::Null => rhs == Value::Null,
                     Value::Bool(lhs) => match rhs {
-                        Value::Null => false,
                         Value::Bool(rhs) => lhs == rhs,
                         _ => panic!(),
                     },
                     Value::Int(lhs) => match rhs {
-                        Value::Null => false,
                         Value::Int(rhs) => lhs == rhs,
                         _ => panic!(),
                     },
                     Value::String(PettyStr::Literal { ptr, len }) => match rhs {
-                        Value::Null => false,
                         Value::Char(rhs) => str_char_eq(str_literal!(ptr, len), rhs),
                         Value::String(PettyStr::Literal { ptr: rhs_ptr, len: rhs_len }) => {
                             (ptr == rhs_ptr && len == rhs_len)
@@ -332,7 +329,6 @@ where
                         _ => panic!(),
                     },
                     Value::String(PettyStr::String(lhs)) => match rhs {
-                        Value::Null => false,
                         Value::Char(rhs) => str_char_eq(&lhs, rhs),
                         Value::String(PettyStr::Literal { ptr, len }) => {
                             let rhs = str_literal!(ptr, len);
@@ -342,7 +338,6 @@ where
                         _ => panic!("{lhs:?} - {rhs:?}"),
                     },
                     Value::Char(lhs) => match rhs {
-                        Value::Null => false,
                         Value::Char(rhs) => lhs == rhs,
                         Value::String(PettyStr::Literal { ptr, len }) => {
                             str_char_eq(str_literal!(ptr, len), lhs)
