@@ -41,11 +41,15 @@ pub enum PettyStr {
     String(Rc<Box<str>>),
 }
 
+/// # Safety
+/// bytecode must have been generated using codegen
 pub unsafe fn execute_bytecode(bytecode: &[u8]) {
     let stdout = std::io::stdout().lock();
     unsafe { execute_bytecode_with(stdout, bytecode).unwrap() }
 }
 
+/// # Safety
+/// bytecode must have been generated using codegen
 #[expect(unsafe_op_in_unsafe_fn)]
 pub unsafe fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
 where
