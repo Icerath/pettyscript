@@ -202,8 +202,15 @@ where
                         Builtin::CreateMap => Value::Map(Rc::default()),
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
-                            let value = stack.pop().unwrap();
-                            writeln!(stdout, "{}", DisplayValue { consts, value: &value })?;
+                            let Value::String(str) = stack.pop().unwrap() else { panic!() };
+                            let str = match str {
+                                PettyStr::Literal { ptr, len } => {
+                                    str_literal!(ptr, len)
+                                }
+                                PettyStr::String(ref str) => str.as_bytes(),
+                            };
+                            stdout.write_all(str).unwrap();
+                            stdout.write_all(b"\n").unwrap();
                             Value::Null
                         }
                         Builtin::ReadFile => {

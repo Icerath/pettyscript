@@ -210,11 +210,11 @@ fn test_late_initialization() {
 fn test_if_stmt() {
     test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
     test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
-    test_expr!(r#"if 5 < 1 { println(f"{true}"); } else { println(false); } "#, "false");
+    test_expr!(r#"if 5 < 1 { println(f"{true}"); } else { println(f"{false}"); } "#, "false");
 }
 
 #[test]
 fn test_string_slicing() {
-    test_expr!(r#"println("Hello, World!"[5])"#, ",");
+    test_expr!(r#"println(f"{"Hello, World!"[5]}")"#, ",");
     test_expr!(r#"println("Hello, World!"[7..13])"#, "World!");
 }
