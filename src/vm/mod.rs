@@ -313,8 +313,8 @@ where
                 }
             }
             Op::Add => {
-                let rhs = { pop_int!() };
-                let lhs = { pop_int!() };
+                let rhs = pop_int!();
+                let lhs = pop_int!();
                 stack.push(Value::Int(lhs + rhs));
             }
             Op::AddInt => {
@@ -405,7 +405,7 @@ where
                 stack.push(Value::Bool(!bool));
             }
             Op::Neg => {
-                let int = { pop_int!() };
+                let int = pop_int!();
                 stack.push(Value::Int(-int));
             }
             Op::Less => {
