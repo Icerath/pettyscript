@@ -1,8 +1,35 @@
 extern crate proc_macro;
 
+use std::path::Path;
+
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Fields, Ident, ItemEnum};
+
+#[proc_macro]
+pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
+    assert!(input.is_empty());
+    let mut tests = quote! {};
+    for dir_entry in std::fs::read_dir("tests").unwrap() {
+        let entry = dir_entry.unwrap();
+        let src = Path::new("..").join(entry.path()).display().to_string();
+        let test_name = Ident::new(
+            &("test_".to_string() + &entry.path().file_stem().unwrap().to_str().unwrap()),
+            Span::call_site(),
+        );
+        tests.extend(quote! {
+            #[test]
+            fn #test_name () {
+                let src = include_str!(#src);
+                let ast = parse(&src).unwrap();
+                let code = codegen::codegen(&ast);
+                exec_vm(&code);
+            }
+        });
+    }
+    tests.into()
+}
 
 #[proc_macro_derive(BcWrite)]
 pub fn bc_write_derive(input: TokenStream) -> TokenStream {

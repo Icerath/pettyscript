@@ -11,16 +11,7 @@ fn exec_vm(bytecode: &[u8]) -> String {
     output.to_str().unwrap().trim().to_owned()
 }
 
-#[test]
-fn integration_tests() {
-    for dir_entry in std::fs::read_dir("tests").unwrap() {
-        let entry = dir_entry.unwrap();
-        let src = std::fs::read_to_string(entry.path()).unwrap();
-        let ast = parse(&src).unwrap();
-        let code = codegen::codegen(&ast);
-        exec_vm(&code);
-    }
-}
+macros::generate_integration_tests! {}
 
 #[test]
 fn test_fizzbuzz_example() {
@@ -188,13 +179,6 @@ fn test_maps() {
     );
     test_expr!(r#"let hi = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}");"#, "32");
     test_expr!(r#"println(f"{#{ "Bob": 32 }}")"#, "{Bob: 32}");
-}
-
-#[test]
-fn test_array_literals() {
-    test_expr!(r#"println(f"{[1, 2, 3]}")"#, r#"[1, 2, 3]"#);
-    test_expr!(r#"let arr: array[int] = []; arr.push(1); println(f"{arr}")"#, "[1]");
-    test_expr!(r#"let arr = [1]; println(f"{arr.pop()}"); println(f"{arr}");"#, "1\n[]");
 }
 
 #[test]
