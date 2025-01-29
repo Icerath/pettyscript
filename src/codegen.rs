@@ -594,16 +594,15 @@ impl Codegen {
             }
             Expr::FieldAccess { expr, field } => {
                 let typ = self.expr(expr).unwrap();
-                let field_type = self.field_type(typ, field).unwrap();
-                let field = self.builder.insert_identifer(field);
-                self.builder.insert(Op::LoadField(field));
-                field_type
+                let field_ident = self.builder.insert_identifer(field);
+                self.builder.insert(Op::LoadField(field_ident));
+                self.field_type(typ, field)
             }
             Expr::Index { expr, index } => {
-                let container_typ = self.expr(expr);
-                let index_typ = self.expr(index);
+                let container_typ = self.expr(expr).unwrap();
+                let index_typ = self.expr(index).unwrap();
                 self.builder.insert(Op::Index);
-                return self.index_type(container_typ?, index_typ?);
+                self.index_type(container_typ, index_typ)
             }
             Expr::InitStruct { ident, fields } => {
                 let struct_type = self.load_name_type(ident).unwrap();
@@ -659,8 +658,8 @@ impl Codegen {
         Some(ty)
     }
 
-    fn index_type(&self, container: Type, index: Type) -> Option<Type> {
-        Some(match container {
+    fn index_type(&self, container: Type, index: Type) -> Type {
+        match container {
             Type::Str => match index {
                 Type::Range => Type::Str,
                 Type::Int => Type::Char,
@@ -671,11 +670,11 @@ impl Codegen {
                 _ => panic!("Cannot index Array({of:?}) with type: {index:?}"),
             },
             _ => panic!("Cannot index {container:?}"),
-        })
+        }
     }
 
-    fn field_type(&self, typ: Type, field: &str) -> Option<Type> {
-        Some(match typ {
+    fn field_type(&self, typ: Type, field: &str) -> Type {
+        match typ {
             Type::Enum { fields, id, .. } if fields.contains(field) => Type::EnumVariant { id },
             Type::Str => match field {
                 "len" => Type::Int,
@@ -727,7 +726,7 @@ impl Codegen {
                 _ => panic!("type Array({of:?}) does not contain field: {field}"),
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),
-        })
+        }
     }
 
     fn finish(self) -> Vec<u8> {
