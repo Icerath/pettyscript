@@ -103,19 +103,19 @@ struct Codegen {
     break_label: Option<u32>,
 }
 
-fn builtin_type(builtin: Builtin) -> Option<Type> {
-    Some(Type::Function(Rc::new(match builtin {
+fn builtin_type(builtin: Builtin) -> Type {
+    Type::Function(Rc::new(match builtin {
         Builtin::Assert => FnSig { ret: Type::Bool, args: [Type::Bool].into() },
         Builtin::Exit => FnSig { ret: Type::Null, args: [Type::Int].into() }, // FIXME: Return never type.
         Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },
         Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },
-    })))
+    }))
 }
 
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            self.write_ident_offset(builtin.name(), builtin_type(builtin));
+            self.write_ident_offset(builtin.name(), Some(builtin_type(builtin)));
         }
         let scope = self.scopes.first_mut().unwrap();
         // FIXME: Should these types be inserted into the interner?
