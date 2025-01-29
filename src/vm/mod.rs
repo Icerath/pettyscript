@@ -5,7 +5,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
     fmt::Write as _,
-    hint::unreachable_unchecked,
+    hint::{assert_unchecked, unreachable_unchecked},
     io::{self, Write},
     rc::Rc,
 };
@@ -184,7 +184,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 }
                 Op::Store(offset) => {
                     let offset = offset as usize;
-                    let variable_stack = self.variable_stacks.last_mut().unwrap();
+                    let variable_stack = self.variable_stacks.last_mut().unwrap_unchecked();
+                    unsafe { assert_unchecked(offset < variable_stack.len()) };
                     variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
                 Op::LoadChar(char) => self.stack.push(Value::Char(char)),
