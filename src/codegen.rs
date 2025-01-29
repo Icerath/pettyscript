@@ -308,8 +308,7 @@ impl Codegen {
                 self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
 
-                self.scopes.last_mut().unwrap().var_types.insert(ident, ident_typ);
-                let offset = self.write_ident_offset(ident, None);
+                let offset = self.write_ident_offset(ident, ident_typ);
                 self.builder.insert(Op::Store(offset));
 
                 self.scopes.last_mut().unwrap().nfor_loops += 1;
