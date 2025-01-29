@@ -1,5 +1,3 @@
-use bstr::ByteSlice;
-
 use crate::{
     bytecode::{Op, VERSION},
     vm::BytecodeReader,
@@ -12,12 +10,12 @@ pub fn disassemble(bytecode: &[u8]) {
     let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
     reader.bytes = &reader.bytes[reader.head..];
     reader.head = 0;
-    let consts = &reader.bytes[..len_consts];
+    let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
     reader.bytes = &reader.bytes[len_consts..];
 
     macro_rules! load_ident {
         ($ident: ident) => {
-            consts[$ident.ptr as usize..$ident.ptr as usize + $ident.len as usize].as_bstr()
+            &consts[$ident.ptr as usize..$ident.ptr as usize + $ident.len as usize]
         };
     }
 
