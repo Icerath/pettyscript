@@ -59,12 +59,25 @@ impl fmt::Debug for Stmt {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ExplicitType {
+    pub ident: &'static str,
+    pub generics: Box<[ExplicitType]>,
+}
+
+impl ExplicitType {
+    #[expect(unused, reason = "TODO: Inferred types")]
+    pub fn is_inferred(&self) -> bool {
+        self.ident == "_"
+    }
+}
+
 #[derive(Debug)]
 pub struct Return(pub Option<Expr>);
 
 pub struct VarDecl {
     pub ident: &'static str,
-    pub typ: Option<&'static str>,
+    pub typ: Option<ExplicitType>,
     pub expr: Option<Expr>,
 }
 
@@ -566,6 +579,25 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_explicit_type(&mut self) -> Result<ExplicitType> {
+        let ident = self.parse_ident()?;
+        if self.peek()? != Token::LBracket {
+            return Ok(ExplicitType { ident, generics: [].into() });
+        }
+        self.skip();
+        let mut generics = vec![];
+        while self.peek()?.kind() != TokenKind::RBracket {
+            let typ = self.parse_explicit_type()?;
+            generics.push(typ);
+            if self.peek()?.kind() == TokenKind::RBracket {
+                break;
+            }
+            self.expect_token(Token::Comma)?;
+        }
+        self.skip();
+        Ok(ExplicitType { ident, generics: generics.into() })
+    }
+
     fn parse_map_literal(&mut self) -> Result<Literal> {
         // We expect hash too, but it's already parsed by `parse_literal`
         self.expect_token(Token::LBrace)?;
@@ -693,7 +725,7 @@ impl<'a> Parser<'a> {
         let ident = self.parse_ident()?;
         if self.peek()? == Token::Colon {
             self.skip();
-            let typ = self.parse_ident()?;
+            let typ = self.parse_explicit_type()?;
             let expr = match self.bump()? {
                 Token::Semicolon => return Ok(VarDecl { ident, typ: Some(typ), expr: None }),
                 Token::Eq => self.parse_root_expr()?,

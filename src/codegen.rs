@@ -163,8 +163,8 @@ impl Codegen {
                 self.builder.insert_label(function_end);
             }
             Stmt::Let(VarDecl { ident, typ, expr }) | Stmt::Const(VarDecl { ident, typ, expr }) => {
-                let expected = typ.map(|typ| {
-                    self.load_name_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
+                let expected = typ.as_ref().map(|typ| {
+                    self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
                 });
                 let ty = match expr {
                     Some(expr) => self.expr(expr),
@@ -357,6 +357,10 @@ impl Codegen {
             Some(typ) => Some(typ.clone()),
             None => self.scopes.first().unwrap().named_types.get(type_name).cloned(),
         }
+    }
+
+    fn load_explicit_type(&self, typ: &ExplicitType) -> Option<Type> {
+        self.load_name_type(typ.ident)
     }
 
     fn load(&mut self, ident: &'static str) -> Option<Type> {
