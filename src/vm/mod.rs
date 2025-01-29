@@ -1,3 +1,5 @@
+#![expect(unsafe_op_in_unsafe_fn, reason = "I'm lazy")]
+
 use core::fmt;
 use std::{
     cell::{Cell, RefCell},
@@ -97,7 +99,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
-    #[expect(unsafe_op_in_unsafe_fn)]
     unsafe fn execute(&mut self) -> io::Result<()> {
         macro_rules! pop_int {
             () => {
@@ -330,9 +331,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let lhs = self.stack.pop().unwrap();
                     macro_rules! glue {
                         ($typ: tt) => {{
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
                             self.stack.push(Value::Bool(lhs == rhs));
                         }};
@@ -355,9 +354,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let lhs = self.stack.pop().unwrap();
                     macro_rules! glue {
                         ($typ: tt) => {{
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
                             self.stack.push(Value::Bool(lhs < rhs));
                         }};
@@ -380,9 +377,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let lhs = self.stack.pop().unwrap();
                     macro_rules! glue {
                         ($typ: tt) => {{
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            #[expect(unsafe_op_in_unsafe_fn)]
                             let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
                             self.stack.push(Value::Bool(lhs > rhs));
                         }};
