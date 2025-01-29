@@ -570,13 +570,24 @@ impl<'a> Parser<'a> {
         let mut segments = vec![];
         while i < str.len() {
             if str.as_bytes()[i] == b'{' {
-                let end = str[i + 1..].find('}').unwrap();
-                let expr_str = &str[i + 1..i + 1 + end];
+                let mut end = i;
+                {
+                    let mut lbraces = 1;
+                    while lbraces != 0 {
+                        end += 1;
+                        match str.as_bytes()[end] as char {
+                            '{' => lbraces += 1,
+                            '}' => lbraces -= 1,
+                            _ => {}
+                        }
+                    }
+                }
+                let expr_str = &str[1..][i..end];
                 // FIXME: Handle EOF correctly to avoid this.
                 let expr = Parser::new(&(expr_str.to_string() + ";")).parse_root_expr()?;
                 let section = intern(&str[section_start..i]);
-                i += end;
-                section_start = i + 2;
+                i = end;
+                section_start = i + 1;
                 segments.push((section, expr));
             }
             i += 1;

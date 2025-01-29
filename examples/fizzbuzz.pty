@@ -7,7 +7,7 @@ fn main() {
         } else if i % 5 == 0 {
             println("Buzz");
         } else {
-            println(i);
+            println(f"{i}");
         }
     }
 }

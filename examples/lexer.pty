@@ -129,9 +129,7 @@ fn lexer_next(lexer: Lexer) -> Token {
             }
             token = Token.Ident;
         } else {
-            // TODO: f strings
-            println("Invalid Symbol: {}");
-            println(first_char);
+            println(f"Invalid Symbol: {first_char}");
             exit(1);
         }
         lexer.remaining = lexer.remaining[skip..lexer.remaining.len];
@@ -144,7 +142,7 @@ fn main() {
     let lexer = Lexer { str, remaining: str };
     while true {
         let token = lexer_next(lexer);
-        println(token);
+        println(f"{token}");
         if lexer.remaining == "" {
             break;
         }

@@ -86,8 +86,10 @@ fn lex_fstring(lexer: &mut Lexer) -> Option<S> {
         }
         let mut lbraces = 1;
         while lbraces != 0 {
-            if rem.next()? == '}' {
-                lbraces -= 1;
+            match rem.next()? {
+                '{' => lbraces += 1,
+                '}' => lbraces -= 1,
+                _ => {}
             }
         }
     }
