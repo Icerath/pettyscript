@@ -611,12 +611,10 @@ impl Codegen {
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(ident));
                     let typ = match expr {
-                        Some(expr) => self.expr(expr),
-                        None => self.load(ident),
+                        Some(expr) => self.expr(expr).unwrap(),
+                        None => self.load(ident).unwrap(),
                     };
-                    if let Some(typ) = typ {
-                        assert_eq!(type_fields.get(ident).unwrap(), &typ);
-                    }
+                    assert_eq!(type_fields.get(ident).unwrap(), &typ);
                     let ident = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::StoreField(ident));
                 }
