@@ -44,8 +44,7 @@ fn test_lexer_example() {
         let token = token.unwrap();
         expected.push_str(&format!("{:?}\n", token.kind()));
     }
-    // TODO: fix fstrings in lexer example
-    //assert_eq!(result, expected.trim());
+    assert_eq!(result, expected.trim());
 }
 
 macro_rules! test_expr {

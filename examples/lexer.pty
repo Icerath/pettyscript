@@ -46,6 +46,7 @@ enum Token {
     Int,
     Character,
     String,
+    FString,
     Ident,
 }
 
@@ -123,6 +124,13 @@ fn lexer_next(lexer: Lexer) -> Token {
             }
             skip = skip + 1;
             token = Token.String;
+        } else if lexer.remaining.starts_with("f\"") {
+            skip = skip + 1;
+            while lexer.remaining[skip] != '"' {
+                skip = skip + 1;
+            }
+            skip = skip + 1;
+            token = Token.FString;
         } else if first_char.is_alphabetic() {
             while lexer.remaining[skip].is_alphabetic() {
                 skip = skip + 1;
