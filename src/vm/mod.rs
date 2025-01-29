@@ -24,15 +24,20 @@ pub enum Value {
     EnumVariant { name: StrIdent, key: u32 },
     Char(char),
     Int(i64),
-    Builtin(Builtin),
-    MethodBuiltin(MethodBuiltin),
-    Function { label: u32 },
+    Callable(Callable),
     String(PettyStr),
     Array(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<PettyMap>>),
     Range(Rc<[Cell<i64>; 2]>),
     RangeInclusive(Rc<[Cell<i64>; 2]>),
     Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Callable {
+    Builtin(Builtin),
+    MethodBuiltin(MethodBuiltin),
+    Function { label: u32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -70,7 +75,7 @@ where
     let mut stack = vec![];
     let mut call_stack = vec![];
     let mut variable_stacks: Vec<Vec<Value>> = vec![vec![]];
-    variable_stacks[0].extend(Builtin::ALL.map(Value::Builtin));
+    variable_stacks[0].extend(Builtin::ALL.map(|b| Value::Callable(Callable::Builtin(b))));
 
     macro_rules! pop_int {
         () => {
@@ -179,9 +184,9 @@ where
                 }
             }
             Op::FnCall { numargs } => 'fn_call: {
-                let function = stack.pop().unwrap();
-                let value = match function {
-                    Value::Builtin(builtin) => match builtin {
+                let Value::Callable(callable) = stack.pop().unwrap() else { panic!() };
+                let value = match callable {
+                    Callable::Builtin(builtin) => match builtin {
                         Builtin::Assert => {
                             assert_eq!(numargs, 1);
                             let Value::Bool(bool) = stack.pop().unwrap() else {
@@ -220,15 +225,7 @@ where
                             std::process::exit(int)
                         }
                     },
-
-                    Value::Function { label } => {
-                        variable_stacks.push(vec![]);
-                        let here = reader.head;
-                        call_stack.push(here);
-                        reader.head = label as usize;
-                        break 'fn_call;
-                    }
-                    Value::MethodBuiltin(method) => match method {
+                    Callable::MethodBuiltin(method) => match method {
                         MethodBuiltin::CharIsAlphabetic(char) => Value::Bool(char.is_alphabetic()),
                         MethodBuiltin::CharIsDigit(char) => Value::Bool(char.is_ascii_digit()),
                         MethodBuiltin::StrTrim { trimmed } => {
@@ -292,7 +289,13 @@ where
                             arr.borrow_mut().pop().unwrap_or(Value::Null)
                         }
                     },
-                    _ => todo!(),
+                    Callable::Function { label } => {
+                        variable_stacks.push(vec![]);
+                        let here = reader.head;
+                        call_stack.push(here);
+                        reader.head = label as usize;
+                        break 'fn_call;
+                    }
                 };
                 stack.push(value);
             }
@@ -361,7 +364,8 @@ where
             }
             Op::LoadTrue => stack.push(Value::Bool(true)),
             Op::LoadFalse => stack.push(Value::Bool(false)),
-            Op::CreateFunction => stack.push(Value::Function { label: reader.head as u32 + 5 + 5 }),
+            Op::CreateFunction => stack
+                .push(Value::Callable(Callable::Function { label: reader.head as u32 + 5 + 5 })),
             Op::LoadNull => stack.push(Value::Null),
             Op::Ret => {
                 reader.head = call_stack.pop().unwrap();
@@ -464,30 +468,30 @@ where
 
 fn load_array_field(consts: &str, arr: Rc<RefCell<Vec<Value>>>, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::MethodBuiltin(match field {
+    Value::Callable(Callable::MethodBuiltin(match field {
         "push" => MethodBuiltin::ArrayPush(arr),
         "pop" => MethodBuiltin::ArrayPop(arr),
         _ => panic!("map does not contain field: {}", field),
-    })
+    }))
 }
 
 fn load_map_field(consts: &str, map: Rc<RefCell<PettyMap>>, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::MethodBuiltin(match field {
+    Value::Callable(Callable::MethodBuiltin(match field {
         "get" => MethodBuiltin::MapGet(map),
         "insert" => MethodBuiltin::MapInsert(map),
         "remove" => MethodBuiltin::MapRemove(map),
         _ => panic!("map does not contain field: {}", field),
-    })
+    }))
 }
 
 fn load_char_field(consts: &str, char: char, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::MethodBuiltin(match field {
+    Value::Callable(Callable::MethodBuiltin(match field {
         "is_digit" => MethodBuiltin::CharIsDigit(char),
         "is_alphabetic" => MethodBuiltin::CharIsAlphabetic(char),
         _ => panic!("char does not contain field: {}", field),
-    })
+    }))
 }
 
 fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
@@ -496,7 +500,7 @@ fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
         PettyStr::Literal { ptr, len } => &consts[*ptr as usize..*ptr as usize + *len as usize],
         PettyStr::String(str) => str,
     };
-    Value::MethodBuiltin(match (field, string.clone()) {
+    Value::Callable(Callable::MethodBuiltin(match (field, string.clone()) {
         ("len", _) => return Value::Int(str.len() as i64),
         ("trim", _) => {
             let trimmed = Rc::new(str.trim().into());
@@ -506,7 +510,7 @@ fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
         ("is_digit", str) => MethodBuiltin::StrIsDigit(str),
         ("is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
         _ => panic!("str does not contain field: {}", field),
-    })
+    }))
 }
 
 fn str_char_eq(str: &str, char: char) -> bool {
@@ -554,11 +558,11 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 }
                 write!(f, " }}")
             }
-            Value::Function { label } => write!(f, "Function at {label}"),
+            Value::Callable(Callable::Function { label }) => write!(f, "Function at {label}"),
+            Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
+            Value::Callable(Callable::MethodBuiltin(method)) => write!(f, "Method: {method:?}"),
             Value::Null => write!(f, "null"),
             Value::Bool(bool) => write!(f, "{bool}"),
-            Value::Builtin(function) => write!(f, "Function::{function:?}"),
-            Value::MethodBuiltin(method) => write!(f, "method: {method:?}"),
             Value::Int(int) => write!(f, "{int}"),
             Value::Range(range) => write!(f, "{}..{}", range[0].get(), range[1].get()),
             Value::RangeInclusive(range) => {
