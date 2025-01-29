@@ -48,7 +48,7 @@ pub enum Type {
     Function(Rc<FnSig>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
     var_types: FxHashMap<&'static str, Option<Type>>,
@@ -67,7 +67,7 @@ struct Codegen {
 fn builtin_type(builtin: Builtin) -> Option<Type> {
     Some(Type::Function(Rc::new(match builtin {
         Builtin::CreateMap => FnSig { ret: Type::Map, args: [].into() },
-        Builtin::Exit => FnSig { ret: Type::Null, args: [].into() }, // FIXME: Return never type.
+        Builtin::Exit => FnSig { ret: Type::Null, args: [Type::Int].into() }, // FIXME: Return never type.
         Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },
         Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },
     })))
@@ -76,9 +76,7 @@ fn builtin_type(builtin: Builtin) -> Option<Type> {
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            self.scopes.last_mut().unwrap().var_types.insert(builtin.name(), builtin_type(builtin));
-            // TODO: each buitlin should have a type.
-            self.write_ident_offset(builtin.name(), None);
+            self.write_ident_offset(builtin.name(), builtin_type(builtin));
         }
         let scope = self.scopes.first_mut().unwrap();
         // FIXME: Should these types be inserted into the interner?
@@ -486,9 +484,11 @@ impl Codegen {
                 let typ = self.expr(function);
                 let ret_type = match typ {
                     Some(Type::Function(fn_type)) => {
-                        assert_eq!(fn_type.args.len(), arg_types.len());
+                        assert_eq!(fn_type.args.len(), arg_types.len(), "{function:?}");
                         for (arg_ty, param_ty) in arg_types.iter().zip(&fn_type.args) {
-                            assert_eq!(arg_ty.as_ref(), Some(param_ty));
+                            if arg_ty.is_some() {
+                                assert_eq!(arg_ty.as_ref(), Some(param_ty));
+                            }
                         }
                         Some(fn_type.ret.clone())
                     }
