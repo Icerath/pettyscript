@@ -97,6 +97,7 @@ struct Codegen {
 
 fn builtin_type(builtin: Builtin) -> Option<Type> {
     Some(Type::Function(Rc::new(match builtin {
+        Builtin::Assert => FnSig { ret: Type::Bool, args: [Type::Bool].into() },
         Builtin::Exit => FnSig { ret: Type::Null, args: [Type::Int].into() }, // FIXME: Return never type.
         Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },
         Builtin::ReadFile => FnSig { ret: Type::Str, args: [Type::Str].into() },

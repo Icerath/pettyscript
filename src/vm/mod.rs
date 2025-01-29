@@ -205,6 +205,12 @@ where
                 let function = stack.pop().unwrap();
                 let value = match function {
                     Value::Builtin(builtin) => match builtin {
+                        Builtin::Assert => {
+                            assert_eq!(numargs, 1);
+                            let Value::Bool(bool) = stack.pop().unwrap() else { panic!() };
+                            assert!(bool, "RUNTIME ASSERTION FAILED");
+                            Value::Bool(bool)
+                        }
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let Value::String(str) = stack.pop().unwrap() else { panic!() };
@@ -354,7 +360,7 @@ where
                             lhs.as_bytes() == rhs
                         }
                         Value::String(PettyStr::String(rhs)) => lhs == rhs,
-                        _ => panic!(),
+                        _ => panic!("{lhs:?} - {rhs:?}"),
                     },
                     Value::Char(lhs) => match rhs {
                         Value::Null => false,

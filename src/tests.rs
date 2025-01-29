@@ -12,6 +12,17 @@ fn exec_vm(bytecode: &[u8]) -> String {
 }
 
 #[test]
+fn integration_tests() {
+    for dir_entry in std::fs::read_dir("tests").unwrap() {
+        let entry = dir_entry.unwrap();
+        let src = std::fs::read_to_string(entry.path()).unwrap();
+        let ast = parse(&src).unwrap();
+        let code = codegen::codegen(&ast);
+        exec_vm(&code);
+    }
+}
+
+#[test]
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();

@@ -10,6 +10,7 @@ pub enum Builtin {
     Println,
     ReadFile,
     Exit,
+    Assert,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,6 +31,7 @@ pub enum MethodBuiltin {
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
+            Self::Assert => "assert",
             Self::Println => "println",
             Self::ReadFile => "read_file",
             Self::Exit => "exit",
