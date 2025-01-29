@@ -90,7 +90,7 @@ impl IncompleteType {
 #[derive(Default, Debug)]
 struct FunctionScope {
     variables: FxHashMap<&'static str, u32>,
-    var_types: FxHashMap<&'static str, Option<Type>>,
+    var_types: FxHashMap<&'static str, Type>,
     named_types: FxHashMap<&'static str, Type>,
     nfor_loops: usize,
 }
@@ -115,7 +115,7 @@ fn builtin_type(builtin: Builtin) -> Type {
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            self.write_ident_offset(builtin.name(), Some(builtin_type(builtin)));
+            self.write_ident_offset(builtin.name(), builtin_type(builtin));
         }
         let scope = self.scopes.first_mut().unwrap();
         // FIXME: Should these types be inserted into the interner?
@@ -137,7 +137,7 @@ impl Codegen {
         }
     }
 
-    fn write_ident_offset(&mut self, ident: &'static str, ty: Option<Type>) -> u32 {
+    fn write_ident_offset(&mut self, ident: &'static str, ty: Type) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
         let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, offset);
         self.scopes.last_mut().unwrap().var_types.insert(ident, ty);
@@ -173,7 +173,7 @@ impl Codegen {
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
 
-                let offset = self.write_ident_offset(ident, Some(typ));
+                let offset = self.write_ident_offset(ident, typ);
                 self.builder.insert(Op::Store(offset));
             }
 
@@ -191,7 +191,7 @@ impl Codegen {
                 }
                 let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));
 
-                let offset = self.write_ident_offset(ident, Some(typ));
+                let offset = self.write_ident_offset(ident, typ);
                 self.builder.insert(Op::CreateFunction);
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
@@ -201,7 +201,7 @@ impl Codegen {
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
-                    let offset = self.write_ident_offset(ident, Some(typ));
+                    let offset = self.write_ident_offset(ident, typ);
                     self.builder.insert(Op::Store(offset));
                 }
                 for stmt in &body.stmts {
@@ -236,17 +236,15 @@ impl Codegen {
                     assert!(ty.matches(expected));
                 }
                 let ty = if let Some(expected) = expected { expected } else { ty };
-                let offset = self.write_ident_offset(ident, Some(ty));
+                let offset = self.write_ident_offset(ident, ty);
                 self.builder.insert(Op::Store(offset));
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
                     let ty = self.expr(expr);
                     let expected = self.load_var_type(root);
-                    if let Some(expected) = expected {
-                        if *expected != ty {
-                            panic!("Type Error: expected {expected:?}, Got: {ty:?}");
-                        }
+                    if *expected != ty {
+                        panic!("Type Error: expected {expected:?}, Got: {ty:?}");
                     }
                     self.store(root);
                 } else {
@@ -301,7 +299,7 @@ impl Codegen {
 
                 let iter = self.expr(iter);
                 let ident_typ = match &iter {
-                    Type::Range | Type::RangeInclusive => Some(Type::Int),
+                    Type::Range | Type::RangeInclusive => Type::Int,
                     _ => panic!(),
                 };
 
@@ -389,12 +387,12 @@ impl Codegen {
         };
     }
 
-    fn load_var_type(&self, ident: &'static str) -> Option<&Type> {
+    fn load_var_type(&self, ident: &'static str) -> &Type {
         match self.scopes.last().unwrap().var_types.get(ident) {
-            Some(ty) => ty.as_ref(),
+            Some(ty) => ty,
             None => {
                 let scope = self.scopes.first().unwrap();
-                scope.var_types.get(ident).unwrap().as_ref()
+                scope.var_types.get(ident).unwrap()
             }
         }
     }
@@ -433,7 +431,7 @@ impl Codegen {
         })
     }
 
-    fn load(&mut self, ident: &'static str) -> Option<Type> {
+    fn load(&mut self, ident: &'static str) -> Type {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => {
                 self.builder.insert(Op::Load(offset));
@@ -510,7 +508,7 @@ impl Codegen {
                         .insert(Op::BuildFstr { num_segments: fstring.segments.len() as u16 });
                     Type::Str
                 }
-                Literal::Ident(ident) => self.load(ident).unwrap(),
+                Literal::Ident(ident) => self.load(ident),
             },
             Expr::Binary { op, exprs } => 'block: {
                 let op = match op {
@@ -608,7 +606,7 @@ impl Codegen {
                     assert!(type_fields.contains_key(ident));
                     let typ = match expr {
                         Some(expr) => self.expr(expr),
-                        None => self.load(ident).unwrap(),
+                        None => self.load(ident),
                     };
                     assert_eq!(type_fields.get(ident).unwrap(), &typ);
                     let ident = self.builder.insert_identifer(ident);
