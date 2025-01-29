@@ -630,8 +630,8 @@ impl Codegen {
                 let typ = self.expr(array_iter.next().unwrap()).unwrap();
                 self.builder.insert(Op::ArrayPush);
                 for expr in array_iter {
-                    let next_typ = self.expr(expr);
-                    assert_eq!(next_typ.as_ref(), Some(&typ));
+                    let next_typ = self.expr(expr).unwrap();
+                    assert_eq!(next_typ, typ);
                     self.builder.insert(Op::ArrayPush);
                 }
                 Type::Array(Rc::new(IncompleteType::Complete(typ)))
