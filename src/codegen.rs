@@ -637,20 +637,18 @@ impl Codegen {
                 Type::Array(Rc::new(IncompleteType::Complete(typ)))
             }
             Expr::Unary { op, expr } => {
-                let typ = self.expr(expr);
-                if let Some(typ) = &typ {
-                    if *op == UnaryOp::Not && *typ != Type::Bool {
-                        panic!("Cannot use ! operator on {typ:?}");
-                    }
-                    if *op == UnaryOp::Neg && *typ != Type::Int {
-                        panic!("Cannot use - operator on {typ:?}");
-                    }
+                let typ = self.expr(expr).unwrap();
+                if *op == UnaryOp::Not && typ != Type::Bool {
+                    panic!("Cannot use ! operator on {typ:?}");
+                }
+                if *op == UnaryOp::Neg && typ != Type::Int {
+                    panic!("Cannot use - operator on {typ:?}");
                 }
                 match op {
                     UnaryOp::Not => self.builder.insert(Op::Not),
                     UnaryOp::Neg => self.builder.insert(Op::Neg),
                 }
-                return typ;
+                typ
             }
         };
         Some(ty)
