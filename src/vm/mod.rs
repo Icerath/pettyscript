@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     builtints::{Builtin, MethodBuiltin},
-    bytecode::{Op, StrIdent, VERSION},
+    bytecode::{EqTag, Op, StrIdent, VERSION},
 };
 
 pub type PettyMap = BTreeMap<Value, Value>;
@@ -292,29 +292,25 @@ where
                 stack.push(Value::Int(lhs % rhs));
             }
             Op::Eq(tag) => {
-                let _ = tag;
                 let rhs = stack.pop().unwrap();
-                let is_eq = match stack.pop().unwrap() {
-                    Value::Null => rhs == Value::Null,
-                    Value::Bool(lhs) => match rhs {
-                        Value::Bool(rhs) => lhs == rhs,
-                        _ => panic!(),
-                    },
-                    Value::Int(lhs) => match rhs {
-                        Value::Int(rhs) => lhs == rhs,
-                        _ => panic!(),
-                    },
-                    Value::String(lhs) => match rhs {
-                        Value::String(rhs) => lhs.as_str(consts) == rhs.as_str(consts),
-                        _ => panic!(),
-                    },
-                    Value::Char(lhs) => match rhs {
-                        Value::Char(rhs) => lhs == rhs,
-                        _ => panic!(),
-                    },
-                    val => todo!("{val:?}"),
-                };
-                stack.push(Value::Bool(is_eq));
+                let lhs = stack.pop().unwrap();
+                macro_rules! eq_glue {
+                    ($typ: tt) => {{
+                        let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
+                        let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs == rhs));
+                    }};
+                }
+                match tag {
+                    EqTag::Int => eq_glue!(Int),
+                    EqTag::Bool => eq_glue!(Bool),
+                    EqTag::Char => eq_glue!(Char),
+                    EqTag::Str => {
+                        let Value::String(lhs) = lhs else { unreachable_unchecked() };
+                        let Value::String(rhs) = rhs else { unreachable_unchecked() };
+                        stack.push(Value::Bool(lhs.as_str(consts) == rhs.as_str(consts)));
+                    }
+                }
             }
             Op::Add => {
                 let rhs = { pop_int!() };
