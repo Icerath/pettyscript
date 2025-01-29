@@ -65,12 +65,34 @@ pub enum Token {
     #[regex(r"0[xX][\da-fA-F_]+", parse_hex_int)]
     #[regex(r"0[oO][0-7_]+", parse_octal_int)]
     Int(i64),
-    #[regex(r#""[^"]*""#, |s| raw_string_escape(&s.slice()[1..s.slice().len()-1]))]
+    #[regex(r#"""#, lex_string)]
     String(S),
     #[token(r#"f""#, lex_fstring)]
     FString(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
+}
+
+fn lex_string(lexer: &mut Lexer) -> Option<S> {
+    // TODO: More string escaping
+    let mut rem = lexer.remainder().chars();
+    let mut out = String::new();
+    loop {
+        match rem.next()? {
+            '\\' if rem.clone().next()? == 'n' => {
+                let _ = rem.next();
+                out.push('\n');
+            }
+            '\\' if rem.clone().next()? == '"' => {
+                let _ = rem.next();
+                out.push('"');
+            }
+            '"' => break,
+            next => out.push(next),
+        }
+    }
+    lexer.bump(lexer.remainder().len() - rem.as_str().len());
+    Some(intern(&out))
 }
 
 fn lex_fstring(lexer: &mut Lexer) -> Option<S> {
@@ -149,11 +171,6 @@ fn parse_int(str: &mut Lexer) -> Option<i64> {
         }
     }
     Some(sum)
-}
-
-fn raw_string_escape(lex: &str) -> &'static str {
-    // TODO: Impl proper string escaping
-    intern(&lex.replace(r"\n", "\n"))
 }
 
 // avoid Logos' special case for &str

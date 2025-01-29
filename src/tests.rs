@@ -85,6 +85,11 @@ fn test_for_loop() {
 }
 
 #[test]
+fn test_str_literal() {
+    test_expr!(r#"println("\"")"#, "\"");
+}
+
+#[test]
 fn test_str_char_eq() {
     test_expr!(r#"println(f"{'/' == '/'}")"#, "true");
     test_expr!(r#"println(f"{"/" == '/'}")"#, "true");
