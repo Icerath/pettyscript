@@ -131,10 +131,12 @@ impl Codegen {
                 let function_start = self.builder.create_label();
                 let function_end = self.builder.create_label();
 
-                let ret = ret_type.map_or(Type::Null, |typ| self.load_name_type(typ).unwrap());
+                let ret = ret_type
+                    .as_ref()
+                    .map_or(Type::Null, |typ| self.load_explicit_type(typ).unwrap());
                 let mut args = vec![];
                 for (_ident, typ) in params {
-                    let typ = self.load_name_type(typ).unwrap();
+                    let typ = self.load_explicit_type(typ).unwrap();
                     args.push(typ);
                 }
                 let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));

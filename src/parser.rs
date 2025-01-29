@@ -124,8 +124,8 @@ impl fmt::Debug for Enum {
 
 pub struct Function {
     pub ident: &'static str,
-    pub params: Box<[(&'static str, &'static str)]>,
-    pub ret_type: Option<&'static str>,
+    pub params: Box<[(&'static str, ExplicitType)]>,
+    pub ret_type: Option<ExplicitType>,
     pub body: Block,
 }
 
@@ -789,13 +789,13 @@ impl<'a> Parser<'a> {
         self.expect_token(Token::Fn)?;
         let ident = self.parse_ident()?;
         self.expect_token(Token::LParen)?;
-        let params = self.parse_separated_ident_pairs(TokenKind::RParen)?;
+        let params = self.parse_separated_ident_types(TokenKind::RParen)?;
         self.expect_token(Token::RParen)?;
 
         let mut ret_type = None;
         if self.peek()? == Token::ThinArrow {
             self.skip();
-            ret_type = Some(self.parse_ident()?);
+            ret_type = Some(self.parse_explicit_type()?);
         }
 
         let body = self.parse_block()?;
@@ -808,6 +808,24 @@ impl<'a> Parser<'a> {
         while self.peek()?.kind() != terminator {
             let ident = self.parse_ident()?;
             params.push(ident);
+            if self.peek()?.kind() == terminator {
+                break;
+            }
+            self.expect_token(Token::Comma)?;
+        }
+        Ok(params.into())
+    }
+
+    fn parse_separated_ident_types(
+        &mut self,
+        terminator: TokenKind,
+    ) -> Result<Box<[(&'static str, ExplicitType)]>> {
+        let mut params = vec![];
+        while self.peek()?.kind() != terminator {
+            let ident = self.parse_ident()?;
+            self.expect_token(Token::Colon)?;
+            let typ = self.parse_explicit_type()?;
+            params.push((ident, typ));
             if self.peek()?.kind() == terminator {
                 break;
             }
