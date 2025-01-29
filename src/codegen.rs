@@ -191,8 +191,7 @@ impl Codegen {
                 }
                 let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));
 
-                self.scopes.last_mut().unwrap().var_types.insert(ident, Some(typ));
-                let offset = self.write_ident_offset(ident, None);
+                let offset = self.write_ident_offset(ident, Some(typ));
                 self.builder.insert(Op::CreateFunction);
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
@@ -200,8 +199,9 @@ impl Codegen {
 
                 self.scopes.push(FunctionScope::default());
 
-                for param in params {
-                    let offset = self.write_ident_offset(param.0, None);
+                for (ident, explicit_typ) in params {
+                    let typ = self.load_explicit_type(explicit_typ).unwrap();
+                    let offset = self.write_ident_offset(ident, Some(typ));
                     self.builder.insert(Op::Store(offset));
                 }
                 for stmt in &body.stmts {
@@ -697,6 +697,13 @@ impl Codegen {
                     Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() }))
                 }
                 _ => panic!("type str does not contain field: {field}"),
+            },
+            Type::Char => match field {
+                "is_digit" => Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                "is_alphabetic" => {
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() }))
+                }
+                _ => panic!("type char does not contain field: {field}"),
             },
             Type::Map { key, value } => match field {
                 "insert" => Type::Function(Rc::new(FnSig {
