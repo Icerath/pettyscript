@@ -105,8 +105,8 @@ impl Codegen {
         match node {
             Stmt::Struct(r#struct) => {
                 let mut fields = FxHashMap::default();
-                for &(field, typ) in &r#struct.fields {
-                    fields.insert(field, self.load_name_type(typ).unwrap());
+                for (field, typ) in &r#struct.fields {
+                    fields.insert(*field, self.load_explicit_type(typ).unwrap());
                 }
                 let typ = Type::Struct { name: r#struct.ident, fields: Rc::new(fields) };
                 self.scopes.last_mut().unwrap().named_types.insert(r#struct.ident, typ);
