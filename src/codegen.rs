@@ -585,12 +585,12 @@ impl Codegen {
                         for (arg_ty, param_ty) in arg_types.iter().zip(&fn_type.args) {
                             assert_eq!(arg_ty, param_ty);
                         }
-                        Some(fn_type.ret.clone())
+                        fn_type.ret.clone()
                     }
                     other => panic!("Cannot call {other:?}"),
                 };
                 self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
-                return ret_type;
+                ret_type
             }
             Expr::FieldAccess { expr, field } => {
                 let typ = self.expr(expr).unwrap();
