@@ -606,11 +606,8 @@ impl Codegen {
                 return self.index_type(container_typ?, index_typ?);
             }
             Expr::InitStruct { ident, fields } => {
-                let Type::Struct { name: _, fields: type_fields } =
-                    self.load_name_type(ident).unwrap()
-                else {
-                    panic!()
-                };
+                let struct_type = self.load_name_type(ident).unwrap();
+                let Type::Struct { name: _, fields: type_fields } = &struct_type else { panic!() };
                 self.builder.insert(Op::EmptyStruct);
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(ident));
@@ -624,7 +621,7 @@ impl Codegen {
                     let ident = self.builder.insert_identifer(ident);
                     self.builder.insert(Op::StoreField(ident));
                 }
-                return None;
+                struct_type
             }
             Expr::Array(array) => 'block: {
                 self.builder.insert(Op::CreateArray);
