@@ -1,3 +1,4 @@
+use macros::*;
 use rustc_hash::FxHashMap;
 
 use crate::builtints::Builtin;
@@ -10,7 +11,6 @@ pub struct StrIdent {
     pub len: u32,
 }
 
-use macros::*;
 #[derive(BcRead, BcWrite, EnumKind, NumVariants, Clone, Copy, Debug, PartialEq)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
