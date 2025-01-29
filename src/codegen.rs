@@ -576,21 +576,18 @@ impl Codegen {
             Expr::FnCall { function, args } => {
                 let mut arg_types = vec![];
                 for arg in args {
-                    arg_types.push(self.expr(arg));
+                    arg_types.push(self.expr(arg).unwrap());
                 }
-                let typ = self.expr(function);
+                let typ = self.expr(function).unwrap();
                 let ret_type = match typ {
-                    Some(Type::Function(fn_type)) => {
+                    Type::Function(fn_type) => {
                         assert_eq!(fn_type.args.len(), arg_types.len(), "{function:?}");
                         for (arg_ty, param_ty) in arg_types.iter().zip(&fn_type.args) {
-                            if arg_ty.is_some() {
-                                assert_eq!(arg_ty.as_ref(), Some(param_ty));
-                            }
+                            assert_eq!(arg_ty, param_ty);
                         }
                         Some(fn_type.ret.clone())
                     }
-                    Some(other) => panic!("Cannot call {other:?}"),
-                    None => None,
+                    other => panic!("Cannot call {other:?}"),
                 };
                 self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
                 return ret_type;
