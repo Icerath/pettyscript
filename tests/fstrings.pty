@@ -1,0 +1,6 @@
+let x = 1;
+let y = 2;
+assert(f"A" == "A");
+assert(f"{x}" == "1");
+assert(f"{x + y}" == "3");
+assert(f"{"Hello, World!"}" == "Hello, World!");
