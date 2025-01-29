@@ -552,7 +552,9 @@ impl Codegen {
                 let lhs_ty = self.expr(&exprs[0]);
                 let rhs_ty = self.expr(&exprs[1]);
                 let typ = match (lhs_ty, rhs_ty, op) {
-                    (_, _, Op::Eq | Op::Less | Op::Greater) => Type::Bool,
+                    (lhs, rhs, Op::Eq | Op::Less | Op::Greater) if self.can_cmp(&lhs, &rhs) => {
+                        Type::Bool
+                    }
                     (Type::Int, Type::Int, Op::Range) => Type::Range,
                     (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
                     (_, _, Op::Range | Op::RangeInclusive) => panic!(),
@@ -644,6 +646,18 @@ impl Codegen {
                 }
                 typ
             }
+        }
+    }
+
+    #[expect(clippy::match_like_matches_macro)]
+    fn can_cmp(&self, lhs: &Type, rhs: &Type) -> bool {
+        match (lhs, rhs) {
+            (Type::Int, Type::Int) => true,
+            (Type::Char, Type::Char) => true,
+            (Type::Str, Type::Str) => true,
+            (Type::Str, Type::Char) => true,
+            (Type::Char, Type::Str) => true,
+            _ => false,
         }
     }
 
