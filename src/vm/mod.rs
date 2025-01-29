@@ -181,7 +181,7 @@ where
                         Builtin::Assert => {
                             assert_eq!(numargs, 1);
                             let Value::Bool(bool) = stack.pop().unwrap() else {
-                                { unreachable_unchecked() }
+                                unreachable_unchecked()
                             };
                             assert!(bool, "RUNTIME ASSERTION FAILED");
                             Value::Bool(bool)
@@ -377,7 +377,7 @@ where
             }
             Op::StoreEnumVariant(variant) => {
                 let Value::Struct { fields } = stack.last_mut().unwrap() else {
-                    { unreachable_unchecked() }
+                    unreachable_unchecked()
                 };
                 fields.borrow_mut().insert(variant, Value::EnumVariant { name: variant, key: 0 });
             }
@@ -430,7 +430,7 @@ where
                         }
                     }
                     Value::Array(arr) => {
-                        let Value::Int(rhs) = rhs else { { unreachable_unchecked() } };
+                        let Value::Int(rhs) = rhs else { unreachable_unchecked() };
                         arr.borrow()[rhs as usize].clone()
                     }
                     _ => todo!("{lhs:?}"),
