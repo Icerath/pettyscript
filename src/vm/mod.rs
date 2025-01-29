@@ -99,16 +99,14 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
-    unsafe fn execute(&mut self) -> io::Result<()> {
-        macro_rules! pop_int {
-            () => {
-                match self.stack.pop().unwrap() {
-                    Value::Int(int) => int,
-                    _ => unreachable_unchecked(),
-                }
-            };
+    unsafe fn pop_int(&mut self) -> i64 {
+        match self.stack.pop().unwrap() {
+            Value::Int(int) => int,
+            _ => unreachable_unchecked(),
         }
+    }
 
+    unsafe fn execute(&mut self) -> io::Result<()> {
         macro_rules! str_literal {
             ($ptr: expr, $len: expr) => {{
                 let ptr = $ptr;
@@ -250,7 +248,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                             }
                             Builtin::Exit => {
                                 assert!(numargs <= 1);
-                                let int = if numargs == 1 { pop_int!() as i32 } else { 0 };
+                                let int = if numargs == 1 { self.pop_int() as i32 } else { 0 };
                                 std::process::exit(int)
                             }
                         },
@@ -322,8 +320,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::Dup => self.stack.push(self.stack.last().unwrap().clone()),
                 Op::Jump(label) => self.head = label as usize,
                 Op::Mod => {
-                    let rhs = pop_int!();
-                    let lhs = pop_int!();
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs % rhs));
                 }
                 Op::Eq(tag) => {
@@ -396,8 +394,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     }
                 }
                 Op::Add => {
-                    let rhs = pop_int!();
-                    let lhs = pop_int!();
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs + rhs));
                 }
                 Op::AddInt => {
@@ -497,7 +495,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(Value::Bool(!bool));
                 }
                 Op::Neg => {
-                    let int = pop_int!();
+                    let int = self.pop_int();
                     self.stack.push(Value::Int(-int));
                 }
             }
