@@ -1,0 +1,3 @@
+let tok: str;
+tok = "a";
+assert(tok == "a");

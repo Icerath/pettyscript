@@ -1,0 +1,3 @@
+enum Emotion { Happy };
+
+assert(f"{Emotion.Happy}" == "Happy");

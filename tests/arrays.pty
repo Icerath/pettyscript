@@ -6,3 +6,4 @@ assert(arr.pop() == 1);
 assert(f"{arr}" == "[]");
 arr.push(2);
 assert(f"{arr}" == "[2]");
+assert([1][0] == 1);

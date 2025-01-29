@@ -70,38 +70,6 @@ fn test_for_loop() {
 }
 
 #[test]
-fn test_str_literal() {
-    test_expr!(r#"println("\"")"#, "\"");
-}
-
-#[test]
-fn test_str_char_eq() {
-    test_expr!(r#"println(f"{'/' == '/'}")"#, "true");
-    test_expr!(r#"println(f"{"/" == '/'}")"#, "true");
-    test_expr!(r#"println(f"{'/' == "/"}")"#, "true");
-    test_expr!(r#"println(f"{"/" == "/"}")"#, "true");
-    test_expr!(r#"println(f"{"/" == "/"}")"#, "true");
-}
-
-#[test]
-fn test_fstr() {
-    test_expr!(r#"println(f"A"); "#, "A");
-    test_expr!(r#"let x = 0; println(f"{x}"); "#, "0");
-    test_expr!(r#"let x = 1; let y = 2; println(f"{x + y}"); "#, "3");
-    test_expr!(r#"let x = 1; let y = 2; println(f"{"a" == "a"}"); "#, "true");
-}
-
-#[test]
-fn test_character_literals() {
-    test_expr!(r#"println(f"{'a'}")"#, "a");
-}
-
-#[test]
-fn test_enum_variants() {
-    test_expr!(r#"enum Emotion { Happy }; println(f"{Emotion.Happy}")"#, "Happy");
-}
-
-#[test]
 fn test_structs() {
     test_expr!("struct Point {x:int,y:int} Point { x: 0, y: 0 }", "");
     test_expr!(
@@ -125,30 +93,11 @@ fn test_structs() {
 }
 
 #[test]
-fn test_int_literals() {
-    test_expr!(r#"println(f"{0x1}")"#, "1");
-    test_expr!(r#"println(f"{0x18a968bc945df}")"#, 0x18a968bc945dfu64.to_string());
-    test_expr!(r#"println(f"{0b0110101011101001}")"#, 0b0110101011101001.to_string());
-    test_expr!(r#"println(f"{0o172364123752317}")"#, 0o172364123752317u64.to_string());
-}
-
-#[test]
 fn test_while_loops() {
     test_expr!(
         r#"let i: int = 0; while true { if i == 4 { break; } println(f"{i}"); i = i + 1; }"#,
         "0\n1\n2\n3"
     );
-}
-
-#[test]
-fn test_list_index() {
-    test_expr!(r#"println(f"{[1][0]}")"#, "1");
-}
-
-#[test]
-fn test_unary() {
-    test_expr!(r#"println(f"{!false}")"#, "true");
-    test_expr!(r#"println(f"{-123712}")"#, "-123712");
 }
 
 #[test]
@@ -166,35 +115,8 @@ fn test_maps() {
 }
 
 #[test]
-fn test_gt_lt() {
-    test_expr!(r#"println(f"{1 < 2}")"#, "true");
-    test_expr!(r#"println(f"{5 > 4}")"#, "true");
-}
-
-#[test]
-fn test_str_len() {
-    test_expr!(r#"println(f"{"123456789".len}")"#, "9");
-}
-
-#[test]
-fn test_trim() {
-    test_expr!(r#"println("  \n   Hello, World!\n  ".trim())"#, "Hello, World!");
-}
-
-#[test]
-fn test_late_initialization() {
-    test_expr!(r#"let tok: str; tok = "a"; println(f"{tok}");"#, "a");
-}
-
-#[test]
 fn test_if_stmt() {
     test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
     test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
     test_expr!(r#"if 5 < 1 { println(f"{true}"); } else { println(f"{false}"); } "#, "false");
-}
-
-#[test]
-fn test_string_slicing() {
-    test_expr!(r#"println(f"{"Hello, World!"[5]}")"#, ",");
-    test_expr!(r#"println("Hello, World!"[7..13])"#, "World!");
 }
