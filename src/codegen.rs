@@ -1,4 +1,7 @@
-use std::rc::Rc;
+use std::{
+    rc::Rc,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -43,7 +46,8 @@ pub enum Type {
     Int,
     Str,
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
-    Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
+    Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>>, id: u32 },
+    EnumVariant { id: u32 },
     Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
     Array(Rc<IncompleteType>),
     Function(Rc<FnSig>),
@@ -152,9 +156,15 @@ impl Codegen {
                 self.scopes.last_mut().unwrap().named_types.insert(r#struct.ident, typ);
             }
             Stmt::Enum(Enum { ident, variants }) => {
-                let typ =
-                    Type::Enum { name: ident, fields: Rc::new(variants.iter().copied().collect()) };
-                self.scopes.last_mut().unwrap().named_types.insert(ident, typ);
+                // Each enum it of a different type
+                static COUNTER: AtomicU32 = AtomicU32::new(0);
+                let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+                let typ = Type::Enum {
+                    name: ident,
+                    fields: Rc::new(variants.iter().copied().collect()),
+                    id,
+                };
+                self.scopes.last_mut().unwrap().named_types.insert(ident, typ.clone());
 
                 self.builder.insert(Op::EmptyStruct);
 
@@ -163,7 +173,7 @@ impl Codegen {
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
 
-                let offset = self.write_ident_offset(ident, None);
+                let offset = self.write_ident_offset(ident, Some(typ));
                 self.builder.insert(Op::Store(offset));
             }
 
@@ -675,7 +685,7 @@ impl Codegen {
 
     fn field_type(&self, typ: Type, field: &str) -> Option<Type> {
         Some(match typ {
-            Type::Enum { fields, .. } if fields.contains(field) => return None,
+            Type::Enum { fields, id, .. } if fields.contains(field) => Type::EnumVariant { id },
             Type::Str => match field {
                 "len" => Type::Int,
                 "trim" => Type::Function(Rc::new(FnSig { ret: Type::Str, args: [].into() })),
