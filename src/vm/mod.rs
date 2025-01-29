@@ -41,12 +41,12 @@ pub enum PettyStr {
     String(Rc<Box<str>>),
 }
 
-pub fn execute_bytecode(bytecode: &[u8]) {
+pub unsafe fn execute_bytecode(bytecode: &[u8]) {
     let stdout = std::io::stdout().lock();
-    execute_bytecode_with(stdout, bytecode).unwrap();
+    unsafe { execute_bytecode_with(stdout, bytecode).unwrap() }
 }
 
-pub fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
+pub unsafe fn execute_bytecode_with<W>(mut stdout: W, bytecode: &[u8]) -> io::Result<()>
 where
     W: Write,
 {

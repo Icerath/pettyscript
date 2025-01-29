@@ -36,6 +36,7 @@ fn main() {
     if args.disassemble {
         disassemble(&bytecode);
     } else {
-        vm::execute_bytecode(&bytecode);
+        // Safety: codegen must produce correct bytecode.
+        unsafe { vm::execute_bytecode(&bytecode) };
     }
 }

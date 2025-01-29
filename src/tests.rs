@@ -4,7 +4,8 @@ use crate::{codegen, parser::parse, vm};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
-    vm::execute_bytecode_with(&mut output, bytecode).unwrap();
+    // Safety: All tests rely on codegen.
+    unsafe { vm::execute_bytecode_with(&mut output, bytecode).unwrap() };
     std::str::from_utf8(&output).unwrap().trim().to_owned()
 }
 
