@@ -25,6 +25,7 @@ pub fn disassemble(bytecode: &[u8]) {
         reader.head += 1 + op.size();
         print!("{offset}: ");
         match op {
+            Op::SetStackSize(size) => println!("SET_STACK_SIZE {size:?}"),
             Op::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
             Op::AddInt => println!("ADD_INT"),
             Op::Neg => println!("NEG"),

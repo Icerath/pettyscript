@@ -16,6 +16,7 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
 
     codegen.scopes.push(FunctionScope::default());
     codegen.insert_builtins();
+    let set_stack_size = codegen.builder.create_set_stack_size();
     for node in ast {
         codegen.r#gen(node);
     }
@@ -25,6 +26,10 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
         codegen.builder.insert(Op::FnCall { numargs: 0 });
         codegen.builder.insert(Op::Pop);
     }
+    codegen.builder.insert_set_stack_size(
+        set_stack_size,
+        codegen.scopes.last().unwrap().variables.len() as u16,
+    );
     codegen.scopes.pop().unwrap();
 
     codegen.finish()
@@ -198,6 +203,7 @@ impl Codegen {
                 self.builder.insert_label(function_start);
 
                 self.scopes.push(FunctionScope::default());
+                let set_stack_size = self.builder.create_set_stack_size();
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
@@ -207,6 +213,8 @@ impl Codegen {
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
                 }
+                let num_scope_vars = self.scopes.last().unwrap().variables.len();
+                self.builder.insert_set_stack_size(set_stack_size, num_scope_vars as u16);
                 self.scopes.pop().unwrap();
 
                 self.builder.insert(Op::LoadNull);

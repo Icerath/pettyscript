@@ -140,6 +140,10 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             let op = Op::bc_read(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
+                Op::SetStackSize(size) => {
+                    let stack = self.variable_stacks.last_mut().unwrap_unchecked();
+                    stack.resize_with(size as usize, || Value::Null);
+                }
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
                     let remaining = self.pop_stack();
@@ -181,9 +185,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::Store(offset) => {
                     let offset = offset as usize;
                     let variable_stack = self.variable_stacks.last_mut().unwrap();
-                    if offset >= variable_stack.len() {
-                        variable_stack.resize_with(offset + 1, || Value::Null);
-                    }
                     variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
                 Op::LoadChar(char) => self.stack.push(Value::Char(char)),
