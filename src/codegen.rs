@@ -229,21 +229,21 @@ impl Codegen {
                             _ => todo!("{expected:?}"),
                         };
                         self.builder.insert(op);
-                        Some(expected)
+                        expected
                     }
                 };
-                if let (Some(ty), Some(expected)) = (&ty, &expected) {
+                if let Some(expected) = &expected {
                     assert!(ty.matches(expected));
                 }
-                let ty = if expected.is_some() { expected } else { ty };
-                let offset = self.write_ident_offset(ident, ty);
+                let ty = if let Some(expected) = expected { expected } else { ty };
+                let offset = self.write_ident_offset(ident, Some(ty));
                 self.builder.insert(Op::Store(offset));
             }
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
                     let ty = self.expr(expr);
                     let expected = self.load_var_type(root);
-                    if let (Some(ty), Some(expected)) = (ty, expected) {
+                    if let Some(expected) = expected {
                         if *expected != ty {
                             panic!("Type Error: expected {expected:?}, Got: {ty:?}");
                         }
@@ -280,11 +280,9 @@ impl Codegen {
                 let prev_break = self.break_label.replace(end_label);
 
                 self.builder.insert_label(start_label);
-                let typ = self.expr(expr);
-                match typ {
-                    Some(Type::Bool) => {}
-                    Some(other) => panic!("Cannot use type: {other:?} in while loop"),
-                    None => {}
+                match self.expr(expr) {
+                    Type::Bool => {}
+                    other => panic!("Cannot use type: {other:?} in while loop"),
                 }
                 self.builder.insert(Op::CJump(end_label));
                 self.gen_block(&body.stmts);
@@ -303,17 +301,15 @@ impl Codegen {
 
                 let iter = self.expr(iter);
                 let ident_typ = match &iter {
-                    Some(Type::Range | Type::RangeInclusive) => Some(Type::Int),
-                    None => None,
+                    Type::Range | Type::RangeInclusive => Some(Type::Int),
                     _ => panic!(),
                 };
 
                 self.builder.insert_label(start_label);
                 let iter_op = match iter {
-                    Some(Type::Range) => Op::IterRange,
-                    Some(Type::RangeInclusive) => Op::IterRangeInclusive,
-                    Some(typ) => panic!("{typ:?}"),
-                    None => Op::IterNext,
+                    Type::Range => Op::IterRange,
+                    Type::RangeInclusive => Op::IterRangeInclusive,
+                    typ => panic!("{typ:?}"),
                 };
                 self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
@@ -339,8 +335,8 @@ impl Codegen {
             Stmt::IfChain(IfChain { first, else_ifs, r#else }) => {
                 let typ = self.expr(&first.condition);
                 match typ {
-                    Some(Type::Bool) | None => {}
-                    Some(other) => panic!("Cannot use type {other:?} in if stmts"),
+                    Type::Bool => {}
+                    other => panic!("Cannot use type {other:?} in if stmts"),
                 }
                 let final_end_label = self.builder.create_label();
                 let mut next_label = self.builder.create_label();
@@ -351,8 +347,8 @@ impl Codegen {
                     self.builder.insert_label(next_label);
                     let typ = self.expr(&elseif.condition);
                     match typ {
-                        Some(Type::Bool) | None => {}
-                        Some(other) => panic!("Cannot use type {other:?} in if stmts"),
+                        Type::Bool => {}
+                        other => panic!("Cannot use type {other:?} in if stmts"),
                     }
                     next_label = self.builder.create_label();
                     self.builder.insert(Op::CJump(next_label));
@@ -453,26 +449,26 @@ impl Codegen {
         }
     }
 
-    fn expr(&mut self, expr: &Expr) -> Option<Type> {
-        let ty = match expr {
+    fn expr(&mut self, expr: &Expr) -> Type {
+        match expr {
             Expr::Literal(literal) => match literal {
                 Literal::Map(map) => {
                     self.builder.insert(Op::CreateMap);
                     if map.is_empty() {
-                        return Some(Type::Map {
+                        return Type::Map {
                             key: Rc::new(IncompleteType::Generic),
                             value: Rc::new(IncompleteType::Generic),
-                        });
+                        };
                     }
                     let mut entries = map.iter();
                     let [key, val] = entries.next().unwrap();
-                    let key_typ = self.expr(key).unwrap();
-                    let val_typ = self.expr(val).unwrap();
+                    let key_typ = self.expr(key);
+                    let val_typ = self.expr(val);
                     self.builder.insert(Op::InsertMap);
 
                     for [key, val] in entries {
-                        assert_eq!(self.expr(key).unwrap(), key_typ);
-                        assert_eq!(self.expr(val).unwrap(), val_typ);
+                        assert_eq!(self.expr(key), key_typ);
+                        assert_eq!(self.expr(val), val_typ);
                         self.builder.insert(Op::InsertMap);
                     }
 
@@ -514,7 +510,7 @@ impl Codegen {
                         .insert(Op::BuildFstr { num_segments: fstring.segments.len() as u16 });
                     Type::Str
                 }
-                Literal::Ident(ident) => return self.load(ident),
+                Literal::Ident(ident) => self.load(ident).unwrap(),
             },
             Expr::Binary { op, exprs } => 'block: {
                 let op = match op {
@@ -555,8 +551,8 @@ impl Codegen {
                     }
                     _ => todo!("{op:?}"),
                 };
-                let lhs_ty = self.expr(&exprs[0]).unwrap();
-                let rhs_ty = self.expr(&exprs[1]).unwrap();
+                let lhs_ty = self.expr(&exprs[0]);
+                let rhs_ty = self.expr(&exprs[1]);
                 let typ = match (lhs_ty, rhs_ty, op) {
                     (_, _, Op::Eq | Op::Less | Op::Greater) => Type::Bool,
                     (Type::Int, Type::Int, Op::Range) => Type::Range,
@@ -576,9 +572,9 @@ impl Codegen {
             Expr::FnCall { function, args } => {
                 let mut arg_types = vec![];
                 for arg in args {
-                    arg_types.push(self.expr(arg).unwrap());
+                    arg_types.push(self.expr(arg));
                 }
-                let typ = self.expr(function).unwrap();
+                let typ = self.expr(function);
                 let ret_type = match typ {
                     Type::Function(fn_type) => {
                         assert_eq!(fn_type.args.len(), arg_types.len(), "{function:?}");
@@ -593,14 +589,14 @@ impl Codegen {
                 ret_type
             }
             Expr::FieldAccess { expr, field } => {
-                let typ = self.expr(expr).unwrap();
+                let typ = self.expr(expr);
                 let field_ident = self.builder.insert_identifer(field);
                 self.builder.insert(Op::LoadField(field_ident));
                 self.field_type(typ, field)
             }
             Expr::Index { expr, index } => {
-                let container_typ = self.expr(expr).unwrap();
-                let index_typ = self.expr(index).unwrap();
+                let container_typ = self.expr(expr);
+                let index_typ = self.expr(index);
                 self.builder.insert(Op::Index);
                 self.index_type(container_typ, index_typ)
             }
@@ -611,7 +607,7 @@ impl Codegen {
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(ident));
                     let typ = match expr {
-                        Some(expr) => self.expr(expr).unwrap(),
+                        Some(expr) => self.expr(expr),
                         None => self.load(ident).unwrap(),
                     };
                     assert_eq!(type_fields.get(ident).unwrap(), &typ);
@@ -627,17 +623,17 @@ impl Codegen {
                     break 'block Type::Array(Rc::new(IncompleteType::Generic));
                 }
                 let mut array_iter = array.iter();
-                let typ = self.expr(array_iter.next().unwrap()).unwrap();
+                let typ = self.expr(array_iter.next().unwrap());
                 self.builder.insert(Op::ArrayPush);
                 for expr in array_iter {
-                    let next_typ = self.expr(expr).unwrap();
+                    let next_typ = self.expr(expr);
                     assert_eq!(next_typ, typ);
                     self.builder.insert(Op::ArrayPush);
                 }
                 Type::Array(Rc::new(IncompleteType::Complete(typ)))
             }
             Expr::Unary { op, expr } => {
-                let typ = self.expr(expr).unwrap();
+                let typ = self.expr(expr);
                 if *op == UnaryOp::Not && typ != Type::Bool {
                     panic!("Cannot use ! operator on {typ:?}");
                 }
@@ -650,8 +646,7 @@ impl Codegen {
                 }
                 typ
             }
-        };
-        Some(ty)
+        }
     }
 
     fn index_type(&self, container: Type, index: Type) -> Type {
