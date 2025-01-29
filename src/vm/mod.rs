@@ -71,7 +71,7 @@ where
         () => {
             match stack.pop().unwrap() {
                 Value::Int(int) => int,
-                val => panic!("{val:?}"),
+                _ => unreachable_unchecked(),
             }
         };
     }
@@ -167,12 +167,12 @@ where
                     stack.push(Value::Bool(false));
                 }
             },
-            Op::CJump(label) => {
-                let Value::Bool(bool) = stack.pop().unwrap() else { unimplemented!() };
+            Op::CJump(label) => unsafe {
+                let Value::Bool(bool) = stack.pop().unwrap() else { unreachable_unchecked() };
                 if !bool {
                     reader.head = label as usize;
                 }
-            }
+            },
             Op::FnCall { numargs } => 'fn_call: {
                 let function = stack.pop().unwrap();
                 let value = match function {
@@ -207,11 +207,11 @@ where
                             };
                             Value::String(PettyStr::String(Rc::new(string.into())))
                         }
-                        Builtin::Exit => {
+                        Builtin::Exit => unsafe {
                             assert!(numargs <= 1);
                             let int = if numargs == 1 { pop_int!() as i32 } else { 0 };
                             std::process::exit(int)
-                        }
+                        },
                     },
 
                     Value::Function { label } => {
@@ -292,11 +292,11 @@ where
             Op::Pop => _ = stack.pop().unwrap(),
             Op::Dup => stack.push(stack.last().unwrap().clone()),
             Op::Jump(label) => reader.head = label as usize,
-            Op::Mod => {
+            Op::Mod => unsafe {
                 let rhs = pop_int!();
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs % rhs));
-            }
+            },
             Op::Eq => {
                 let rhs = stack.pop().unwrap();
                 let is_eq = match stack.pop().unwrap() {
@@ -348,8 +348,8 @@ where
                 stack.push(Value::Bool(is_eq));
             }
             Op::Add => {
-                let rhs = pop_int!();
-                let lhs = pop_int!();
+                let rhs = unsafe { pop_int!() };
+                let lhs = unsafe { pop_int!() };
                 stack.push(Value::Int(lhs + rhs));
             }
             Op::AddInt => unsafe {
@@ -444,7 +444,7 @@ where
                 stack.push(Value::Bool(!bool));
             }
             Op::Neg => {
-                let int = pop_int!();
+                let int = unsafe { pop_int!() };
                 stack.push(Value::Int(-int));
             }
             Op::Less => {
