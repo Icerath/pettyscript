@@ -179,7 +179,9 @@ where
                     Value::Builtin(builtin) => match builtin {
                         Builtin::Assert => {
                             assert_eq!(numargs, 1);
-                            let Value::Bool(bool) = stack.pop().unwrap() else { panic!() };
+                            let Value::Bool(bool) = stack.pop().unwrap() else {
+                                unsafe { unreachable_unchecked() }
+                            };
                             assert!(bool, "RUNTIME ASSERTION FAILED");
                             Value::Bool(bool)
                         }
@@ -373,7 +375,9 @@ where
                 fields.borrow_mut().insert(field, value);
             }
             Op::StoreEnumVariant(variant) => {
-                let Value::Struct { fields } = stack.last_mut().unwrap() else { panic!() };
+                let Value::Struct { fields } = stack.last_mut().unwrap() else {
+                    unsafe { unreachable_unchecked() }
+                };
                 fields.borrow_mut().insert(variant, Value::EnumVariant { name: variant, key: 0 });
             }
             Op::EmptyStruct => stack.push(Value::Struct { fields: Rc::default() }),
@@ -381,10 +385,7 @@ where
                 let value = match stack.pop().unwrap() {
                     Value::Struct { fields } => match fields.borrow().get(&field) {
                         Some(value) => value.clone(),
-                        None => panic!(
-                            "struct does not contain field: {:?}",
-                            str_literal!(field.ptr, field.len)
-                        ),
+                        None => unsafe { unreachable_unchecked() },
                     },
                     Value::String(str) => load_str_field(consts, str, field),
                     Value::Char(char) => load_char_field(consts, char, field),
@@ -428,47 +429,31 @@ where
                         }
                     }
                     Value::Array(arr) => {
-                        let Value::Int(rhs) = rhs else { panic!() };
+                        let Value::Int(rhs) = rhs else { unsafe { unreachable_unchecked() } };
                         arr.borrow()[rhs as usize].clone()
                     }
                     _ => todo!("{lhs:?}"),
                 };
                 stack.push(value);
             }
-            Op::Not => {
-                let bool = match stack.pop().unwrap() {
-                    Value::Null => false,
-                    Value::Bool(bool) => bool,
-                    _ => panic!(),
-                };
+            Op::Not => unsafe {
+                let Value::Bool(bool) = stack.pop().unwrap() else { unreachable_unchecked() };
                 stack.push(Value::Bool(!bool));
-            }
+            },
             Op::Neg => {
                 let int = unsafe { pop_int!() };
                 stack.push(Value::Int(-int));
             }
-            Op::Less => {
-                let rhs = stack.pop().unwrap();
-                let is_less = match stack.pop().unwrap() {
-                    Value::Int(lhs) => match rhs {
-                        Value::Int(rhs) => lhs < rhs,
-                        _ => panic!(),
-                    },
-                    val => todo!("{val:?}"),
-                };
-                stack.push(Value::Bool(is_less));
-            }
-            Op::Greater => {
-                let rhs = stack.pop().unwrap();
-                let is_greater = match stack.pop().unwrap() {
-                    Value::Int(lhs) => match rhs {
-                        Value::Int(rhs) => lhs > rhs,
-                        _ => panic!(),
-                    },
-                    val => todo!("{val:?}"),
-                };
-                stack.push(Value::Bool(is_greater));
-            }
+            Op::Less => unsafe {
+                let rhs = pop_int!();
+                let lhs = pop_int!();
+                stack.push(Value::Bool(lhs < rhs));
+            },
+            Op::Greater => unsafe {
+                let rhs = pop_int!();
+                let lhs = pop_int!();
+                stack.push(Value::Bool(lhs > rhs));
+            },
         }
     }
 
