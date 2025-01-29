@@ -25,7 +25,7 @@ pub enum Op {
     Neg,
     Not,
     Mod,
-    Eq,
+    Eq(EqTag),
     Add,
     Range,
     RangeInclusive,
@@ -53,6 +53,25 @@ pub enum Op {
     Dup,
     IterRange,
     IterRangeInclusive,
+}
+
+#[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EqTag {
+    Int,
+    Str,
+    Char,
+    Bool,
+}
+
+impl TryFrom<u8> for EqTag {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value as usize >= Self::VARIANT_COUNT {
+            return Err(());
+        }
+        unsafe { std::mem::transmute(value) }
+    }
 }
 
 trait BcRead: Sized {
@@ -99,8 +118,9 @@ impl_int!(u8);
 impl_int!(u16);
 impl_int!(u32);
 impl_int!(i64);
-impl_from!(Builtin, u16);
 impl_from!(char, u32);
+impl_from!(Builtin, u16);
+impl_from!(EqTag, u8);
 
 impl BcRead for StrIdent {
     fn bc_read(bytes: &mut &[u8]) -> Self {

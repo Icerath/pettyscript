@@ -7,7 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     builtints::Builtin,
-    bytecode::{BytecodeBuilder, Op},
+    bytecode::{BytecodeBuilder, EqTag, Op},
     parser::*,
 };
 
@@ -514,15 +514,22 @@ impl Codegen {
                 let op = match op {
                     BinOp::Range => Op::Range,
                     BinOp::RangeInclusive => Op::RangeInclusive,
-                    BinOp::Eq => Op::Eq,
                     BinOp::Mod => Op::Mod,
                     BinOp::Add => Op::Add,
                     BinOp::Less => Op::Less,
                     BinOp::Greater => Op::Greater,
+                    BinOp::Eq => {
+                        let lhs = self.expr(&exprs[0]);
+                        let rhs = self.expr(&exprs[1]);
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Eq(self.eq_tag(lhs)));
+                        break 'block Type::Bool;
+                    }
                     BinOp::Neq => {
-                        self.expr(&exprs[0]);
-                        self.expr(&exprs[1]);
-                        self.builder.insert(Op::Eq);
+                        let lhs = self.expr(&exprs[0]);
+                        let rhs = self.expr(&exprs[1]);
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Eq(self.eq_tag(lhs)));
                         self.builder.insert(Op::Not);
                         break 'block Type::Bool;
                     }
@@ -552,9 +559,7 @@ impl Codegen {
                 let lhs_ty = self.expr(&exprs[0]);
                 let rhs_ty = self.expr(&exprs[1]);
                 let typ = match (lhs_ty, rhs_ty, op) {
-                    (lhs, rhs, Op::Eq | Op::Less | Op::Greater) if self.can_cmp(&lhs, &rhs) => {
-                        Type::Bool
-                    }
+                    (lhs, rhs, Op::Less | Op::Greater) if self.can_cmp(&lhs, &rhs) => Type::Bool,
                     (Type::Int, Type::Int, Op::Range) => Type::Range,
                     (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
                     (_, _, Op::Range | Op::RangeInclusive) => panic!(),
@@ -649,12 +654,23 @@ impl Codegen {
         }
     }
 
+    fn eq_tag(&self, typ: Type) -> EqTag {
+        match typ {
+            Type::Int => EqTag::Int,
+            Type::Str => EqTag::Str,
+            Type::Bool => EqTag::Bool,
+            Type::Char => EqTag::Char,
+            _ => panic!("Cannot compare instances of type: {typ:?}"),
+        }
+    }
+
     #[expect(clippy::match_like_matches_macro)]
     fn can_cmp(&self, lhs: &Type, rhs: &Type) -> bool {
         match (lhs, rhs) {
             (Type::Int, Type::Int) => true,
             (Type::Char, Type::Char) => true,
             (Type::Str, Type::Str) => true,
+            (Type::Bool, Type::Bool) => true,
             _ => false,
         }
     }

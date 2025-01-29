@@ -34,7 +34,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::CreateArray => println!("CREATE_ARRAY"),
             Op::ArrayPush => println!("ARRAY_PUSH"),
             Op::Dup => println!("DUP"),
-            Op::Eq => println!("EQ"),
+            Op::Eq(tag) => println!("EQ {}", tag as u8),
             Op::Index => println!("INDEX"),
             Op::Less => println!("LESS"),
             Op::Jump(label) => println!("JUMP {label}"),

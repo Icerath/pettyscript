@@ -307,7 +307,8 @@ where
                 let lhs = pop_int!();
                 stack.push(Value::Int(lhs % rhs));
             }
-            Op::Eq => {
+            Op::Eq(tag) => {
+                let _ = tag;
                 let rhs = stack.pop().unwrap();
                 let is_eq = match stack.pop().unwrap() {
                     Value::Null => rhs == Value::Null,

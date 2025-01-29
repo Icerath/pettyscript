@@ -61,7 +61,7 @@ fn lexer_next(lexer: Lexer) -> Token {
 
         if lexer.remaining.starts_with("//") {
             let i = 2;
-            while i < lexer.remaining.len && lexer.remaining[i] != "\n" {
+            while i < lexer.remaining.len && lexer.remaining[i] != '\n' {
                 i = i + 1;
             }
             lexer.remaining = lexer.remaining[i..lexer.remaining.len];
