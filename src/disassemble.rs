@@ -23,7 +23,7 @@ pub fn disassemble(bytecode: &[u8]) {
         let offset = reader.head;
         let op = Op::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
-        print!("x{offset:x}: ");
+        print!("{offset}: ");
         match op {
             Op::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
             Op::AddInt => println!("ADD_INT"),
@@ -37,8 +37,8 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::Eq => println!("EQ"),
             Op::Index => println!("INDEX"),
             Op::Less => println!("LESS"),
-            Op::Jump(label) => println!("JUMP x{label:x}"),
-            Op::CJump(label) => println!("CJUMP x{label:x}"),
+            Op::Jump(label) => println!("JUMP {label}"),
+            Op::CJump(label) => println!("CJUMP {label}"),
             Op::CreateFunction => println!("CREATE_FUNCTION"),
             Op::EmptyStruct => println!("EMPTY_STRUCT"),
             Op::FnCall { numargs } => println!("FN_CALL {numargs}"),
@@ -57,7 +57,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
             Op::LoadInt(int) => println!("LOAD_INT {int}"),
             Op::LoadNull => println!("LOAD_NULL"),
-            Op::LoadString { ptr, len } => println!("LOAD_STR x{ptr:x} {len}"),
+            Op::LoadString { ptr, len } => println!("LOAD_STR {ptr} {len}"),
             Op::Mod => println!("MODULO"),
             Op::Not => println!("NOT"),
             Op::Range => println!("RANGE"),
