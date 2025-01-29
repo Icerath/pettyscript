@@ -98,20 +98,7 @@ where
                         panic!()
                     };
                     builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
-
-                    match value {
-                        Value::Int(x) => _ = write!(builder, "{x}"),
-                        Value::String(str) => {
-                            let str_ref = match str {
-                                PettyStr::Literal { ptr, len } => {
-                                    str_literal!(ptr, len).as_bstr().to_str().unwrap()
-                                }
-                                PettyStr::String(ref str) => str,
-                            };
-                            builder.push_str(str_ref);
-                        }
-                        other => todo!("{other:?}"),
-                    }
+                    let _ = write!(builder, "{}", DisplayValue { value: &value, consts });
                 }
                 let Value::String(PettyStr::Literal { ptr, len }) = remaining else { panic!() };
                 builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
