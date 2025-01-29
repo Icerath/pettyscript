@@ -51,7 +51,6 @@ pub enum Op {
     StoreField(StrIdent),
     Pop,
     Dup,
-    IterNext,
     IterRange,
     IterRangeInclusive,
 }

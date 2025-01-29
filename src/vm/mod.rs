@@ -143,32 +143,6 @@ where
                 let Value::Int(start) = stack.pop().unwrap() else { unimplemented!() };
                 stack.push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
             }
-            Op::IterNext => {
-                let last = stack.last().unwrap();
-                match last {
-                    Value::RangeInclusive(range) => {
-                        let [start, end] = &*range.clone();
-                        if start.get() <= end.get() {
-                            stack.push(Value::Int(start.get()));
-                            stack.push(Value::Bool(true));
-                            start.set(start.get() + 1);
-                        } else {
-                            stack.push(Value::Bool(false));
-                        }
-                    }
-                    Value::Range(range) => {
-                        let [start, end] = &*range.clone();
-                        if start.get() < end.get() {
-                            stack.push(Value::Int(start.get()));
-                            stack.push(Value::Bool(true));
-                            start.set(start.get() + 1);
-                        } else {
-                            stack.push(Value::Bool(false));
-                        }
-                    }
-                    _ => unimplemented!("{last:?}"),
-                }
-            }
             Op::IterRange => unsafe {
                 let Value::Range(range) = stack.last().unwrap() else { unreachable_unchecked() };
                 let [start, end] = &*range.clone();

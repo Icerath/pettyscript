@@ -43,7 +43,6 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::EmptyStruct => println!("EMPTY_STRUCT"),
             Op::FnCall { numargs } => println!("FN_CALL {numargs}"),
             Op::Greater => println!("GREATER"),
-            Op::IterNext => println!("ITER_NEXT"),
             Op::IterRange => println!("ITER_RANGE"),
             Op::IterRangeInclusive => println!("ITER_RANGE_INCLUSIVE"),
             Op::Load(ident) => println!("LOAD {ident}"),
