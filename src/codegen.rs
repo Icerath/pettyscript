@@ -506,10 +506,10 @@ impl Codegen {
                 return field_type;
             }
             Expr::Index { expr, index } => {
-                self.expr(expr);
-                self.expr(index);
+                let container_typ = self.expr(expr);
+                let index_typ = self.expr(index);
                 self.builder.insert(Op::Index);
-                return None;
+                return self.index_type(container_typ?, index_typ?);
             }
             Expr::InitStruct { ident, fields } => {
                 let Type::Struct { name: _, fields: type_fields } =
@@ -558,6 +558,17 @@ impl Codegen {
             }
         };
         Some(ty)
+    }
+
+    fn index_type(&self, container: Type, index: Type) -> Option<Type> {
+        Some(match container {
+            Type::Str => match index {
+                Type::Range => Type::Str,
+                Type::Int => Type::Char,
+                _ => panic!("Cannot index str with type: {index:?}"),
+            },
+            _ => panic!(),
+        })
     }
 
     fn field_type(&self, typ: Type, field: &str) -> Option<Type> {
