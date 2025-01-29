@@ -59,7 +59,7 @@ pub enum Token {
     #[token("true")] True,
     #[token("false")] False,
     // Literals
-    #[regex("'[^']'", |lex| lex.slice()[1..].chars().next().unwrap())]
+    #[token("'", lex_character)]
     Char(char),
     #[regex(r"\d[\d_]*", parse_int)]
     #[regex(r"0[bB][01_]+", parse_binary_int)]
@@ -72,6 +72,23 @@ pub enum Token {
     FString(S),
     #[regex(r"[a-zA-Z_][a-zA-Z_\d]*", |lex| intern(lex.slice()))]
     Ident(S),
+}
+
+fn lex_character(lexer: &mut Lexer) -> Option<char> {
+    let mut rem = lexer.remainder().chars();
+    let char = match rem.next()? {
+        '\\' => match rem.next()? {
+            'n' => '\n',
+            '\'' => '\'',
+            _ => return None,
+        },
+        other => other,
+    };
+    if rem.next()? != '\'' {
+        return None;
+    }
+    lexer.bump(lexer.remainder().len() - rem.as_str().len());
+    Some(char)
 }
 
 fn lex_string(lexer: &mut Lexer) -> Option<S> {
