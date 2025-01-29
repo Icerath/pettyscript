@@ -98,6 +98,18 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
 
     impl_pop_helper! { pop_str, String, PettyStr }
 
+    unsafe fn pop_stack(&mut self) -> Value {
+        Self::partial_pop_stack(&mut self.stack)
+    }
+
+    unsafe fn partial_pop_stack(stack: &mut Vec<Value>) -> Value {
+        stack.pop().unwrap_unchecked()
+    }
+
+    unsafe fn last_stack(&self) -> &Value {
+        self.stack.last().unwrap_unchecked()
+    }
+
     fn new(bytecode: &'a [u8], stdout: W) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
@@ -114,14 +126,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         variable_stacks[0].extend(Builtin::ALL.map(|b| Value::Callable(Callable::Builtin(b))));
 
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
-    }
-
-    unsafe fn pop_stack(&mut self) -> Value {
-        Self::partial_pop_stack(&mut self.stack)
-    }
-
-    unsafe fn partial_pop_stack(stack: &mut Vec<Value>) -> Value {
-        stack.pop().unwrap_unchecked()
     }
 
     unsafe fn execute(&mut self) -> io::Result<()> {
@@ -199,9 +203,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         .push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
                 }
                 Op::IterRange => {
-                    let Value::Range(range) = self.stack.last().unwrap() else {
-                        unreachable_unchecked()
-                    };
+                    let Value::Range(range) = self.last_stack() else { unreachable_unchecked() };
                     let [start, end] = &*range.clone();
                     if start.get() < end.get() {
                         self.stack.push(Value::Int(start.get()));
@@ -212,7 +214,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     }
                 }
                 Op::IterRangeInclusive => {
-                    let Value::RangeInclusive(range) = self.stack.last().unwrap() else {
+                    let Value::RangeInclusive(range) = self.last_stack() else {
                         unreachable_unchecked()
                     };
                     let [start, end] = &*range.clone();
@@ -322,7 +324,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(value);
                 }
                 Op::Pop => _ = self.pop_stack(),
-                Op::Dup => self.stack.push(self.stack.last().unwrap().clone()),
+                Op::Dup => self.stack.push(self.last_stack().clone()),
                 Op::Jump(label) => self.head = label as usize,
                 Op::Mod => {
                     let rhs = self.pop_int();
