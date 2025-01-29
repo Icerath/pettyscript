@@ -1,14 +1,11 @@
 use std::borrow::Cow;
 
-use bstr::ByteSlice;
-use logos::Logos;
-
-use crate::{codegen, lexer::Token, parser::parse, vm};
+use crate::{codegen, parser::parse, vm};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
     vm::execute_bytecode_with(&mut output, bytecode).unwrap();
-    output.to_str().unwrap().trim().to_owned()
+    std::str::from_utf8(&output).unwrap().trim().to_owned()
 }
 
 macros::generate_integration_tests! {}
@@ -35,6 +32,9 @@ fn test_fizzbuzz_example() {
 #[test]
 #[cfg(not(miri))]
 fn test_lexer_example() {
+    use logos::Logos;
+
+    use crate::lexer::Token;
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();

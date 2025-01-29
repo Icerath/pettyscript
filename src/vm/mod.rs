@@ -8,8 +8,6 @@ use std::{
     rc::Rc,
 };
 
-use bstr::ByteSlice;
-
 use crate::{
     builtints::{Builtin, MethodBuiltin},
     bytecode::{Op, StrIdent, VERSION},
@@ -61,7 +59,7 @@ where
     let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
     reader.bytes = &reader.bytes[reader.head..];
     reader.head = 0;
-    let consts = &reader.bytes[..len_consts];
+    let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
     reader.bytes = &reader.bytes[len_consts..];
 
     let mut stack = vec![];
@@ -97,11 +95,11 @@ where
                     let Value::String(PettyStr::Literal { ptr, len }) = stack.pop().unwrap() else {
                         panic!()
                     };
-                    builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
+                    builder.push_str(str_literal!(ptr, len));
                     let _ = write!(builder, "{}", DisplayValue { value: &value, consts });
                 }
                 let Value::String(PettyStr::Literal { ptr, len }) = remaining else { panic!() };
-                builder.push_str(str_literal!(ptr, len).as_bstr().to_str().unwrap());
+                builder.push_str(str_literal!(ptr, len));
                 stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
             }
             Op::CreateMap => stack.push(Value::Map(Rc::default())),
@@ -218,9 +216,9 @@ where
                                 PettyStr::Literal { ptr, len } => {
                                     str_literal!(ptr, len)
                                 }
-                                PettyStr::String(ref str) => str.as_bytes(),
+                                PettyStr::String(ref str) => str,
                             };
-                            stdout.write_all(str).unwrap();
+                            stdout.write_all(str.as_bytes()).unwrap();
                             stdout.write_all(b"\n").unwrap();
                             Value::Null
                         }
@@ -229,8 +227,7 @@ where
                             let Value::String(str) = stack.pop().unwrap() else { panic!() };
                             let string = match str {
                                 PettyStr::Literal { ptr, len } => {
-                                    let str = str_literal!(ptr, len).to_str().unwrap();
-                                    std::fs::read_to_string(str).unwrap()
+                                    std::fs::read_to_string(str_literal!(ptr, len)).unwrap()
                                 }
                                 PettyStr::String(str) => std::fs::read_to_string(&**str).unwrap(),
                             };
@@ -258,27 +255,27 @@ where
                         }
                         MethodBuiltin::StrIsAlphabetic(str) => {
                             let str = match &str {
-                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::String(str) => str,
                                 PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
                             };
-                            Value::Bool(str.iter().all(|c| c.is_ascii_alphabetic()))
+                            Value::Bool(str.chars().all(|c| c.is_ascii_alphabetic()))
                         }
                         MethodBuiltin::StrIsDigit(str) => {
                             let str = match &str {
-                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::String(str) => str,
                                 PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
                             };
-                            Value::Bool(str.iter().all(|c| c.is_ascii_digit()))
+                            Value::Bool(str.chars().all(|c| c.is_ascii_digit()))
                         }
                         MethodBuiltin::StrStartsWith(str) => {
                             assert_eq!(numargs, 1);
                             let Value::String(arg) = stack.pop().unwrap() else { panic!() };
                             let arg = match &arg {
-                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::String(str) => str,
                                 PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
                             };
                             let str = match &str {
-                                PettyStr::String(str) => str.as_bytes(),
+                                PettyStr::String(str) => str,
                                 PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
                             };
                             Value::Bool(str.starts_with(arg))
@@ -349,16 +346,16 @@ where
                         }
                         Value::String(PettyStr::String(rhs)) => {
                             let lhs = str_literal!(ptr, len);
-                            lhs == rhs.as_bytes()
+                            lhs == &**rhs
                         }
                         _ => panic!(),
                     },
                     Value::String(PettyStr::String(lhs)) => match rhs {
                         Value::Null => false,
-                        Value::Char(rhs) => str_char_eq(lhs.as_bytes(), rhs),
+                        Value::Char(rhs) => str_char_eq(&lhs, rhs),
                         Value::String(PettyStr::Literal { ptr, len }) => {
                             let rhs = str_literal!(ptr, len);
-                            lhs.as_bytes() == rhs
+                            &**lhs == rhs
                         }
                         Value::String(PettyStr::String(rhs)) => lhs == rhs,
                         _ => panic!("{lhs:?} - {rhs:?}"),
@@ -369,7 +366,7 @@ where
                         Value::String(PettyStr::Literal { ptr, len }) => {
                             str_char_eq(str_literal!(ptr, len), lhs)
                         }
-                        Value::String(PettyStr::String(rhs)) => str_char_eq(rhs.as_bytes(), lhs),
+                        Value::String(PettyStr::String(rhs)) => str_char_eq(&rhs, lhs),
                         _ => panic!(),
                     },
                     val => todo!("{val:?}"),
@@ -412,7 +409,7 @@ where
                         Some(value) => value.clone(),
                         None => panic!(
                             "struct does not contain field: {:?}",
-                            str_literal!(field.ptr, field.len).as_bstr()
+                            str_literal!(field.ptr, field.len)
                         ),
                     },
                     Value::String(str) => load_str_field(consts, str, field),
@@ -506,60 +503,60 @@ where
     Ok(())
 }
 
-fn load_array_field(consts: &[u8], arr: Rc<RefCell<Vec<Value>>>, field: StrIdent) -> Value {
+fn load_array_field(consts: &str, arr: Rc<RefCell<Vec<Value>>>, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
     Value::MethodBuiltin(match field {
-        b"push" => MethodBuiltin::ArrayPush(arr),
-        b"pop" => MethodBuiltin::ArrayPop(arr),
-        _ => panic!("map does not contain field: {}", field.as_bstr()),
+        "push" => MethodBuiltin::ArrayPush(arr),
+        "pop" => MethodBuiltin::ArrayPop(arr),
+        _ => panic!("map does not contain field: {}", field),
     })
 }
 
-fn load_map_field(consts: &[u8], map: Rc<RefCell<PettyMap>>, field: StrIdent) -> Value {
+fn load_map_field(consts: &str, map: Rc<RefCell<PettyMap>>, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
     Value::MethodBuiltin(match field {
-        b"get" => MethodBuiltin::MapGet(map),
-        b"insert" => MethodBuiltin::MapInsert(map),
-        b"remove" => MethodBuiltin::MapRemove(map),
-        _ => panic!("map does not contain field: {}", field.as_bstr()),
+        "get" => MethodBuiltin::MapGet(map),
+        "insert" => MethodBuiltin::MapInsert(map),
+        "remove" => MethodBuiltin::MapRemove(map),
+        _ => panic!("map does not contain field: {}", field),
     })
 }
 
-fn load_char_field(consts: &[u8], char: char, field: StrIdent) -> Value {
+fn load_char_field(consts: &str, char: char, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
     Value::MethodBuiltin(match field {
-        b"is_digit" => MethodBuiltin::CharIsDigit(char),
-        b"is_alphabetic" => MethodBuiltin::CharIsAlphabetic(char),
-        _ => panic!("char does not contain field: {}", field.as_bstr()),
+        "is_digit" => MethodBuiltin::CharIsDigit(char),
+        "is_alphabetic" => MethodBuiltin::CharIsAlphabetic(char),
+        _ => panic!("char does not contain field: {}", field),
     })
 }
 
-fn load_str_field(consts: &[u8], string: PettyStr, field: StrIdent) -> Value {
+fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
     let str = match &string {
         PettyStr::Literal { ptr, len } => &consts[*ptr as usize..*ptr as usize + *len as usize],
-        PettyStr::String(str) => str.as_bytes(),
+        PettyStr::String(str) => str,
     };
     Value::MethodBuiltin(match (field, string.clone()) {
-        (b"len", _) => return Value::Int(str.len() as i64),
-        (b"trim", _) => {
-            let trimmed = Rc::new(std::str::from_utf8(str).unwrap().trim().into());
+        ("len", _) => return Value::Int(str.len() as i64),
+        ("trim", _) => {
+            let trimmed = Rc::new(str.trim().into());
             MethodBuiltin::StrTrim { trimmed }
         }
-        (b"starts_with", str) => MethodBuiltin::StrStartsWith(str),
-        (b"is_digit", str) => MethodBuiltin::StrIsDigit(str),
-        (b"is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
-        _ => panic!("str does not contain field: {}", field.as_bstr()),
+        ("starts_with", str) => MethodBuiltin::StrStartsWith(str),
+        ("is_digit", str) => MethodBuiltin::StrIsDigit(str),
+        ("is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
+        _ => panic!("str does not contain field: {}", field),
     })
 }
 
-fn str_char_eq(str: &[u8], char: char) -> bool {
+fn str_char_eq(str: &str, char: char) -> bool {
     str.len() == char.len_utf8() && str.chars().next().unwrap() == char
 }
 
 #[derive(Clone, Copy)]
 struct DisplayValue<'a, 'b> {
-    consts: &'a [u8],
+    consts: &'a str,
     value: &'b Value,
 }
 
@@ -585,15 +582,14 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 debug_map.finish()
             }
             Value::EnumVariant { name: StrIdent { ptr, len }, .. } => {
-                write!(f, "{}", self.consts[*ptr as usize..*ptr as usize + *len as usize].as_bstr())
+                write!(f, "{}", &self.consts[*ptr as usize..*ptr as usize + *len as usize])
             }
 
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
                 for (i, (key, value)) in fields.borrow().iter().enumerate() {
-                    let key = self.consts[key.ptr as usize..key.ptr as usize + key.len as usize]
-                        .as_bstr();
+                    let key = &self.consts[key.ptr as usize..key.ptr as usize + key.len as usize];
                     let prefix = if i != 0 { "," } else { "" };
                     write!(f, "{prefix} {key}: {}", DisplayValue { value, ..*self })?;
                 }
@@ -612,8 +608,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::String(PettyStr::Literal { ptr, len }) => {
                 let ptr = *ptr as usize;
                 let len = *len as usize;
-                let str = std::str::from_utf8(&self.consts[ptr..ptr + len]).unwrap();
-                write!(f, "{str}")
+                write!(f, "{}", &self.consts[ptr..ptr + len])
             }
             Value::String(PettyStr::String(str)) => write!(f, "{str}"),
             Value::Array(values) => {
