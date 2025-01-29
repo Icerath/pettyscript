@@ -234,8 +234,7 @@ impl Codegen {
                     let ty = self.expr(expr);
                     let expected = self.load_var_type(root);
                     if let (Some(ty), Some(expected)) = (ty, expected) {
-                        // FIXME: Special case null until explicit types are properly supported to allow late initialization.
-                        if *expected != Type::Null && *expected != ty {
+                        if *expected != ty {
                             panic!("Type Error: expected {expected:?}, Got: {ty:?}");
                         }
                     }
