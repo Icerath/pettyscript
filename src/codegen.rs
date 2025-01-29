@@ -44,7 +44,7 @@ pub enum Type {
     Str,
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
     Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
-    Map,
+    Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
     Array(Rc<IncompleteType>),
     Function(Rc<FnSig>),
 }
@@ -55,6 +55,9 @@ impl Type {
         }
         match (self, other) {
             (Self::Array(lhs), Self::Array(rhs)) => lhs.is_complete() || rhs.is_complete(),
+            (Self::Map { key: lk, value: lv }, Self::Map { key: rk, value: rv }) => {
+                (lk.is_complete() || rk.is_complete()) && (lv.is_complete() || rv.is_complete())
+            }
             _ => false,
         }
     }
@@ -71,6 +74,7 @@ impl IncompleteType {
         matches!(self, Self::Complete(_))
     }
 
+    #[track_caller]
     pub fn unwrap_complete(&self) -> Type {
         match self {
             Self::Complete(typ) => typ.clone(),
@@ -117,6 +121,10 @@ impl Codegen {
         scope.named_types.insert("char", Type::Char);
         scope.named_types.insert("null", Type::Null);
         scope.named_types.insert("array", Type::Array(Rc::new(IncompleteType::Generic)));
+        scope.named_types.insert("map", Type::Map {
+            key: Rc::new(IncompleteType::Generic),
+            value: Rc::new(IncompleteType::Generic),
+        });
     }
 
     fn gen_block(&mut self, ast: &[Stmt]) {
@@ -217,7 +225,7 @@ impl Codegen {
                 if let (Some(ty), Some(expected)) = (&ty, &expected) {
                     assert!(ty.matches(expected));
                 }
-                let ty = expected;
+                let ty = if expected.is_some() { expected } else { ty };
                 let offset = self.write_ident_offset(ident, ty);
                 self.builder.insert(Op::Store(offset));
             }
@@ -403,6 +411,17 @@ impl Codegen {
                     self.load_explicit_type(&explicit_typ.generics[0])?,
                 )))
             }
+            Type::Map { key, value } if !key.is_complete() || !value.is_complete() => {
+                assert_eq!(explicit_typ.generics.len(), 2);
+                Type::Map {
+                    key: Rc::new(IncompleteType::Complete(
+                        self.load_explicit_type(&explicit_typ.generics[0])?,
+                    )),
+                    value: Rc::new(IncompleteType::Complete(
+                        self.load_explicit_type(&explicit_typ.generics[1])?,
+                    )),
+                }
+            }
             other => {
                 assert_eq!(explicit_typ.generics.len(), 0);
                 other
@@ -431,14 +450,28 @@ impl Codegen {
             Expr::Literal(literal) => match literal {
                 Literal::Map(map) => {
                     self.builder.insert(Op::CreateMap);
-                    for entry in map {
-                        let [key, value] = entry;
-                        self.expr(key);
-                        self.expr(value);
+                    if map.is_empty() {
+                        return Some(Type::Map {
+                            key: Rc::new(IncompleteType::Generic),
+                            value: Rc::new(IncompleteType::Generic),
+                        });
+                    }
+                    let mut entries = map.iter();
+                    let [key, val] = entries.next().unwrap();
+                    let key_typ = self.expr(key).unwrap();
+                    let val_typ = self.expr(val).unwrap();
+                    self.builder.insert(Op::InsertMap);
+
+                    for [key, val] in entries {
+                        assert_eq!(self.expr(key).unwrap(), key_typ);
+                        assert_eq!(self.expr(val).unwrap(), val_typ);
                         self.builder.insert(Op::InsertMap);
                     }
 
-                    Type::Map
+                    Type::Map {
+                        key: Rc::new(IncompleteType::Complete(key_typ)),
+                        value: Rc::new(IncompleteType::Complete(val_typ)),
+                    }
                 }
                 Literal::Bool(true) => {
                     self.builder.insert(Op::LoadTrue);
@@ -660,10 +693,19 @@ impl Codegen {
                 }
                 _ => panic!("type str does not contain field: {field}"),
             },
-            Type::Map => match field {
-                "insert" => return None,
-                "remove" => return None,
-                "get" => return None,
+            Type::Map { key, value } => match field {
+                "insert" => Type::Function(Rc::new(FnSig {
+                    ret: Type::Null,
+                    args: [key.unwrap_complete(), value.unwrap_complete()].into(),
+                })),
+                "remove" => Type::Function(Rc::new(FnSig {
+                    ret: Type::Null,
+                    args: [key.unwrap_complete()].into(),
+                })),
+                "get" => Type::Function(Rc::new(FnSig {
+                    ret: value.unwrap_complete(),
+                    args: [key.unwrap_complete()].into(),
+                })),
                 _ => panic!("type map does not contain field: {field}"),
             },
             Type::Struct { name, fields } => match fields.get(field) {
