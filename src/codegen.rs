@@ -85,6 +85,7 @@ impl Codegen {
         scope.named_types.insert("bool", Type::Bool);
         scope.named_types.insert("char", Type::Char);
         scope.named_types.insert("null", Type::Null);
+        scope.named_types.insert("array", Type::Array(Rc::new(Type::Null)));
     }
 
     fn gen_block(&mut self, ast: &[Stmt]) {
@@ -361,8 +362,18 @@ impl Codegen {
         }
     }
 
-    fn load_explicit_type(&self, typ: &ExplicitType) -> Option<Type> {
-        self.load_name_type(typ.ident)
+    fn load_explicit_type(&self, explicit_typ: &ExplicitType) -> Option<Type> {
+        let typ = self.load_name_type(explicit_typ.ident)?;
+        Some(match typ {
+            Type::Array(_) => {
+                assert_eq!(explicit_typ.generics.len(), 1);
+                Type::Array(Rc::new(self.load_explicit_type(&explicit_typ.generics[0])?))
+            }
+            other => {
+                assert_eq!(explicit_typ.generics.len(), 0);
+                other
+            }
+        })
     }
 
     fn load(&mut self, ident: &'static str) -> Option<Type> {

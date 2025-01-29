@@ -183,7 +183,7 @@ fn test_maps() {
 fn test_array_literals() {
     // test_expr!(r#"println(f"{[]}")"#, "[]");
     test_expr!(r#"println(f"{[1, 2, 3]}")"#, r#"[1, 2, 3]"#);
-    test_expr!(r#"let arr = [2]; arr.pop(); arr.push(1); println(f"{arr}")"#, "[1]");
+    test_expr!(r#"let arr: array[int] = [2]; arr.pop(); arr.push(1); println(f"{arr}")"#, "[1]");
     test_expr!(r#"let arr = [1]; println(f"{arr.pop()}"); println(f"{arr}");"#, "1\n[]");
 }
 
