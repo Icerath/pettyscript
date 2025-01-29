@@ -46,6 +46,15 @@ pub enum PettyStr {
     String(Rc<Box<str>>),
 }
 
+impl PettyStr {
+    fn as_str<'a>(&'a self, consts: &'a str) -> &'a str {
+        match *self {
+            Self::Literal { ptr, len } => &consts[ptr as usize..ptr as usize + len as usize],
+            Self::String(ref str) => str,
+        }
+    }
+}
+
 /// # Safety
 /// bytecode must have been generated using codegen
 pub unsafe fn execute_bytecode(bytecode: &[u8]) {
@@ -198,25 +207,14 @@ where
                         Builtin::Println => {
                             assert_eq!(numargs, 1);
                             let Value::String(str) = stack.pop().unwrap() else { panic!() };
-                            let str = match str {
-                                PettyStr::Literal { ptr, len } => {
-                                    str_literal!(ptr, len)
-                                }
-                                PettyStr::String(ref str) => str,
-                            };
-                            stdout.write_all(str.as_bytes()).unwrap();
+                            stdout.write_all(str.as_str(consts).as_bytes()).unwrap();
                             stdout.write_all(b"\n").unwrap();
                             Value::Null
                         }
                         Builtin::ReadFile => {
                             assert_eq!(numargs, 1);
                             let Value::String(str) = stack.pop().unwrap() else { panic!() };
-                            let string = match str {
-                                PettyStr::Literal { ptr, len } => {
-                                    std::fs::read_to_string(str_literal!(ptr, len)).unwrap()
-                                }
-                                PettyStr::String(str) => std::fs::read_to_string(&**str).unwrap(),
-                            };
+                            let string = std::fs::read_to_string(str.as_str(consts)).unwrap();
                             Value::String(PettyStr::String(Rc::new(string.into())))
                         }
                         Builtin::Exit => {
@@ -232,30 +230,16 @@ where
                             Value::String(PettyStr::String(trimmed))
                         }
                         MethodBuiltin::StrIsAlphabetic(str) => {
-                            let str = match &str {
-                                PettyStr::String(str) => str,
-                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
-                            };
-                            Value::Bool(str.chars().all(|c| c.is_ascii_alphabetic()))
+                            Value::Bool(str.as_str(consts).chars().all(|c| c.is_ascii_alphabetic()))
                         }
                         MethodBuiltin::StrIsDigit(str) => {
-                            let str = match &str {
-                                PettyStr::String(str) => str,
-                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
-                            };
-                            Value::Bool(str.chars().all(|c| c.is_ascii_digit()))
+                            Value::Bool(str.as_str(consts).chars().all(|c| c.is_ascii_digit()))
                         }
                         MethodBuiltin::StrStartsWith(str) => {
                             assert_eq!(numargs, 1);
                             let Value::String(arg) = stack.pop().unwrap() else { panic!() };
-                            let arg = match &arg {
-                                PettyStr::String(str) => str,
-                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
-                            };
-                            let str = match &str {
-                                PettyStr::String(str) => str,
-                                PettyStr::Literal { ptr, len } => str_literal!(*ptr, *len),
-                            };
+                            let arg = arg.as_str(consts);
+                            let str = str.as_str(consts);
                             Value::Bool(str.starts_with(arg))
                         }
                         MethodBuiltin::MapGet(map) => {
@@ -320,24 +304,9 @@ where
                         Value::Int(rhs) => lhs == rhs,
                         _ => panic!(),
                     },
-                    Value::String(PettyStr::Literal { ptr, len }) => match rhs {
-                        Value::String(PettyStr::Literal { ptr: rhs_ptr, len: rhs_len }) => {
-                            (ptr == rhs_ptr && len == rhs_len)
-                                || str_literal!(ptr, len) == str_literal!(rhs_ptr, rhs_len)
-                        }
-                        Value::String(PettyStr::String(rhs)) => {
-                            let lhs = str_literal!(ptr, len);
-                            lhs == &**rhs
-                        }
+                    Value::String(lhs) => match rhs {
+                        Value::String(rhs) => lhs.as_str(consts) == rhs.as_str(consts),
                         _ => panic!(),
-                    },
-                    Value::String(PettyStr::String(lhs)) => match rhs {
-                        Value::String(PettyStr::Literal { ptr, len }) => {
-                            let rhs = str_literal!(ptr, len);
-                            &**lhs == rhs
-                        }
-                        Value::String(PettyStr::String(rhs)) => lhs == rhs,
-                        _ => panic!("{lhs:?} - {rhs:?}"),
                     },
                     Value::Char(lhs) => match rhs {
                         Value::Char(rhs) => lhs == rhs,
@@ -491,10 +460,7 @@ fn load_char_field(consts: &str, char: char, field: StrIdent) -> Value {
 
 fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
     let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    let str = match &string {
-        PettyStr::Literal { ptr, len } => &consts[*ptr as usize..*ptr as usize + *len as usize],
-        PettyStr::String(str) => str,
-    };
+    let str = string.as_str(consts);
     Value::Callable(Callable::MethodBuiltin(match (field, string.clone()) {
         ("len", _) => return Value::Int(str.len() as i64),
         ("trim", _) => {
@@ -538,7 +504,6 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::EnumVariant { name: StrIdent { ptr, len }, .. } => {
                 write!(f, "{}", &self.consts[*ptr as usize..*ptr as usize + *len as usize])
             }
-
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
@@ -559,12 +524,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::RangeInclusive(range) => {
                 write!(f, "{}..={}", range[0].get(), range[1].get())
             }
-            Value::String(PettyStr::Literal { ptr, len }) => {
-                let ptr = *ptr as usize;
-                let len = *len as usize;
-                write!(f, "{}", &self.consts[ptr..ptr + len])
-            }
-            Value::String(PettyStr::String(str)) => write!(f, "{str}"),
+            Value::String(str) => write!(f, "{}", &str.as_str(self.consts)),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();
                 for value in &*values.borrow() {
