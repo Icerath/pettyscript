@@ -6,7 +6,7 @@ use crate::intern::intern;
 
 #[derive(Debug, Logos, Clone, PartialEq, macros::EnumKind)]
 #[enum_kind(TokenKind)]
-#[logos(skip "//[^\n]*\n")]
+#[logos(skip "//[^\n]*")]
 #[logos(skip "[ \t\r\n]")]
 #[rustfmt::skip]
 pub enum Token {
