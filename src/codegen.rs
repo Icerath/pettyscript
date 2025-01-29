@@ -45,8 +45,38 @@ pub enum Type {
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
     Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>> },
     Map,
-    Array(Rc<Type>),
+    Array(Rc<IncompleteType>),
     Function(Rc<FnSig>),
+}
+impl Type {
+    pub fn matches(&self, other: &Type) -> bool {
+        if self == other {
+            return true;
+        }
+        match (self, other) {
+            (Self::Array(lhs), Self::Array(rhs)) => lhs.is_complete() || rhs.is_complete(),
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum IncompleteType {
+    Complete(Type),
+    Generic,
+}
+
+impl IncompleteType {
+    pub fn is_complete(&self) -> bool {
+        matches!(self, Self::Complete(_))
+    }
+
+    pub fn unwrap_complete(&self) -> Type {
+        match self {
+            Self::Complete(typ) => typ.clone(),
+            Self::Generic => panic!(),
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -85,7 +115,7 @@ impl Codegen {
         scope.named_types.insert("bool", Type::Bool);
         scope.named_types.insert("char", Type::Char);
         scope.named_types.insert("null", Type::Null);
-        scope.named_types.insert("array", Type::Array(Rc::new(Type::Null)));
+        scope.named_types.insert("array", Type::Array(Rc::new(IncompleteType::Generic)));
     }
 
     fn gen_block(&mut self, ast: &[Stmt]) {
@@ -184,8 +214,9 @@ impl Codegen {
                     }
                 };
                 if let (Some(ty), Some(expected)) = (&ty, &expected) {
-                    assert_eq!(ty, expected);
+                    assert!(ty.matches(expected));
                 }
+                let ty = expected;
                 let offset = self.write_ident_offset(ident, ty);
                 self.builder.insert(Op::Store(offset));
             }
@@ -365,9 +396,11 @@ impl Codegen {
     fn load_explicit_type(&self, explicit_typ: &ExplicitType) -> Option<Type> {
         let typ = self.load_name_type(explicit_typ.ident)?;
         Some(match typ {
-            Type::Array(_) => {
+            Type::Array(typ) if *typ == IncompleteType::Generic => {
                 assert_eq!(explicit_typ.generics.len(), 1);
-                Type::Array(Rc::new(self.load_explicit_type(&explicit_typ.generics[0])?))
+                Type::Array(Rc::new(IncompleteType::Complete(
+                    self.load_explicit_type(&explicit_typ.generics[0])?,
+                )))
             }
             other => {
                 assert_eq!(explicit_typ.generics.len(), 0);
@@ -560,19 +593,21 @@ impl Codegen {
                 }
                 return None;
             }
-            Expr::Array(array) => {
+            Expr::Array(array) => 'block: {
                 self.builder.insert(Op::CreateArray);
+
+                if array.is_empty() {
+                    break 'block Type::Array(Rc::new(IncompleteType::Generic));
+                }
                 let mut array_iter = array.iter();
-                let typ = self
-                    .expr(array_iter.next().unwrap_or_else(|| todo!("Empty array literals")))
-                    .unwrap();
+                let typ = self.expr(array_iter.next().unwrap()).unwrap();
                 self.builder.insert(Op::ArrayPush);
                 for expr in array_iter {
                     let next_typ = self.expr(expr);
                     assert_eq!(next_typ.as_ref(), Some(&typ));
                     self.builder.insert(Op::ArrayPush);
                 }
-                Type::Array(Rc::new(typ))
+                Type::Array(Rc::new(IncompleteType::Complete(typ)))
             }
             Expr::Unary { op, expr } => {
                 let typ = self.expr(expr);
@@ -602,7 +637,7 @@ impl Codegen {
                 _ => panic!("Cannot index str with type: {index:?}"),
             },
             Type::Array(of) => match index {
-                Type::Int => (*of).clone(),
+                Type::Int => (*of).clone().unwrap_complete(),
                 _ => panic!("Cannot index Array({of:?}) with type: {index:?}"),
             },
             _ => panic!("Cannot index {container:?}"),
@@ -635,10 +670,14 @@ impl Codegen {
                 None => panic!("struct {name} does not contain field: {field}"),
             },
             Type::Array(of) => match field {
-                "pop" => Type::Function(Rc::new(FnSig { ret: (*of).clone(), args: [].into() })),
-                "push" => {
-                    Type::Function(Rc::new(FnSig { ret: Type::Null, args: [(*of).clone()].into() }))
-                }
+                "pop" => Type::Function(Rc::new(FnSig {
+                    ret: (*of).clone().unwrap_complete(),
+                    args: [].into(),
+                })),
+                "push" => Type::Function(Rc::new(FnSig {
+                    ret: Type::Null,
+                    args: [(*of).clone().unwrap_complete()].into(),
+                })),
                 _ => panic!("type Array({of:?}) does not contain field: {field}"),
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),
