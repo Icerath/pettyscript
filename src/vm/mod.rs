@@ -80,7 +80,24 @@ struct VirtualMachine<'a, W> {
     stdout: W,
 }
 
+macro_rules! impl_pop_helper {
+    ($name: ident, $variant: ident, $typ: ty) => {
+        unsafe fn $name(&mut self) -> $typ {
+            match self.pop_stack() {
+                Value::$variant(inner) => inner,
+                _ => unreachable_unchecked(),
+            }
+        }
+    };
+}
+
 impl<'a, W: Write> VirtualMachine<'a, W> {
+    impl_pop_helper! { pop_int, Int, i64 }
+
+    impl_pop_helper! { pop_bool, Bool, bool }
+
+    impl_pop_helper! { pop_str, String, PettyStr }
+
     fn new(bytecode: &'a [u8], stdout: W) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
@@ -99,11 +116,12 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
-    unsafe fn pop_int(&mut self) -> i64 {
-        match self.stack.pop().unwrap() {
-            Value::Int(int) => int,
-            _ => unreachable_unchecked(),
-        }
+    unsafe fn pop_stack(&mut self) -> Value {
+        Self::partial_pop_stack(&mut self.stack)
+    }
+
+    unsafe fn partial_pop_stack(stack: &mut Vec<Value>) -> Value {
+        stack.pop().unwrap_unchecked()
     }
 
     unsafe fn execute(&mut self) -> io::Result<()> {
@@ -120,12 +138,10 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             match op {
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
-                    let remaining = self.stack.pop().unwrap();
+                    let remaining = self.pop_stack();
                     for _ in 0..num_segments {
-                        let value = self.stack.pop().unwrap();
-                        let Value::String(PettyStr::Literal { ptr, len }) =
-                            self.stack.pop().unwrap()
-                        else {
+                        let value = self.pop_stack();
+                        let Value::String(PettyStr::Literal { ptr, len }) = self.pop_stack() else {
                             panic!()
                         };
                         builder.push_str(str_literal!(ptr, len));
@@ -140,14 +156,14 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 }
                 Op::CreateMap => self.stack.push(Value::Map(Rc::default())),
                 Op::InsertMap => {
-                    let value = self.stack.pop().unwrap();
-                    let key = self.stack.pop().unwrap();
+                    let value = self.pop_stack();
+                    let key = self.pop_stack();
                     let Value::Map(map) = self.stack.last_mut().unwrap() else { panic!() };
                     map.borrow_mut().insert(key, value);
                 }
                 Op::CreateArray => self.stack.push(Value::Array(Rc::default())),
                 Op::ArrayPush => {
-                    let value = self.stack.pop().unwrap();
+                    let value = self.pop_stack();
                     let arr = self.stack.last_mut().unwrap();
                     let Value::Array(arr) = arr else { panic!() };
                     arr.borrow_mut().push(value);
@@ -164,7 +180,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     if offset >= variable_stack.len() {
                         variable_stack.resize_with(offset + 1, || Value::Null);
                     }
-                    variable_stack[offset] = self.stack.pop().unwrap()
+                    variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
                 Op::LoadChar(char) => self.stack.push(Value::Char(char)),
                 Op::LoadInt(int) => self.stack.push(Value::Int(int)),
@@ -172,13 +188,13 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(Value::String(PettyStr::Literal { ptr, len }))
                 }
                 Op::Range => {
-                    let Value::Int(end) = self.stack.pop().unwrap() else { unimplemented!() };
-                    let Value::Int(start) = self.stack.pop().unwrap() else { unimplemented!() };
+                    let end = self.pop_int();
+                    let start = self.pop_int();
                     self.stack.push(Value::Range(Rc::new([Cell::new(start), Cell::new(end)])));
                 }
                 Op::RangeInclusive => {
-                    let Value::Int(end) = self.stack.pop().unwrap() else { unimplemented!() };
-                    let Value::Int(start) = self.stack.pop().unwrap() else { unimplemented!() };
+                    let end = self.pop_int();
+                    let start = self.pop_int();
                     self.stack
                         .push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
                 }
@@ -209,39 +225,30 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     }
                 }
                 Op::CJump(label) => {
-                    let Value::Bool(bool) = self.stack.pop().unwrap() else {
-                        unreachable_unchecked()
-                    };
-                    if !bool {
+                    if !self.pop_bool() {
                         self.head = label as usize;
                     }
                 }
                 Op::FnCall { numargs } => 'fn_call: {
-                    let Value::Callable(callable) = self.stack.pop().unwrap() else { panic!() };
+                    let Value::Callable(callable) = self.pop_stack() else { panic!() };
                     let value = match callable {
                         Callable::Builtin(builtin) => match builtin {
                             Builtin::Assert => {
                                 assert_eq!(numargs, 1);
-                                let Value::Bool(bool) = self.stack.pop().unwrap() else {
-                                    unreachable_unchecked()
-                                };
+                                let bool = self.pop_bool();
                                 assert!(bool, "RUNTIME ASSERTION FAILED");
                                 Value::Bool(bool)
                             }
                             Builtin::Println => {
                                 assert_eq!(numargs, 1);
-                                let Value::String(str) = self.stack.pop().unwrap() else {
-                                    panic!()
-                                };
+                                let Value::String(str) = self.pop_stack() else { panic!() };
                                 self.stdout.write_all(str.as_str(self.consts).as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
                                 Value::Null
                             }
                             Builtin::ReadFile => {
                                 assert_eq!(numargs, 1);
-                                let Value::String(str) = self.stack.pop().unwrap() else {
-                                    panic!()
-                                };
+                                let str = self.pop_str();
                                 let string =
                                     std::fs::read_to_string(str.as_str(self.consts)).unwrap();
                                 Value::String(PettyStr::String(Rc::new(string.into())))
@@ -268,35 +275,33 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                             ),
                             MethodBuiltin::StrStartsWith(str) => {
                                 assert_eq!(numargs, 1);
-                                let Value::String(arg) = self.stack.pop().unwrap() else {
-                                    panic!()
-                                };
+                                let Value::String(arg) = self.pop_stack() else { panic!() };
                                 let arg = arg.as_str(self.consts);
                                 let str = str.as_str(self.consts);
                                 Value::Bool(str.starts_with(arg))
                             }
                             MethodBuiltin::MapGet(map) => {
                                 assert_eq!(numargs, 1);
-                                let key = self.stack.pop().unwrap();
+                                let key = self.pop_stack();
                                 // TODO: Is this the right output for unknown key?
                                 map.borrow().get(&key).cloned().unwrap_or(Value::Null)
                             }
                             MethodBuiltin::MapInsert(map) => {
                                 assert_eq!(numargs, 2);
-                                let value = self.stack.pop().unwrap();
-                                let key = self.stack.pop().unwrap();
+                                let value = self.pop_stack();
+                                let key = self.pop_stack();
                                 map.borrow_mut().insert(key, value);
                                 Value::Null
                             }
                             MethodBuiltin::MapRemove(map) => {
                                 assert_eq!(numargs, 1);
-                                let key = self.stack.pop().unwrap();
+                                let key = self.pop_stack();
                                 map.borrow_mut().remove(&key);
                                 Value::Null
                             }
                             MethodBuiltin::ArrayPush(arr) => {
                                 assert_eq!(numargs, 1);
-                                let value = self.stack.pop().unwrap();
+                                let value = self.pop_stack();
                                 arr.borrow_mut().push(value);
                                 Value::Null
                             }
@@ -316,7 +321,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     };
                     self.stack.push(value);
                 }
-                Op::Pop => _ = self.stack.pop().unwrap(),
+                Op::Pop => _ = self.pop_stack(),
                 Op::Dup => self.stack.push(self.stack.last().unwrap().clone()),
                 Op::Jump(label) => self.head = label as usize,
                 Op::Mod => {
@@ -325,8 +330,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(Value::Int(lhs % rhs));
                 }
                 Op::Eq(tag) => {
-                    let rhs = self.stack.pop().unwrap();
-                    let lhs = self.stack.pop().unwrap();
+                    let rhs = self.pop_stack();
+                    let lhs = self.pop_stack();
                     macro_rules! glue {
                         ($typ: tt) => {{
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
@@ -348,8 +353,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     }
                 }
                 Op::Less(tag) => {
-                    let rhs = self.stack.pop().unwrap();
-                    let lhs = self.stack.pop().unwrap();
+                    let rhs = self.pop_stack();
+                    let lhs = self.pop_stack();
                     macro_rules! glue {
                         ($typ: tt) => {{
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
@@ -371,8 +376,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     }
                 }
                 Op::Greater(tag) => {
-                    let rhs = self.stack.pop().unwrap();
-                    let lhs = self.stack.pop().unwrap();
+                    let rhs = self.pop_stack();
+                    let lhs = self.pop_stack();
                     macro_rules! glue {
                         ($typ: tt) => {{
                             let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
@@ -399,12 +404,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(Value::Int(lhs + rhs));
                 }
                 Op::AddInt => {
-                    let Value::Int(lhs) = self.stack.pop().unwrap() else {
-                        unreachable_unchecked()
-                    };
-                    let Value::Int(rhs) = self.stack.pop().unwrap() else {
-                        unreachable_unchecked()
-                    };
+                    let Value::Int(lhs) = self.pop_stack() else { unreachable_unchecked() };
+                    let Value::Int(rhs) = self.pop_stack() else { unreachable_unchecked() };
                     self.stack.push(Value::Int(lhs + rhs));
                 }
                 Op::LoadTrue => self.stack.push(Value::Bool(true)),
@@ -418,7 +419,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.variable_stacks.pop().unwrap();
                 }
                 Op::StoreField(field) => {
-                    let value = self.stack.pop().unwrap();
+                    let value = self.pop_stack();
                     let Value::Struct { fields } = self.stack.last_mut().unwrap() else {
                         unimplemented!("{:?}", self.stack.last().unwrap())
                     };
@@ -434,7 +435,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 }
                 Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
                 Op::LoadField(field) => {
-                    let value = match self.stack.pop().unwrap() {
+                    let value = match self.pop_stack() {
                         Value::Struct { fields } => match fields.borrow().get(&field) {
                             Some(value) => value.clone(),
                             None => unreachable_unchecked(),
@@ -448,8 +449,8 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(value);
                 }
                 Op::Index => {
-                    let rhs = self.stack.pop().unwrap();
-                    let lhs = self.stack.pop().unwrap();
+                    let rhs = self.pop_stack();
+                    let lhs = self.pop_stack();
                     let value = match lhs {
                         Value::String(PettyStr::String(str)) => match rhs {
                             Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
@@ -489,9 +490,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     self.stack.push(value);
                 }
                 Op::Not => {
-                    let Value::Bool(bool) = self.stack.pop().unwrap() else {
-                        unreachable_unchecked()
-                    };
+                    let bool = self.pop_bool();
                     self.stack.push(Value::Bool(!bool));
                 }
                 Op::Neg => {
