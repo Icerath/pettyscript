@@ -56,6 +56,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::LoadBuiltinField(field) => println!("LOAD_FIELD {}", field as u8),
             Op::StoreField(field) => println!("STORE_FIELD {}", load_ident!(field)),
             Op::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
+            Op::LoadIntSmall(int) => println!("LOAD_INT_SMALL {int}"),
             Op::LoadInt(int) => println!("LOAD_INT {int}"),
             Op::LoadNull => println!("LOAD_NULL"),
             Op::LoadString { ptr, len } => println!("LOAD_STR {ptr} {len}"),

@@ -429,7 +429,7 @@ impl Codegen {
                 let expected = expected.clone().unwrap();
                 let op = match expected {
                     Type::Null => Op::LoadNull,
-                    Type::Int => Op::LoadInt(0),
+                    Type::Int => Op::LoadIntSmall(0),
                     Type::Str => Op::LoadString { ptr: 0, len: 0 },
                     _ => todo!("{expected:?}"),
                 };
@@ -558,7 +558,11 @@ impl Codegen {
                     Type::Char
                 }
                 Literal::Int(int) => {
-                    self.builder.insert(Op::LoadInt(*int));
+                    let op = match (*int).try_into() {
+                        Ok(small) => Op::LoadIntSmall(small),
+                        Err(_) => Op::LoadInt(*int),
+                    };
+                    self.builder.insert(op);
                     Type::Int
                 }
                 Literal::String(string) => {

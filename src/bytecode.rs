@@ -41,6 +41,7 @@ pub enum Op {
     LoadFalse,
     LoadChar(char),
     LoadInt(i64),
+    LoadIntSmall(i16),
     LoadString { ptr: u32, len: u32 },
     Jump(u32),
     CJump(u32),
@@ -118,6 +119,7 @@ macro_rules! impl_from {
 impl_int!(u8);
 impl_int!(u16);
 impl_int!(u32);
+impl_int!(i16);
 impl_int!(i64);
 impl_from!(char, u32);
 impl_from!(Builtin, u16);

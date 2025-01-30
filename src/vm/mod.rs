@@ -203,6 +203,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
                 Op::LoadChar(char) => self.stack.push(Value::Char(char)),
+                Op::LoadIntSmall(int) => self.stack.push(Value::Int(int as i64)),
                 Op::LoadInt(int) => self.stack.push(Value::Int(int)),
                 Op::LoadString { ptr, len } => {
                     self.stack.push(Value::String(PettyStr::Literal { ptr, len }))
