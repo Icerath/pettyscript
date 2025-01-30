@@ -60,9 +60,9 @@ impl Type {
             return true;
         }
         match (self, other) {
-            (Self::Array(lhs), Self::Array(rhs)) => lhs.is_complete() || rhs.is_complete(),
+            (Self::Array(lhs), Self::Array(rhs)) => lhs.is_complete() ^ rhs.is_complete(),
             (Self::Map { key: lk, value: lv }, Self::Map { key: rk, value: rv }) => {
-                (lk.is_complete() || rk.is_complete()) && (lv.is_complete() || rv.is_complete())
+                (lk.is_complete() ^ rk.is_complete()) && (lv.is_complete() ^ rv.is_complete())
             }
             _ => false,
         }
