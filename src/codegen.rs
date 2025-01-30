@@ -577,22 +577,26 @@ impl Codegen {
                     }
                     BinOp::And => {
                         let end_label = self.builder.create_label();
-                        self.expr(&exprs[0]);
+                        let lhs = self.expr(&exprs[0]);
+                        assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
                         self.builder.insert(Op::Dup);
                         self.builder.insert(Op::CJump(end_label));
                         self.builder.insert(Op::Pop);
-                        self.expr(&exprs[1]);
+                        let rhs = self.expr(&exprs[1]);
+                        assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
                         break 'block Type::Bool;
                     }
                     BinOp::Or => {
                         let end_label = self.builder.create_label();
-                        self.expr(&exprs[0]);
+                        let lhs = self.expr(&exprs[0]);
+                        assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
                         self.builder.insert(Op::Dup);
                         self.builder.insert(Op::Not);
                         self.builder.insert(Op::CJump(end_label));
                         self.builder.insert(Op::Pop);
-                        self.expr(&exprs[1]);
+                        let rhs = self.expr(&exprs[1]);
+                        assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
                         break 'block Type::Bool;
                     }
