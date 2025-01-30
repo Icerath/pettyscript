@@ -76,7 +76,7 @@ struct VirtualMachine<'a, W> {
     head: usize,
     stack: Vec<Value>,
     call_stack: Vec<usize>,
-    variable_stacks: Vec<Vec<Value>>,
+    variable_stacks: Vec<Box<[Value]>>,
     stdout: W,
 }
 
@@ -123,10 +123,13 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
 
         let stack = vec![];
         let call_stack = vec![];
-        let mut variable_stacks: Vec<Vec<Value>> = vec![vec![]];
-        variable_stacks[0].extend(Builtin::ALL.map(|b| Value::Callable(Callable::Builtin(b))));
-        variable_stacks[0].resize_with(global_stack_size, || Value::Null);
 
+        let global_scope = Builtin::ALL
+            .map(|b| Value::Callable(Callable::Builtin(b)))
+            .into_iter()
+            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Null))
+            .collect();
+        let variable_stacks: Vec<Box<[Value]>> = vec![global_scope];
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
@@ -144,7 +147,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             match op {
                 Op::SetStackSize(size) => {
                     let stack = self.variable_stacks.last_mut().unwrap_unchecked();
-                    stack.resize_with(size as usize, || Value::Null);
+                    *stack = (0..size).map(|_| Value::Null).collect();
                 }
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
@@ -318,7 +321,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                             }
                         },
                         Callable::Function { label } => {
-                            self.variable_stacks.push(vec![]);
+                            self.variable_stacks.push([].into());
                             let here = self.head;
                             self.call_stack.push(here);
                             self.head = label as usize;
