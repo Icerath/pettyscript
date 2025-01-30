@@ -806,6 +806,7 @@ impl Codegen {
                     ret: Type::Null,
                     args: [(*of).clone().unwrap_complete()].into(),
                 })),
+                "len" => Type::Int,
                 _ => panic!("type Array({of:?}) does not contain field: {field}"),
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),

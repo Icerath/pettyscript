@@ -489,6 +489,7 @@ fn load_array_field(consts: &str, arr: Rc<RefCell<Vec<Value>>>, field: StrIdent)
     Value::Callable(Callable::MethodBuiltin(match field {
         "push" => MethodBuiltin::ArrayPush(arr),
         "pop" => MethodBuiltin::ArrayPop(arr),
+        "len" => return Value::Int(arr.borrow().len() as i64),
         _ => panic!("map does not contain field: {}", field),
     }))
 }
