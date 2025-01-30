@@ -93,6 +93,7 @@ impl IncompleteType {
 struct Variable {
     offset: u32,
     typ: Type,
+    is_const: bool,
 }
 
 #[derive(Debug)]
@@ -134,7 +135,7 @@ fn builtin_type(builtin: Builtin) -> Type {
 impl Codegen {
     fn insert_builtins(&mut self) {
         for builtin in Builtin::ALL {
-            self.write_ident_offset(builtin.name(), builtin_type(builtin));
+            self.write_ident_offset(builtin.name(), builtin_type(builtin), true);
         }
         let scope = self.scopes.first_mut().unwrap();
         // FIXME: Should these types be inserted into the interner?
@@ -156,10 +157,13 @@ impl Codegen {
         }
     }
 
-    fn write_ident_offset(&mut self, ident: &'static str, typ: Type) -> u32 {
+    fn write_ident_offset(&mut self, ident: &'static str, typ: Type, is_const: bool) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
-        let newly_inserted =
-            self.scopes.last_mut().unwrap().variables.insert(ident, Variable { offset, typ });
+        let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, Variable {
+            offset,
+            typ,
+            is_const,
+        });
         assert!(newly_inserted.is_none());
         offset
     }
@@ -192,7 +196,7 @@ impl Codegen {
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
 
-                let offset = self.write_ident_offset(ident, typ);
+                let offset = self.write_ident_offset(ident, typ, true);
                 self.builder.insert(Op::Store(offset));
             }
 
@@ -210,7 +214,7 @@ impl Codegen {
                 }
                 let typ = Type::Function(Rc::new(FnSig { ret: ret.clone(), args: args.into() }));
 
-                let offset = self.write_ident_offset(ident, typ);
+                let offset = self.write_ident_offset(ident, typ, true);
                 let set_stack_size = self.builder.create_function();
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
@@ -220,7 +224,7 @@ impl Codegen {
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
-                    let offset = self.write_ident_offset(ident, typ);
+                    let offset = self.write_ident_offset(ident, typ, false);
                     self.builder.insert(Op::Store(offset));
                 }
                 for stmt in &body.stmts {
@@ -240,31 +244,8 @@ impl Codegen {
 
                 self.builder.insert_label(function_end);
             }
-            Stmt::Let(VarDecl { ident, typ, expr }) | Stmt::Const(VarDecl { ident, typ, expr }) => {
-                let expected = typ.as_ref().map(|typ| {
-                    self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
-                });
-                let ty = match expr {
-                    Some(expr) => self.expr(expr),
-                    None => {
-                        let expected = expected.clone().unwrap();
-                        let op = match expected {
-                            Type::Null => Op::LoadNull,
-                            Type::Int => Op::LoadInt(0),
-                            Type::Str => Op::LoadString { ptr: 0, len: 0 },
-                            _ => todo!("{expected:?}"),
-                        };
-                        self.builder.insert(op);
-                        expected
-                    }
-                };
-                if let Some(expected) = &expected {
-                    assert!(ty.matches(expected));
-                }
-                let ty = if let Some(expected) = expected { expected } else { ty };
-                let offset = self.write_ident_offset(ident, ty);
-                self.builder.insert(Op::Store(offset));
-            }
+            Stmt::Let(var_decl) => self.var_decl(var_decl, false),
+            Stmt::Const(var_decl) => self.var_decl(var_decl, true),
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
                     let ty = self.expr(expr);
@@ -341,7 +322,7 @@ impl Codegen {
                 self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
 
-                let offset = self.write_ident_offset(ident, ident_typ);
+                let offset = self.write_ident_offset(ident, ident_typ, false);
                 self.builder.insert(Op::Store(offset));
 
                 self.scopes.last_mut().unwrap().nfor_loops += 1;
@@ -417,9 +398,39 @@ impl Codegen {
         }
     }
 
+    fn var_decl(&mut self, var_decl: &VarDecl, is_const: bool) {
+        let VarDecl { ident, typ, expr } = var_decl;
+        let expected = typ.as_ref().map(|typ| {
+            self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
+        });
+        let ty = match expr {
+            Some(expr) => self.expr(expr),
+            None => {
+                let expected = expected.clone().unwrap();
+                let op = match expected {
+                    Type::Null => Op::LoadNull,
+                    Type::Int => Op::LoadInt(0),
+                    Type::Str => Op::LoadString { ptr: 0, len: 0 },
+                    _ => todo!("{expected:?}"),
+                };
+                self.builder.insert(op);
+                expected
+            }
+        };
+        if let Some(expected) = &expected {
+            assert!(ty.matches(expected));
+        }
+        let ty = if let Some(expected) = expected { expected } else { ty };
+        let offset = self.write_ident_offset(ident, ty, is_const);
+        self.builder.insert(Op::Store(offset));
+    }
+
     fn store(&mut self, ident: &'static str) {
         match self.scopes.last().unwrap().variables.get(ident) {
-            Some(var) => self.builder.insert(Op::Store(var.offset)),
+            Some(var) => {
+                assert!(!var.is_const);
+                self.builder.insert(Op::Store(var.offset))
+            }
             None => panic!(),
         };
     }
