@@ -269,8 +269,11 @@ impl Codegen {
                     }
                     match last {
                         AssignSegment::Field(field) => {
-                            let expected = self.field_type(segment_type, field);
+                            let Type::Struct { .. } = segment_type.clone() else {
+                                panic!("Cannot store field into type: {segment_type:?}")
+                            };
                             let typ = self.expr(expr);
+                            let expected = self.field_type(segment_type, field);
                             assert_eq!(typ, expected);
                             let field = self.builder.insert_identifer(field);
                             self.builder.insert(Op::StoreField(field));
