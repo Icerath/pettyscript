@@ -14,7 +14,8 @@ use crate::{
 pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     let mut codegen = Codegen::default();
 
-    codegen.scopes.push(FunctionScope::default());
+    // return type doesn't matter
+    codegen.scopes.push(FunctionScope::new(Type::Null));
     codegen.insert_builtins();
     for node in ast {
         codegen.r#gen(node);
@@ -88,12 +89,25 @@ impl IncompleteType {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct FunctionScope {
+    ret: Type,
     variables: FxHashMap<&'static str, u32>,
     var_types: FxHashMap<&'static str, Type>,
     named_types: FxHashMap<&'static str, Type>,
     nfor_loops: usize,
+}
+
+impl FunctionScope {
+    fn new(ret: Type) -> Self {
+        Self {
+            ret,
+            variables: Default::default(),
+            var_types: Default::default(),
+            named_types: Default::default(),
+            nfor_loops: Default::default(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -198,7 +212,7 @@ impl Codegen {
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 
-                self.scopes.push(FunctionScope::default());
+                self.scopes.push(FunctionScope::new(ret.clone()));
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
@@ -374,12 +388,19 @@ impl Codegen {
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
             Stmt::Return(Return(expr)) => {
-                if let Some(expr) = expr {
-                    self.expr(expr);
+                let typ = if let Some(expr) = expr {
+                    self.expr(expr)
                 } else {
                     self.builder.insert(Op::LoadNull);
-                }
-                for _ in 0..self.scopes.last().unwrap().nfor_loops {
+                    Type::Null
+                };
+                let scope = self.scopes.last().unwrap();
+                assert!(
+                    scope.ret == typ,
+                    "Tried to return {typ:?} from function returning: {:?}",
+                    scope.ret
+                );
+                for _ in 0..scope.nfor_loops {
                     self.builder.insert(Op::Pop);
                 }
                 self.builder.insert(Op::Ret);
