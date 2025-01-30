@@ -21,8 +21,8 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
         codegen.r#gen(node);
     }
 
-    if let Some(&offset) = codegen.scopes.last().unwrap().variables.get("main") {
-        codegen.builder.insert(Op::Load(offset));
+    if let Some(var) = codegen.scopes.last().unwrap().variables.get("main") {
+        codegen.builder.insert(Op::Load(var.offset));
         codegen.builder.insert(Op::FnCall { numargs: 0 });
         codegen.builder.insert(Op::Pop);
     }
@@ -90,10 +90,15 @@ impl IncompleteType {
 }
 
 #[derive(Debug)]
+struct Variable {
+    offset: u32,
+    typ: Type,
+}
+
+#[derive(Debug)]
 struct FunctionScope {
     ret: Type,
-    variables: FxHashMap<&'static str, u32>,
-    var_types: FxHashMap<&'static str, Type>,
+    variables: FxHashMap<&'static str, Variable>,
     named_types: FxHashMap<&'static str, Type>,
     nfor_loops: usize,
 }
@@ -103,7 +108,6 @@ impl FunctionScope {
         Self {
             ret,
             variables: Default::default(),
-            var_types: Default::default(),
             named_types: Default::default(),
             nfor_loops: Default::default(),
         }
@@ -152,10 +156,10 @@ impl Codegen {
         }
     }
 
-    fn write_ident_offset(&mut self, ident: &'static str, ty: Type) -> u32 {
+    fn write_ident_offset(&mut self, ident: &'static str, typ: Type) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
-        let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, offset);
-        self.scopes.last_mut().unwrap().var_types.insert(ident, ty);
+        let newly_inserted =
+            self.scopes.last_mut().unwrap().variables.insert(ident, Variable { offset, typ });
         assert!(newly_inserted.is_none());
         offset
     }
@@ -415,19 +419,16 @@ impl Codegen {
 
     fn store(&mut self, ident: &'static str) {
         match self.scopes.last().unwrap().variables.get(ident) {
-            Some(&offset) => self.builder.insert(Op::Store(offset)),
+            Some(var) => self.builder.insert(Op::Store(var.offset)),
             None => panic!(),
         };
     }
 
     #[must_use]
     fn load_var_type(&self, ident: &'static str) -> &Type {
-        match self.scopes.last().unwrap().var_types.get(ident) {
-            Some(ty) => ty,
-            None => {
-                let scope = self.scopes.first().unwrap();
-                scope.var_types.get(ident).unwrap()
-            }
+        match self.scopes.last().unwrap().variables.get(ident) {
+            Some(var) => &var.typ,
+            None => &self.scopes.first().unwrap().variables.get(ident).unwrap().typ,
         }
     }
 
@@ -470,16 +471,16 @@ impl Codegen {
     #[must_use]
     fn load(&mut self, ident: &'static str) -> Type {
         match self.scopes.last().unwrap().variables.get(ident) {
-            Some(&offset) => {
-                self.builder.insert(Op::Load(offset));
-                self.scopes.last().unwrap().var_types.get(ident).unwrap().clone()
+            Some(var) => {
+                self.builder.insert(Op::Load(var.offset));
+                var.typ.clone()
             }
             None => {
                 let scope = self.scopes.first().unwrap();
-                let offset =
-                    *scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
-                self.builder.insert(Op::LoadGlobal(offset));
-                scope.var_types.get(ident).unwrap().clone()
+                let var =
+                    scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
+                self.builder.insert(Op::LoadGlobal(var.offset));
+                var.typ.clone()
             }
         }
     }
