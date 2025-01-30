@@ -530,7 +530,8 @@ impl Codegen {
                     for (str, expr) in &fstring.segments {
                         let [ptr, len] = self.builder.insert_string(str);
                         self.builder.insert(Op::LoadString { ptr, len });
-                        self.expr(expr);
+                        // TODO: Will need to somehow specify these types to the vm
+                        let _ = self.expr(expr);
                     }
                     let [ptr, len] = self.builder.insert_string(fstring.remaining);
                     self.builder.insert(Op::LoadString { ptr, len });
