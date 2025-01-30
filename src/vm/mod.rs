@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::{
-    builtints::{Builtin, MethodBuiltin},
+    builtints::{Builtin, BuiltinField, MethodBuiltin},
     bytecode::{EqTag, Op, StrIdent, VERSION},
 };
 
@@ -97,7 +97,13 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
 
     impl_pop_helper! { pop_bool, Bool, bool }
 
+    impl_pop_helper! { pop_char, Char, char }
+
     impl_pop_helper! { pop_str, String, PettyStr }
+
+    impl_pop_helper! { pop_arr, Array, Rc<RefCell<Vec<Value>>> }
+
+    impl_pop_helper! { pop_map, Map, Rc<RefCell<PettyMap>> }
 
     unsafe fn pop_stack(&mut self) -> Value {
         Self::partial_pop_stack(&mut self.stack)
@@ -375,7 +381,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::StoreField(field) => {
                     let value = self.pop_stack();
                     let Value::Struct { fields } = self.stack.last_mut().unwrap() else {
-                        unimplemented!("{:?}", self.stack.last().unwrap())
+                        unreachable_unchecked()
                     };
                     fields.borrow_mut().insert(field, value);
                 }
@@ -388,17 +394,40 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         .insert(variant, Value::EnumVariant { name: variant, key: 0 });
                 }
                 Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
+                Op::LoadBuiltinField(field) => {
+                    use BuiltinField as B;
+                    let val = match field {
+                        B::StrLen => Value::Int(self.pop_str().as_str(self.consts).len() as i64),
+                        B::StrIsAlphabetic => MethodBuiltin::StrIsAlphabetic(self.pop_str()).into(),
+                        B::StrIsDigit => MethodBuiltin::StrIsDigit(self.pop_str()).into(),
+                        B::StrStartsWith => MethodBuiltin::StrStartsWith(self.pop_str()).into(),
+                        B::StrTrim => MethodBuiltin::StrTrim {
+                            trimmed: Rc::new(self.pop_str().as_str(self.consts).trim().into()),
+                        }
+                        .into(),
+
+                        B::CharIsDigit => MethodBuiltin::CharIsDigit(self.pop_char()).into(),
+                        B::CharIsAlphabetic => {
+                            MethodBuiltin::CharIsAlphabetic(self.pop_char()).into()
+                        }
+
+                        B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
+                        B::ArrayPush => MethodBuiltin::ArrayPush(self.pop_arr()).into(),
+                        B::ArrayPop => MethodBuiltin::ArrayPop(self.pop_arr()).into(),
+
+                        B::MapGet => MethodBuiltin::MapGet(self.pop_map()).into(),
+                        B::MapInsert => MethodBuiltin::MapInsert(self.pop_map()).into(),
+                        B::MapRemove => MethodBuiltin::MapRemove(self.pop_map()).into(),
+                    };
+                    self.stack.push(val);
+                }
                 Op::LoadField(field) => {
-                    let value = match self.pop_stack() {
-                        Value::Struct { fields } => match fields.borrow().get(&field) {
-                            Some(value) => value.clone(),
-                            None => unreachable_unchecked(),
-                        },
-                        Value::String(str) => load_str_field(self.consts, str, field),
-                        Value::Char(char) => load_char_field(self.consts, char, field),
-                        Value::Map(map) => load_map_field(self.consts, map, field),
-                        Value::Array(arr) => load_array_field(self.consts, arr, field),
-                        other => panic!("{other:?}"),
+                    let Value::Struct { fields } = self.pop_stack() else {
+                        unreachable_unchecked()
+                    };
+                    let value = match fields.borrow().get(&field) {
+                        Some(value) => value.clone(),
+                        None => unreachable_unchecked(),
                     };
                     self.stack.push(value);
                 }
@@ -477,51 +506,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             }
         }
     }
-}
-
-fn load_array_field(consts: &str, arr: Rc<RefCell<Vec<Value>>>, field: StrIdent) -> Value {
-    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::Callable(Callable::MethodBuiltin(match field {
-        "push" => MethodBuiltin::ArrayPush(arr),
-        "pop" => MethodBuiltin::ArrayPop(arr),
-        "len" => return Value::Int(arr.borrow().len() as i64),
-        _ => panic!("map does not contain field: {}", field),
-    }))
-}
-
-fn load_map_field(consts: &str, map: Rc<RefCell<PettyMap>>, field: StrIdent) -> Value {
-    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::Callable(Callable::MethodBuiltin(match field {
-        "get" => MethodBuiltin::MapGet(map),
-        "insert" => MethodBuiltin::MapInsert(map),
-        "remove" => MethodBuiltin::MapRemove(map),
-        _ => panic!("map does not contain field: {}", field),
-    }))
-}
-
-fn load_char_field(consts: &str, char: char, field: StrIdent) -> Value {
-    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    Value::Callable(Callable::MethodBuiltin(match field {
-        "is_digit" => MethodBuiltin::CharIsDigit(char),
-        "is_alphabetic" => MethodBuiltin::CharIsAlphabetic(char),
-        _ => panic!("char does not contain field: {}", field),
-    }))
-}
-
-fn load_str_field(consts: &str, string: PettyStr, field: StrIdent) -> Value {
-    let field = &consts[field.ptr as usize..field.ptr as usize + field.len as usize];
-    let str = string.as_str(consts);
-    Value::Callable(Callable::MethodBuiltin(match (field, string.clone()) {
-        ("len", _) => return Value::Int(str.len() as i64),
-        ("trim", _) => {
-            let trimmed = Rc::new(str.trim().into());
-            MethodBuiltin::StrTrim { trimmed }
-        }
-        ("starts_with", str) => MethodBuiltin::StrStartsWith(str),
-        ("is_digit", str) => MethodBuiltin::StrIsDigit(str),
-        ("is_alphabetic", str) => MethodBuiltin::StrIsAlphabetic(str),
-        _ => panic!("str does not contain field: {}", field),
-    }))
 }
 
 #[derive(Clone, Copy)]

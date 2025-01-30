@@ -6,8 +6,8 @@ use std::{
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    builtints::Builtin,
-    bytecode::{BytecodeBuilder, EqTag, Op},
+    builtints::{Builtin, BuiltinField},
+    bytecode::{BytecodeBuilder, EqTag, Op, StrIdent},
     parser::*,
 };
 
@@ -66,6 +66,23 @@ impl Type {
             }
             _ => false,
         }
+    }
+}
+
+enum LoadField {
+    Builtin(BuiltinField),
+    StructField(StrIdent),
+}
+
+impl From<StrIdent> for LoadField {
+    fn from(value: StrIdent) -> Self {
+        Self::StructField(value)
+    }
+}
+
+impl From<BuiltinField> for LoadField {
+    fn from(value: BuiltinField) -> Self {
+        Self::Builtin(value)
     }
 }
 
@@ -261,9 +278,9 @@ impl Codegen {
                         match segment {
                             AssignSegment::Index(_) => todo!(),
                             AssignSegment::Field(field) => {
-                                segment_type = self.field_type(segment_type, field);
-                                let field = self.builder.insert_identifer(field);
-                                self.builder.insert(Op::LoadField(field));
+                                let (load_field, field_typ) = self.load_field(segment_type, field);
+                                segment_type = field_typ;
+                                self.insert_load_field(load_field);
                             }
                         }
                     }
@@ -273,7 +290,7 @@ impl Codegen {
                                 panic!("Cannot store field into type: {segment_type:?}")
                             };
                             let typ = self.expr(expr);
-                            let expected = self.field_type(segment_type, field);
+                            let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
                             let field = self.builder.insert_identifer(field);
                             self.builder.insert(Op::StoreField(field));
@@ -667,9 +684,9 @@ impl Codegen {
             }
             Expr::FieldAccess { expr, field } => {
                 let typ = self.expr(expr);
-                let field_ident = self.builder.insert_identifer(field);
-                self.builder.insert(Op::LoadField(field_ident));
-                self.field_type(typ, field)
+                let (load_field, typ) = self.load_field(typ.clone(), field);
+                self.insert_load_field(load_field);
+                typ
             }
             Expr::Index { expr, index } => {
                 let container_typ = self.expr(expr);
@@ -762,61 +779,104 @@ impl Codegen {
         }
     }
 
-    fn field_type(&self, typ: Type, field: &str) -> Type {
-        match typ {
-            Type::Enum { fields, id, .. } if fields.contains(field) => Type::EnumVariant { id },
+    fn insert_load_field(&mut self, load_field: LoadField) {
+        match load_field {
+            LoadField::Builtin(builtin) => self.builder.insert(Op::LoadBuiltinField(builtin)),
+            LoadField::StructField(field) => self.builder.insert(Op::LoadField(field)),
+        }
+    }
+
+    fn load_field(&mut self, typ: Type, field: &'static str) -> (LoadField, Type) {
+        macro_rules! ident {
+            () => {
+                LoadField::StructField({ self.builder.insert_identifer(field) })
+            };
+        }
+        use BuiltinField::*;
+
+        let (builtin_field, typ) = match typ {
+            Type::Enum { fields, id, .. } if fields.contains(field) => {
+                return (ident!(), Type::EnumVariant { id });
+            }
+            Type::Struct { name, fields } => match fields.get(field) {
+                Some(field_type) => return (ident!(), field_type.clone()),
+                None => panic!("struct {name} does not contain field: {field}"),
+            },
             Type::Str => match field {
-                "len" => Type::Int,
-                "trim" => Type::Function(Rc::new(FnSig { ret: Type::Str, args: [].into() })),
-                "starts_with" => {
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [Type::Str].into() }))
+                "len" => (StrLen, Type::Int),
+                "trim" => {
+                    (StrTrim, Type::Function(Rc::new(FnSig { ret: Type::Str, args: [].into() })))
                 }
-                "is_digit" => Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                "is_alphabetic" => {
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() }))
-                }
+                "starts_with" => (
+                    StrStartsWith,
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [Type::Str].into() })),
+                ),
+                "is_digit" => (
+                    StrIsDigit,
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                ),
+                "is_alphabetic" => (
+                    StrIsAlphabetic,
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                ),
                 _ => panic!("type str does not contain field: {field}"),
             },
             Type::Char => match field {
-                "is_digit" => Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                "is_alphabetic" => {
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() }))
-                }
+                "is_digit" => (
+                    CharIsDigit,
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                ),
+                "is_alphabetic" => (
+                    CharIsAlphabetic,
+                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
+                ),
                 _ => panic!("type char does not contain field: {field}"),
             },
             Type::Map { key, value } => match field {
-                "insert" => Type::Function(Rc::new(FnSig {
-                    ret: Type::Null,
-                    args: [key.unwrap_complete(), value.unwrap_complete()].into(),
-                })),
-                "remove" => Type::Function(Rc::new(FnSig {
-                    ret: Type::Null,
-                    args: [key.unwrap_complete()].into(),
-                })),
-                "get" => Type::Function(Rc::new(FnSig {
-                    ret: value.unwrap_complete(),
-                    args: [key.unwrap_complete()].into(),
-                })),
+                "insert" => (
+                    MapInsert,
+                    Type::Function(Rc::new(FnSig {
+                        ret: Type::Null,
+                        args: [key.unwrap_complete(), value.unwrap_complete()].into(),
+                    })),
+                ),
+                "remove" => (
+                    MapRemove,
+                    Type::Function(Rc::new(FnSig {
+                        ret: Type::Null,
+                        args: [key.unwrap_complete()].into(),
+                    })),
+                ),
+                "get" => (
+                    MapGet,
+                    Type::Function(Rc::new(FnSig {
+                        ret: value.unwrap_complete(),
+                        args: [key.unwrap_complete()].into(),
+                    })),
+                ),
                 _ => panic!("type map does not contain field: {field}"),
             },
-            Type::Struct { name, fields } => match fields.get(field) {
-                Some(field_type) => field_type.clone(),
-                None => panic!("struct {name} does not contain field: {field}"),
-            },
             Type::Array(of) => match field {
-                "pop" => Type::Function(Rc::new(FnSig {
-                    ret: (*of).clone().unwrap_complete(),
-                    args: [].into(),
-                })),
-                "push" => Type::Function(Rc::new(FnSig {
-                    ret: Type::Null,
-                    args: [(*of).clone().unwrap_complete()].into(),
-                })),
-                "len" => Type::Int,
+                "pop" => (
+                    ArrayPop,
+                    Type::Function(Rc::new(FnSig {
+                        ret: (*of).clone().unwrap_complete(),
+                        args: [].into(),
+                    })),
+                ),
+                "push" => (
+                    ArrayPush,
+                    Type::Function(Rc::new(FnSig {
+                        ret: Type::Null,
+                        args: [(*of).clone().unwrap_complete()].into(),
+                    })),
+                ),
+                "len" => (ArrayLen, Type::Int),
                 _ => panic!("type Array({of:?}) does not contain field: {field}"),
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),
-        }
+        };
+        (builtin_field.into(), typ)
     }
 
     fn finish(self) -> Vec<u8> {
