@@ -27,7 +27,6 @@ pub enum Op {
     Eq(EqTag),
     Greater(EqTag),
     Less(EqTag),
-    Add,
     Range,
     RangeInclusive,
     LoadNull,

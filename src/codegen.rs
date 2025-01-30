@@ -566,7 +566,14 @@ impl Codegen {
                     BinOp::Range => Op::Range,
                     BinOp::RangeInclusive => Op::RangeInclusive,
                     BinOp::Mod => Op::Mod,
-                    BinOp::Add => Op::Add,
+                    BinOp::Add => {
+                        let lhs = self.expr(&exprs[0]);
+                        let rhs = self.expr(&exprs[1]);
+                        assert_eq!(lhs, Type::Int);
+                        assert_eq!(rhs, Type::Int);
+                        self.builder.insert(Op::AddInt);
+                        break 'block Type::Int;
+                    }
                     BinOp::Eq => {
                         let lhs = self.expr(&exprs[0]);
                         let rhs = self.expr(&exprs[1]);
@@ -633,11 +640,7 @@ impl Codegen {
                     (lhs, rhs, _) if lhs == rhs => lhs,
                     (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
                 };
-                if op == Op::Add && typ == Type::Int {
-                    self.builder.insert(Op::AddInt);
-                } else {
-                    self.builder.insert(op);
-                }
+                self.builder.insert(op);
                 typ
             }
             Expr::FnCall { function, args } => {

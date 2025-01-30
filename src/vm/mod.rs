@@ -354,11 +354,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let is_greater = self.cmp(tag) == Ordering::Equal;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Add => {
-                    let rhs = self.pop_int();
-                    let lhs = self.pop_int();
-                    self.stack.push(Value::Int(lhs + rhs));
-                }
                 Op::AddInt => {
                     let Value::Int(lhs) = self.pop_stack() else { unreachable_unchecked() };
                     let Value::Int(rhs) = self.pop_stack() else { unreachable_unchecked() };
