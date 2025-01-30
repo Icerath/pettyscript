@@ -179,10 +179,15 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     arr.borrow_mut().push(value);
                 }
                 Op::LoadGlobal(offset) => {
-                    self.stack.push(self.variable_stacks[0][offset as usize].clone())
+                    unsafe { assert_unchecked(!self.variable_stacks.is_empty()) };
+                    let stack = &self.variable_stacks[0];
+                    unsafe { assert_unchecked((offset as usize) < stack.len()) };
+                    self.stack.push(stack[offset as usize].clone());
                 }
                 Op::Load(offset) => {
-                    self.stack.push(self.variable_stacks.last().unwrap()[offset as usize].clone())
+                    let stack = self.variable_stacks.last().unwrap_unchecked();
+                    unsafe { assert_unchecked((offset as usize) < stack.len()) };
+                    self.stack.push(stack[offset as usize].clone())
                 }
                 Op::Store(offset) => {
                     let offset = offset as usize;
