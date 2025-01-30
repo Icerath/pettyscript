@@ -420,6 +420,7 @@ impl Codegen {
         };
     }
 
+    #[must_use]
     fn load_var_type(&self, ident: &'static str) -> &Type {
         match self.scopes.last().unwrap().var_types.get(ident) {
             Some(ty) => ty,
@@ -430,6 +431,7 @@ impl Codegen {
         }
     }
 
+    #[must_use]
     fn load_name_type(&self, type_name: &'static str) -> Option<Type> {
         match self.scopes.last().unwrap().named_types.get(type_name) {
             Some(typ) => Some(typ.clone()),
@@ -437,6 +439,7 @@ impl Codegen {
         }
     }
 
+    #[must_use]
     fn load_explicit_type(&self, explicit_typ: &ExplicitType) -> Option<Type> {
         let typ = self.load_name_type(explicit_typ.ident)?;
         Some(match typ {
@@ -464,6 +467,7 @@ impl Codegen {
         })
     }
 
+    #[must_use]
     fn load(&mut self, ident: &'static str) -> Type {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(&offset) => {
