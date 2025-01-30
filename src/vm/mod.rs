@@ -394,33 +394,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         .insert(variant, Value::EnumVariant { name: variant, key: 0 });
                 }
                 Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
-                Op::LoadBuiltinField(field) => {
-                    use BuiltinField as B;
-                    let val = match field {
-                        B::StrLen => Value::Int(self.pop_str().as_str(self.consts).len() as i64),
-                        B::StrIsAlphabetic => MethodBuiltin::StrIsAlphabetic(self.pop_str()).into(),
-                        B::StrIsDigit => MethodBuiltin::StrIsDigit(self.pop_str()).into(),
-                        B::StrStartsWith => MethodBuiltin::StrStartsWith(self.pop_str()).into(),
-                        B::StrTrim => MethodBuiltin::StrTrim {
-                            trimmed: Rc::new(self.pop_str().as_str(self.consts).trim().into()),
-                        }
-                        .into(),
-
-                        B::CharIsDigit => MethodBuiltin::CharIsDigit(self.pop_char()).into(),
-                        B::CharIsAlphabetic => {
-                            MethodBuiltin::CharIsAlphabetic(self.pop_char()).into()
-                        }
-
-                        B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
-                        B::ArrayPush => MethodBuiltin::ArrayPush(self.pop_arr()).into(),
-                        B::ArrayPop => MethodBuiltin::ArrayPop(self.pop_arr()).into(),
-
-                        B::MapGet => MethodBuiltin::MapGet(self.pop_map()).into(),
-                        B::MapInsert => MethodBuiltin::MapInsert(self.pop_map()).into(),
-                        B::MapRemove => MethodBuiltin::MapRemove(self.pop_map()).into(),
-                    };
-                    self.stack.push(val);
-                }
+                Op::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Op::LoadField(field) => {
                     let Value::Struct { fields } = self.pop_stack() else {
                         unreachable_unchecked()
@@ -505,6 +479,32 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 lhs.as_str(self.consts).cmp(rhs.as_str(self.consts))
             }
         }
+    }
+
+    unsafe fn load_builtin_field(&mut self, field: BuiltinField) {
+        use BuiltinField as B;
+        let val = match field {
+            B::StrLen => Value::Int(self.pop_str().as_str(self.consts).len() as i64),
+            B::StrIsAlphabetic => MethodBuiltin::StrIsAlphabetic(self.pop_str()).into(),
+            B::StrIsDigit => MethodBuiltin::StrIsDigit(self.pop_str()).into(),
+            B::StrStartsWith => MethodBuiltin::StrStartsWith(self.pop_str()).into(),
+            B::StrTrim => MethodBuiltin::StrTrim {
+                trimmed: Rc::new(self.pop_str().as_str(self.consts).trim().into()),
+            }
+            .into(),
+
+            B::CharIsDigit => MethodBuiltin::CharIsDigit(self.pop_char()).into(),
+            B::CharIsAlphabetic => MethodBuiltin::CharIsAlphabetic(self.pop_char()).into(),
+
+            B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
+            B::ArrayPush => MethodBuiltin::ArrayPush(self.pop_arr()).into(),
+            B::ArrayPop => MethodBuiltin::ArrayPop(self.pop_arr()).into(),
+
+            B::MapGet => MethodBuiltin::MapGet(self.pop_map()).into(),
+            B::MapInsert => MethodBuiltin::MapInsert(self.pop_map()).into(),
+            B::MapRemove => MethodBuiltin::MapRemove(self.pop_map()).into(),
+        };
+        self.stack.push(val);
     }
 }
 
