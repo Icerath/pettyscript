@@ -146,6 +146,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             let op = Op::bc_read(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
+                Op::Abort => panic!("ABORTING"),
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
                     let remaining = self.pop_stack();

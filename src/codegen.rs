@@ -190,7 +190,7 @@ impl Codegen {
                     let typ = self.load_explicit_type(typ).unwrap();
                     args.push(typ);
                 }
-                let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));
+                let typ = Type::Function(Rc::new(FnSig { ret: ret.clone(), args: args.into() }));
 
                 let offset = self.write_ident_offset(ident, typ);
                 let set_stack_size = self.builder.create_function();
@@ -212,8 +212,13 @@ impl Codegen {
                 self.builder.set_function_stack_size(set_stack_size, num_scope_vars as u16);
                 self.scopes.pop().unwrap();
 
-                self.builder.insert(Op::LoadNull);
-                self.builder.insert(Op::Ret);
+                if ret == Type::Null {
+                    self.builder.insert(Op::LoadNull);
+                    self.builder.insert(Op::Ret);
+                } else {
+                    // FIXME: Instead produce a compile error when this is possible
+                    self.builder.insert(Op::Abort);
+                }
 
                 self.builder.insert_label(function_end);
             }

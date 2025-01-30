@@ -15,6 +15,7 @@ pub struct StrIdent {
 #[enum_kind(OpCode)]
 #[repr(u8)]
 pub enum Op {
+    Abort,
     BuildFstr { num_segments: u16 },
     AddInt,
     EmptyStruct,
