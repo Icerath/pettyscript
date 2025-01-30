@@ -476,6 +476,7 @@ impl Codegen {
         }
     }
 
+    #[must_use]
     fn expr(&mut self, expr: &Expr) -> Type {
         match expr {
             Expr::Literal(literal) => match literal {
