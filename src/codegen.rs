@@ -179,8 +179,8 @@ impl Codegen {
                     fields: Rc::new(variants.iter().copied().collect()),
                     id,
                 };
-                self.scopes.last_mut().unwrap().named_types.insert(ident, typ.clone());
 
+                self.scopes.last_mut().unwrap().named_types.insert(ident, Type::EnumVariant { id });
                 self.builder.insert(Op::EmptyStruct);
 
                 for variant in variants {
