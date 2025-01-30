@@ -114,6 +114,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
         assert_eq!(version, VERSION);
+        let global_stack_size = u32::from_le_bytes(*reader.read::<4>()) as usize;
 
         let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
         reader.bytes = &reader.bytes[reader.head..];
@@ -124,6 +125,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         let call_stack = vec![];
         let mut variable_stacks: Vec<Vec<Value>> = vec![vec![]];
         variable_stacks[0].extend(Builtin::ALL.map(|b| Value::Callable(Callable::Builtin(b))));
+        variable_stacks[0].resize_with(global_stack_size, || Value::Null);
 
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }

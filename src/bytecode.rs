@@ -138,6 +138,7 @@ impl BcWrite for StrIdent {
 
 #[derive(Default)]
 pub struct BytecodeBuilder {
+    global_scope_size: u32,
     string_map: FxHashMap<&'static str, u32>,
     string_data: Vec<u8>,
     instruction_data: Vec<u8>,
@@ -146,6 +147,10 @@ pub struct BytecodeBuilder {
 }
 
 impl BytecodeBuilder {
+    pub fn set_global_stack_size(&mut self, size: u32) {
+        self.global_scope_size = size;
+    }
+
     pub fn create_label(&mut self) -> u32 {
         let x = self.labels.len() as u32;
         self.labels.push(u32::MAX);
@@ -203,6 +208,7 @@ impl BytecodeBuilder {
         }
         let mut output = vec![];
         output.extend(VERSION.to_le_bytes());
+        output.extend(self.global_scope_size.to_le_bytes());
         let string_data_len: u32 = self.string_data.len().try_into().unwrap();
         output.extend(string_data_len.to_le_bytes());
         output.extend_from_slice(&self.string_data);
