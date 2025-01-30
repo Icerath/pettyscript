@@ -410,31 +410,16 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let rhs = self.pop_stack();
                     let lhs = self.pop_stack();
                     let value = match lhs {
-                        Value::String(PettyStr::String(str)) => match rhs {
-                            Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
-                            Value::RangeInclusive(_) => todo!(),
-                            Value::Range(range) => {
-                                let [start, end] = &*range;
-                                Value::String(PettyStr::String(Rc::new(
-                                    str[start.get() as usize..end.get() as usize].into(),
-                                )))
-                            }
-                            _ => panic!("{rhs:?}"),
-                        },
-                        Value::String(PettyStr::Literal { ptr, len }) => {
-                            let str = &str_literal!(ptr, len);
+                        Value::String(str) => {
+                            let str = str.as_str(self.consts);
                             match rhs {
                                 Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                                 Value::RangeInclusive(_) => todo!(),
                                 Value::Range(range) => {
-                                    let range_start: u32 = range[0].get().try_into().unwrap();
-                                    let range_len: u32 = range[1].get().try_into().unwrap();
-                                    let new = &str[range_start as usize..range_len as usize];
-                                    let ptr_diff = new.as_ptr().addr() - str.as_ptr().addr();
-                                    Value::String(PettyStr::Literal {
-                                        ptr: ptr + ptr_diff as u32,
-                                        len: new.len() as u32,
-                                    })
+                                    let [start, end] = &*range;
+                                    Value::String(PettyStr::String(Rc::new(
+                                        str[start.get() as usize..end.get() as usize].into(),
+                                    )))
                                 }
                                 _ => panic!("{rhs:?}"),
                             }
