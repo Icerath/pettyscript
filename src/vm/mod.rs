@@ -3,6 +3,7 @@
 use core::fmt;
 use std::{
     cell::{Cell, RefCell},
+    cmp::Ordering,
     collections::BTreeMap,
     fmt::Write as _,
     hint::{assert_unchecked, unreachable_unchecked},
@@ -335,74 +336,17 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs % rhs));
                 }
-                Op::Eq(tag) => {
-                    let rhs = self.pop_stack();
-                    let lhs = self.pop_stack();
-                    macro_rules! glue {
-                        ($typ: tt) => {{
-                            let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(lhs == rhs));
-                        }};
-                    }
-                    match tag {
-                        EqTag::Int => glue!(Int),
-                        EqTag::Bool => glue!(Bool),
-                        EqTag::Char => glue!(Char),
-                        EqTag::Str => {
-                            let Value::String(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::String(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(
-                                lhs.as_str(self.consts) == rhs.as_str(self.consts),
-                            ));
-                        }
-                    }
+                Op::Greater(tag) => {
+                    let is_greater = self.cmp(tag) == Ordering::Greater;
+                    self.stack.push(Value::Bool(is_greater))
                 }
                 Op::Less(tag) => {
-                    let rhs = self.pop_stack();
-                    let lhs = self.pop_stack();
-                    macro_rules! glue {
-                        ($typ: tt) => {{
-                            let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(lhs < rhs));
-                        }};
-                    }
-                    match tag {
-                        EqTag::Int => glue!(Int),
-                        EqTag::Bool => glue!(Bool),
-                        EqTag::Char => glue!(Char),
-                        EqTag::Str => {
-                            let Value::String(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::String(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(
-                                lhs.as_str(self.consts) < rhs.as_str(self.consts),
-                            ));
-                        }
-                    }
+                    let is_greater = self.cmp(tag) == Ordering::Less;
+                    self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Greater(tag) => {
-                    let rhs = self.pop_stack();
-                    let lhs = self.pop_stack();
-                    macro_rules! glue {
-                        ($typ: tt) => {{
-                            let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(lhs > rhs));
-                        }};
-                    }
-                    match tag {
-                        EqTag::Int => glue!(Int),
-                        EqTag::Bool => glue!(Bool),
-                        EqTag::Char => glue!(Char),
-                        EqTag::Str => {
-                            let Value::String(lhs) = lhs else { unreachable_unchecked() };
-                            let Value::String(rhs) = rhs else { unreachable_unchecked() };
-                            self.stack.push(Value::Bool(
-                                lhs.as_str(self.consts) > rhs.as_str(self.consts),
-                            ));
-                        }
-                    }
+                Op::Eq(tag) => {
+                    let is_greater = self.cmp(tag) == Ordering::Equal;
+                    self.stack.push(Value::Bool(is_greater))
                 }
                 Op::Add => {
                     let rhs = self.pop_int();
@@ -509,6 +453,28 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             }
         }
         Ok(())
+    }
+
+    unsafe fn cmp(&mut self, tag: EqTag) -> Ordering {
+        let rhs = self.pop_stack();
+        let lhs = self.pop_stack();
+        macro_rules! glue {
+            ($typ: tt) => {{
+                let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
+                let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
+                lhs.cmp(&rhs)
+            }};
+        }
+        match tag {
+            EqTag::Int => glue!(Int),
+            EqTag::Bool => glue!(Bool),
+            EqTag::Char => glue!(Char),
+            EqTag::Str => {
+                let Value::String(lhs) = lhs else { unreachable_unchecked() };
+                let Value::String(rhs) = rhs else { unreachable_unchecked() };
+                lhs.as_str(self.consts).cmp(rhs.as_str(self.consts))
+            }
+        }
     }
 }
 
