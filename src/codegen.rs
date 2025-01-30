@@ -271,11 +271,12 @@ impl Codegen {
                     self.store(root);
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
-                    self.load(root);
+                    let mut segment_type = self.load(root);
                     for segment in rest {
                         match segment {
                             AssignSegment::Index(_) => todo!(),
                             AssignSegment::Field(field) => {
+                                segment_type = self.field_type(segment_type, field);
                                 let field = self.builder.insert_identifer(field);
                                 self.builder.insert(Op::LoadField(field));
                             }
@@ -283,7 +284,9 @@ impl Codegen {
                     }
                     match last {
                         AssignSegment::Field(field) => {
-                            self.expr(expr);
+                            let expected = self.field_type(segment_type, field);
+                            let typ = self.expr(expr);
+                            assert_eq!(typ, expected);
                             let field = self.builder.insert_identifer(field);
                             self.builder.insert(Op::StoreField(field));
                         }
@@ -382,7 +385,8 @@ impl Codegen {
                 self.builder.insert_label(final_end_label);
             }
             Stmt::Expr(expr) => {
-                self.expr(expr);
+                // TODO: Pop will need an explicit type
+                let _ = self.expr(expr);
                 self.builder.insert(Op::Pop);
             }
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
