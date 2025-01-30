@@ -193,13 +193,12 @@ impl Codegen {
                 let typ = Type::Function(Rc::new(FnSig { ret, args: args.into() }));
 
                 let offset = self.write_ident_offset(ident, typ);
-                self.builder.insert(Op::CreateFunction);
+                let set_stack_size = self.builder.create_function();
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
                 self.builder.insert_label(function_start);
 
                 self.scopes.push(FunctionScope::default());
-                let set_stack_size = self.builder.create_set_stack_size();
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
@@ -210,7 +209,7 @@ impl Codegen {
                     self.r#gen(stmt);
                 }
                 let num_scope_vars = self.scopes.last().unwrap().variables.len();
-                self.builder.insert_set_stack_size(set_stack_size, num_scope_vars as u16);
+                self.builder.set_function_stack_size(set_stack_size, num_scope_vars as u16);
                 self.scopes.pop().unwrap();
 
                 self.builder.insert(Op::LoadNull);

@@ -26,7 +26,6 @@ pub fn disassemble(bytecode: &[u8]) {
         reader.head += 1 + op.size();
         print!("{offset}: ");
         match op {
-            Op::SetStackSize(size) => println!("SET_STACK_SIZE {size:?}"),
             Op::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
             Op::AddInt => println!("ADD_INT"),
             Op::Neg => println!("NEG"),
@@ -42,7 +41,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::Index => println!("INDEX"),
             Op::Jump(label) => println!("JUMP {label}"),
             Op::CJump(label) => println!("CJUMP {label}"),
-            Op::CreateFunction => println!("CREATE_FUNCTION"),
+            Op::CreateFunction { stack_size } => println!("CREATE_FUNCTION {stack_size}"),
             Op::EmptyStruct => println!("EMPTY_STRUCT"),
             Op::FnCall { numargs } => println!("FN_CALL {numargs}"),
             Op::IterRange => println!("ITER_RANGE"),

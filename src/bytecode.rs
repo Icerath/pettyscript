@@ -32,7 +32,7 @@ pub enum Op {
     LoadNull,
     Index,
     StoreEnumVariant(StrIdent),
-    CreateFunction,
+    CreateFunction { stack_size: u16 },
     CreateMap,
     InsertMap,
     CreateArray,
@@ -46,7 +46,6 @@ pub enum Op {
     CJump(u32),
     Load(u32),
     Store(u32),
-    SetStackSize(u16),
     LoadGlobal(u32),
     LoadField(StrIdent),
     StoreField(StrIdent),
@@ -162,13 +161,13 @@ impl BytecodeBuilder {
         self.labels[label as usize] = self.instruction_data.len() as u32;
     }
 
-    pub fn create_set_stack_size(&mut self) -> usize {
+    pub fn create_function(&mut self) -> usize {
         let out = self.instruction_data.len() + 1;
-        self.insert(Op::SetStackSize(0));
+        self.insert(Op::CreateFunction { stack_size: 0 });
         out
     }
 
-    pub fn insert_set_stack_size(&mut self, label: usize, value: u16) {
+    pub fn set_function_stack_size(&mut self, label: usize, value: u16) {
         self.instruction_data[label..label + 2].copy_from_slice(&value.to_le_bytes());
     }
 

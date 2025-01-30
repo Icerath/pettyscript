@@ -39,7 +39,7 @@ pub enum Value {
 pub enum Callable {
     Builtin(Builtin),
     MethodBuiltin(MethodBuiltin),
-    Function { label: u32 },
+    Function { label: u32, stack_size: u16 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -145,10 +145,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
             let op = Op::bc_read(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
-                Op::SetStackSize(size) => {
-                    let stack = self.variable_stacks.last_mut().unwrap_unchecked();
-                    *stack = (0..size).map(|_| Value::Null).collect();
-                }
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
                     let remaining = self.pop_stack();
@@ -320,8 +316,9 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 arr.borrow_mut().pop().unwrap_or(Value::Null)
                             }
                         },
-                        Callable::Function { label } => {
-                            self.variable_stacks.push([].into());
+                        Callable::Function { label, stack_size } => {
+                            self.variable_stacks
+                                .push((0..stack_size).map(|_| Value::Null).collect());
                             let here = self.head;
                             self.call_stack.push(here);
                             self.head = label as usize;
@@ -419,9 +416,12 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 }
                 Op::LoadTrue => self.stack.push(Value::Bool(true)),
                 Op::LoadFalse => self.stack.push(Value::Bool(false)),
-                Op::CreateFunction => self
-                    .stack
-                    .push(Value::Callable(Callable::Function { label: self.head as u32 + 5 + 5 })),
+                Op::CreateFunction { stack_size } => {
+                    self.stack.push(Value::Callable(Callable::Function {
+                        label: self.head as u32 + 5 + 5,
+                        stack_size,
+                    }))
+                }
                 Op::LoadNull => self.stack.push(Value::Null),
                 Op::Ret => {
                     self.head = self.call_stack.pop().unwrap();
@@ -596,7 +596,9 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 }
                 write!(f, " }}")
             }
-            Value::Callable(Callable::Function { label }) => write!(f, "Function at {label}"),
+            Value::Callable(Callable::Function { label, stack_size: _ }) => {
+                write!(f, "Function at {label}")
+            }
             Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
             Value::Callable(Callable::MethodBuiltin(method)) => write!(f, "Method: {method:?}"),
             Value::Null => write!(f, "null"),
