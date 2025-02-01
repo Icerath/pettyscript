@@ -174,6 +174,15 @@ impl Codegen {
         }
     }
 
+    fn store_new(&mut self, ident: &'static str, typ: Type, is_const: bool) {
+        if ident == "_" {
+            self.builder.insert(Op::Pop);
+        } else {
+            let offset = self.write_ident_offset(ident, typ, is_const);
+            self.builder.insert(Op::Store(offset));
+        }
+    }
+
     fn write_ident_offset(&mut self, ident: &'static str, typ: Type, is_const: bool) -> u32 {
         let offset = self.scopes.last().unwrap().variables.len() as u32;
         let newly_inserted = self.scopes.last_mut().unwrap().variables.insert(ident, Variable {
@@ -213,8 +222,7 @@ impl Codegen {
                     self.builder.insert(Op::StoreEnumVariant(variant));
                 }
 
-                let offset = self.write_ident_offset(ident, typ, true);
-                self.builder.insert(Op::Store(offset));
+                self.store_new(ident, typ, true);
             }
 
             Stmt::Function(Function { ident, params, ret_type, body }) => {
@@ -241,8 +249,7 @@ impl Codegen {
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
-                    let offset = self.write_ident_offset(ident, typ, false);
-                    self.builder.insert(Op::Store(offset));
+                    self.store_new(ident, typ, false);
                 }
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
@@ -342,8 +349,7 @@ impl Codegen {
                 self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
 
-                let offset = self.write_ident_offset(ident, ident_typ, false);
-                self.builder.insert(Op::Store(offset));
+                self.store_new(ident, ident_typ, false);
 
                 self.scopes.last_mut().unwrap().nfor_loops += 1;
 
@@ -448,9 +454,8 @@ impl Codegen {
         if let Some(expected) = &expected {
             assert!(ty.matches(expected));
         }
-        let ty = if let Some(expected) = expected { expected } else { ty };
-        let offset = self.write_ident_offset(ident, ty, is_const);
-        self.builder.insert(Op::Store(offset));
+        let typ = if let Some(expected) = expected { expected } else { ty };
+        self.store_new(ident, typ, is_const);
     }
 
     fn store(&mut self, ident: &'static str) {
