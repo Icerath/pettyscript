@@ -31,8 +31,8 @@ pub enum Value {
     String(PettyStr),
     Array(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<PettyMap>>),
-    Range(Rc<[Cell<i64>; 2]>),
-    RangeInclusive(Rc<[Cell<i64>; 2]>),
+    Range([Cell<i64>; 2]),
+    RangeInclusive([Cell<i64>; 2]),
     Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
 }
 
@@ -211,35 +211,40 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::Range => {
                     let end = self.pop_int();
                     let start = self.pop_int();
-                    self.stack.push(Value::Range(Rc::new([Cell::new(start), Cell::new(end)])));
+                    self.stack.push(Value::Range([Cell::new(start), Cell::new(end)]));
                 }
                 Op::RangeInclusive => {
                     let end = self.pop_int();
                     let start = self.pop_int();
-                    self.stack
-                        .push(Value::RangeInclusive(Rc::new([Cell::new(start), Cell::new(end)])));
+                    self.stack.push(Value::RangeInclusive([Cell::new(start), Cell::new(end)]));
                 }
                 Op::IterRange => {
-                    let Value::Range(range) = self.last_stack() else { unreachable_unchecked() };
-                    let [start, end] = &*range.clone();
-                    if start.get() < end.get() {
-                        self.stack.push(Value::Int(start.get()));
+                    let Value::Range(range) = self.pop_stack() else { unreachable_unchecked() };
+                    let start = range[0].get();
+                    let end = range[1].get();
+                    if start < end {
+                        self.stack
+                            .push(Value::RangeInclusive([Cell::new(start + 1), Cell::new(end)]));
+                        self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
-                        start.set(start.get() + 1);
                     } else {
+                        self.stack.push(Value::RangeInclusive(range));
                         self.stack.push(Value::Bool(false));
                     }
                 }
                 Op::IterRangeInclusive => {
-                    let Value::RangeInclusive(range) = self.last_stack() else {
+                    let Value::RangeInclusive(range) = self.pop_stack() else {
                         unreachable_unchecked()
                     };
-                    let [start, end] = &*range.clone();
-                    if start.get() <= end.get() {
-                        self.stack.push(Value::Int(start.get()));
+                    let start = range[0].get();
+                    let end = range[1].get();
+                    if start <= end {
+                        self.stack
+                            .push(Value::RangeInclusive([Cell::new(start + 1), Cell::new(end)]));
+                        self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
-                        start.set(start.get() + 1);
                     } else {
+                        self.stack.push(Value::RangeInclusive([Cell::new(start), Cell::new(end)]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
@@ -401,12 +406,9 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                             match rhs {
                                 Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                                 Value::RangeInclusive(_) => todo!(),
-                                Value::Range(range) => {
-                                    let [start, end] = &*range;
-                                    Value::String(PettyStr::String(Rc::new(
-                                        str[start.get() as usize..end.get() as usize].into(),
-                                    )))
-                                }
+                                Value::Range([start, end]) => Value::String(PettyStr::String(
+                                    Rc::new(str[start.get() as usize..end.get() as usize].into()),
+                                )),
                                 _ => panic!("{rhs:?}"),
                             }
                         }
@@ -528,9 +530,9 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Null => write!(f, "null"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
-            Value::Range(range) => write!(f, "{}..{}", range[0].get(), range[1].get()),
-            Value::RangeInclusive(range) => {
-                write!(f, "{}..={}", range[0].get(), range[1].get())
+            Value::Range([start, end]) => write!(f, "{}..{}", start.get(), end.get()),
+            Value::RangeInclusive([start, end]) => {
+                write!(f, "{}..={}", start.get(), end.get())
             }
             Value::String(str) => write!(f, "{}", &str.as_str(self.consts)),
             Value::Array(values) => {
