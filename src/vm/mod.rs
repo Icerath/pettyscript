@@ -395,6 +395,15 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
         let value = match method {
             M::CharIsDigit => Value::Bool(self.pop_char().is_ascii_digit()),
             M::CharIsAlphabetic => Value::Bool(self.pop_char().is_alphabetic()),
+
+            M::StrIsAlphabetic => {
+                let str = self.pop_str();
+                Value::Bool(str.as_str(self.consts).chars().all(|c| c.is_ascii_alphabetic()))
+            }
+            M::StrIsDigit => {
+                let str = self.pop_str();
+                Value::Bool(str.as_str(self.consts).chars().all(|c| c.is_ascii_digit()))
+            }
             M::StrTrim => {
                 let str = self.pop_str();
                 Value::String(PettyStr::String(Rc::new(str.as_str(self.consts).trim().into())))
@@ -438,7 +447,6 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                 map.borrow_mut().remove(&key);
                 return;
             }
-            _ => todo!("{method:?}"),
         };
         self.stack.push(value);
     }
