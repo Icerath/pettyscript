@@ -1,5 +1,3 @@
-use std::fmt;
-
 use logos::{Lexer, Logos};
 use miette::{Context, Error, LabeledSpan, Result};
 
@@ -12,6 +10,7 @@ pub fn parse(src: &str) -> Result<Box<[Stmt]>> {
     Parser::new(src).parse_root()
 }
 
+#[derive(Debug)]
 pub enum Stmt {
     Struct(Struct),
     Enum(Enum),
@@ -27,36 +26,6 @@ pub enum Stmt {
     Continue,
     Break,
     Return(Return),
-}
-
-impl fmt::Debug for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Continue => f.debug_struct("Continue").finish(),
-            Self::Break => f.debug_struct("Break").finish(),
-            Self::Return(r#return) => fmt::Debug::fmt(r#return, f),
-            Self::Assign(Assign { root, segments, expr }) => f
-                .debug_struct("Assign")
-                .field("root", root)
-                .field("segments", &segments)
-                .field("expr", expr)
-                .finish(),
-            Self::Let(var) => {
-                f.debug_struct("let").field("ident", &var.ident).field("expr", &var.expr).finish()
-            }
-            Self::Const(var) => {
-                f.debug_struct("const").field("ident", &var.ident).field("expr", &var.expr).finish()
-            }
-            Self::Struct(r#struct) => fmt::Debug::fmt(r#struct, f),
-            Self::Enum(r#enum) => fmt::Debug::fmt(r#enum, f),
-            Self::Block(block) => fmt::Debug::fmt(block, f),
-            Self::Function(fun) => fmt::Debug::fmt(fun, f),
-            Self::WhileLoop(while_loop) => fmt::Debug::fmt(while_loop, f),
-            Self::IfChain(if_chain) => fmt::Debug::fmt(if_chain, f),
-            Self::Expr(expr) => fmt::Debug::fmt(expr, f),
-            Self::ForLoop(for_loop) => fmt::Debug::fmt(for_loop, f),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -75,12 +44,14 @@ impl ExplicitType {
 #[derive(Debug)]
 pub struct Return(pub Option<Expr>);
 
+#[derive(Debug)]
 pub struct VarDecl {
     pub ident: &'static str,
     pub typ: Option<ExplicitType>,
     pub expr: Option<Expr>,
 }
 
+#[derive(Debug)]
 pub struct Assign {
     pub root: &'static str,
     pub segments: Box<[AssignSegment]>,
@@ -94,34 +65,19 @@ pub enum AssignSegment {
     Index(Expr),
 }
 
+#[derive(Debug)]
 pub struct Struct {
     pub ident: &'static str,
     pub fields: Box<[(&'static str, ExplicitType)]>,
 }
 
-impl fmt::Debug for Struct {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Struct")
-            .field("ident", &format_args!("{}", self.ident))
-            .field("fields", &self.fields)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 pub struct Enum {
     pub ident: &'static str,
     pub variants: Box<[&'static str]>,
 }
 
-impl fmt::Debug for Enum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Enum")
-            .field("ident", &format_args!("{}", self.ident))
-            .field("variants", &self.variants)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 pub struct Function {
     pub ident: &'static str,
     pub params: Box<[(&'static str, ExplicitType)]>,
@@ -129,26 +85,12 @@ pub struct Function {
     pub body: Block,
 }
 
-impl fmt::Debug for Function {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Fn")
-            .field("ident", &format_args!("{}", self.ident))
-            .field("params", &self.params)
-            .field("body", &self.body)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 pub struct Block {
     pub stmts: Box<[Stmt]>,
 }
 
-impl fmt::Debug for Block {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(&self.stmts).finish()
-    }
-}
-
+#[derive(Debug)]
 pub enum Expr {
     Index { expr: Box<Expr>, index: Box<Expr> },
     FieldAccess { expr: Box<Expr>, field: &'static str },
@@ -160,66 +102,13 @@ pub enum Expr {
     Array(Box<[Expr]>),
 }
 
-impl fmt::Debug for Expr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Array(values) => f.debug_tuple("Array").field(values).finish(),
-            Self::Index { expr, index } => {
-                f.debug_struct("Index").field("expr", expr).field("index", index).finish()
-            }
-            Self::FieldAccess { expr, field } => f
-                .debug_struct("field_access")
-                .field("expr", expr)
-                .field("field", &format_args!("{}", field))
-                .finish(),
-            Self::InitStruct { ident, fields } => {
-                f.debug_struct("InitStruct").field("ident", ident).field("fields", fields).finish()
-            }
-            Self::Literal(literal) => fmt::Debug::fmt(literal, f),
-            Self::Binary { op, exprs } => f
-                .debug_struct("BinaryExpr")
-                .field("lhs", &exprs[0])
-                .field("op", op)
-                .field("rhs", &exprs[1])
-                .finish(),
-            Self::Unary { op, expr } => {
-                f.debug_struct("UnaryExpr").field("op", op).field("expr", expr).finish()
-            }
-            Self::FnCall { function, args } => {
-                f.debug_struct("FnCall").field("function", function).field("args", args).finish()
-            }
-        }
-    }
-}
-
+#[derive(Debug)]
 pub struct StructInitField {
     pub ident: &'static str,
     pub expr: Option<Expr>,
 }
 
-impl fmt::Debug for StructInitField {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InitField")
-            .field("ident", &format_args!("{}", self.ident))
-            .field("expr", &self.expr)
-            .finish()
-    }
-}
-
-impl fmt::Debug for Literal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Map(entries) => f.debug_struct("Map").field("entries", entries).finish(),
-            Self::Bool(bool) => write!(f, "Bool({bool})"),
-            Self::Int(int) => write!(f, "Int({int})"),
-            Self::Char(char) => write!(f, "Char({char:?})"),
-            Self::String(str) => write!(f, "String({str:?})"),
-            Self::Ident(ident) => write!(f, "Ident({ident})"),
-            Self::FString(str) => write!(f, "FString({str:?})"),
-        }
-    }
-}
-
+#[derive(Debug)]
 pub enum Literal {
     Bool(bool),
     Int(i64),
@@ -286,31 +175,17 @@ pub enum UnaryOp {
     Neg,
 }
 
+#[derive(Debug)]
 pub struct ForLoop {
     pub ident: &'static str,
     pub iter: Expr,
     pub body: Block,
 }
 
-impl fmt::Debug for ForLoop {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ForLoop")
-            .field("ident", &format_args!("{}", self.ident))
-            .field("iter", &self.iter)
-            .field("body", &self.body)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 pub struct WhileLoop {
     pub expr: Expr,
     pub body: Block,
-}
-
-impl fmt::Debug for WhileLoop {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("WhileLoop").field("expr", &self.expr).field("body", &self.body).finish()
-    }
 }
 
 #[derive(Debug)]
