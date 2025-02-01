@@ -1,3 +1,14 @@
-// Add null global builtin / keyword.
+// TODO: Add null global builtin / keyword.
+
 struct Hi { x: null }
+
+fn returns_null() -> null {}
+
+let x = returns_null();
+let hi = Hi { x: x };
+x = hi.x;
+
 fn takes_null(x: null) {}
+takes_null(x);
+
+// TODO: How do we handle builtins expecting values?

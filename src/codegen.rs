@@ -164,6 +164,12 @@ impl Codegen {
     }
 
     fn store_new(&mut self, ident: &'static str, typ: Type, is_const: bool) {
+        if typ.is_zst() {
+            if ident != "_" {
+                let _ = self.write_ident_offset(ident, typ, is_const);
+            }
+            return;
+        }
         if ident == "_" {
             self.builder.insert(Op::Pop);
         } else {
@@ -220,7 +226,7 @@ impl Codegen {
                 }
                 let typ = Type::Function(Rc::new(FnSig { ret: ret.clone(), args: args.into() }));
 
-                let offset = self.write_ident_offset(ident, typ, true);
+                let offset = self.write_ident_offset(ident, typ.clone(), true);
                 let set_stack_size = self.builder.create_function();
                 self.builder.insert(Op::Store(offset));
                 self.builder.insert(Op::Jump(function_end));
@@ -236,6 +242,7 @@ impl Codegen {
                     self.r#gen(stmt);
                 }
                 let num_scope_vars = self.scopes.last().unwrap().variables.len();
+                // TODO: Remove extra space for ZSTs
                 self.builder.set_function_stack_size(set_stack_size, num_scope_vars as u16);
                 self.scopes.pop().unwrap();
 
@@ -279,7 +286,9 @@ impl Codegen {
                             let typ = self.expr(expr);
                             let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
-                            self.builder.insert(Op::StoreField(fields[field].0));
+                            if !typ.is_zst() {
+                                self.builder.insert(Op::StoreField(fields[field].0));
+                            }
                         }
                         AssignSegment::Index(_) => todo!(),
                     }
@@ -429,7 +438,9 @@ impl Codegen {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(var) => {
                 assert!(!var.is_const);
-                self.builder.insert(Op::Store(var.offset))
+                if !var.typ.is_zst() {
+                    self.builder.insert(Op::Store(var.offset));
+                }
             }
             None => panic!(),
         };
@@ -485,6 +496,7 @@ impl Codegen {
             Some(var) => {
                 match &var.typ {
                     Type::Enum { .. } => {}
+                    typ if typ.is_zst() => {}
                     _ => self.builder.insert(Op::Load(var.offset)),
                 }
                 var.typ.clone()
@@ -495,6 +507,7 @@ impl Codegen {
                     scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
                 match &var.typ {
                     Type::Enum { .. } => {}
+                    typ if typ.is_zst() => {}
                     _ => self.builder.insert(Op::LoadGlobal(var.offset)),
                 }
                 var.typ.clone()
@@ -696,7 +709,9 @@ impl Codegen {
                         None => self.load(ident),
                     };
                     assert_eq!(type_fields.get(ident).unwrap().1, typ);
-                    self.builder.insert(Op::StoreField(type_fields[ident].0));
+                    if !typ.is_zst() {
+                        self.builder.insert(Op::StoreField(type_fields[ident].0));
+                    }
                 }
                 struct_type
             }
@@ -789,6 +804,9 @@ impl Codegen {
                 );
             }
             Type::Struct { name, fields } => match fields.get(field) {
+                Some((_, field_type)) if field_type.is_zst() => {
+                    return (LoadField::ZstField, field_type.clone());
+                }
                 Some((i, field_type)) => return (LoadField::StructField(*i), field_type.clone()),
                 None => panic!("struct {name} does not contain field: {field}"),
             },
