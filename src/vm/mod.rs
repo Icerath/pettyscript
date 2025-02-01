@@ -2,7 +2,7 @@
 
 use core::fmt;
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     cmp::Ordering,
     collections::BTreeMap,
     fmt::Write as _,
@@ -31,8 +31,8 @@ pub enum Value {
     String(PettyStr),
     Array(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<PettyMap>>),
-    Range([Cell<i64>; 2]),
-    RangeInclusive([Cell<i64>; 2]),
+    Range([i64; 2]),
+    RangeInclusive([i64; 2]),
     Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
 }
 
@@ -211,40 +211,36 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::Range => {
                     let end = self.pop_int();
                     let start = self.pop_int();
-                    self.stack.push(Value::Range([Cell::new(start), Cell::new(end)]));
+                    self.stack.push(Value::Range([start, end]));
                 }
                 Op::RangeInclusive => {
                     let end = self.pop_int();
                     let start = self.pop_int();
-                    self.stack.push(Value::RangeInclusive([Cell::new(start), Cell::new(end)]));
+                    self.stack.push(Value::RangeInclusive([start, end]));
                 }
                 Op::IterRange => {
-                    let Value::Range(range) = self.pop_stack() else { unreachable_unchecked() };
-                    let start = range[0].get();
-                    let end = range[1].get();
+                    let Value::Range([start, end]) = self.pop_stack() else {
+                        unreachable_unchecked()
+                    };
                     if start < end {
-                        self.stack
-                            .push(Value::RangeInclusive([Cell::new(start + 1), Cell::new(end)]));
+                        self.stack.push(Value::RangeInclusive([start + 1, end]));
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
-                        self.stack.push(Value::RangeInclusive(range));
+                        self.stack.push(Value::RangeInclusive([start, end]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
                 Op::IterRangeInclusive => {
-                    let Value::RangeInclusive(range) = self.pop_stack() else {
+                    let Value::RangeInclusive([start, end]) = self.pop_stack() else {
                         unreachable_unchecked()
                     };
-                    let start = range[0].get();
-                    let end = range[1].get();
                     if start <= end {
-                        self.stack
-                            .push(Value::RangeInclusive([Cell::new(start + 1), Cell::new(end)]));
+                        self.stack.push(Value::RangeInclusive([start + 1, end]));
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
-                        self.stack.push(Value::RangeInclusive([Cell::new(start), Cell::new(end)]));
+                        self.stack.push(Value::RangeInclusive([start, end]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
@@ -407,7 +403,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                                 Value::RangeInclusive(_) => todo!(),
                                 Value::Range([start, end]) => Value::String(PettyStr::String(
-                                    Rc::new(str[start.get() as usize..end.get() as usize].into()),
+                                    Rc::new(str[start as usize..end as usize].into()),
                                 )),
                                 _ => panic!("{rhs:?}"),
                             }
@@ -530,9 +526,9 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Null => write!(f, "null"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
-            Value::Range([start, end]) => write!(f, "{}..{}", start.get(), end.get()),
+            Value::Range([start, end]) => write!(f, "{}..{}", start, end),
             Value::RangeInclusive([start, end]) => {
-                write!(f, "{}..={}", start.get(), end.get())
+                write!(f, "{}..={}", start, end)
             }
             Value::String(str) => write!(f, "{}", &str.as_str(self.consts)),
             Value::Array(values) => {
