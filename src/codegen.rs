@@ -118,17 +118,11 @@ struct FunctionScope {
     ret: Type,
     variables: FxHashMap<&'static str, Variable>,
     named_types: FxHashMap<&'static str, Type>,
-    nfor_loops: usize,
 }
 
 impl FunctionScope {
     fn new(ret: Type) -> Self {
-        Self {
-            ret,
-            variables: Default::default(),
-            named_types: Default::default(),
-            nfor_loops: Default::default(),
-        }
+        Self { ret, variables: Default::default(), named_types: Default::default() }
     }
 }
 
@@ -351,17 +345,12 @@ impl Codegen {
 
                 self.store_new(ident, ident_typ, false);
 
-                self.scopes.last_mut().unwrap().nfor_loops += 1;
-
                 for stmt in &body.stmts {
                     self.r#gen(stmt);
                 }
 
-                self.scopes.last_mut().unwrap().nfor_loops -= 1;
-
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
-                self.builder.insert(Op::Pop);
 
                 self.continue_label = prev_continue;
                 self.break_label = prev_break;
@@ -423,9 +412,6 @@ impl Codegen {
                     "Tried to return {typ:?} from function returning: {:?}",
                     scope.ret
                 );
-                for _ in 0..scope.nfor_loops {
-                    self.builder.insert(Op::Pop);
-                }
                 self.builder.insert(Op::Ret);
             }
             _ => todo!("{node:?}"),

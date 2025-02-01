@@ -227,7 +227,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
-                        self.stack.push(Value::Range([start, end]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
@@ -240,7 +239,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
-                        self.stack.push(Value::RangeInclusive([start, end]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
