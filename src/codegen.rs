@@ -588,10 +588,9 @@ impl Codegen {
                         if typ == Type::Null {
                             let [ptr, len] = self.builder.insert_string("null");
                             self.builder.insert(Op::LoadString { ptr, len });
+                        } else if typ.is_zst() {
+                            todo!()
                         }
-
-                        // TODO: Support other zsts here
-                        if typ.is_zst() {}
                     }
                     let [ptr, len] = self.builder.insert_string(fstring.remaining);
                     self.builder.insert(Op::LoadString { ptr, len });
