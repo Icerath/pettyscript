@@ -146,6 +146,7 @@ impl Codegen {
             let builtin_var = Variable { offset, typ: builtin_type(builtin), is_const: true };
             scope.variables.insert(builtin.name(), builtin_var);
         }
+        scope.variables.insert("null", Variable { offset: 0, typ: Type::Null, is_const: true });
         // FIXME: Should these types be inserted into the interner?
         scope.named_types.insert("int", Type::Int);
         scope.named_types.insert("str", Type::Str);
