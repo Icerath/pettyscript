@@ -468,12 +468,19 @@ impl Codegen {
         Some(match typ {
             Type::Array(typ) if *typ == IncompleteType::Generic => {
                 assert_eq!(explicit_typ.generics.len(), 1);
-                Type::Array(Rc::new(IncompleteType::Complete(
-                    self.load_explicit_type(&explicit_typ.generics[0])?,
-                )))
+                let generic = self.load_explicit_type(&explicit_typ.generics[0])?;
+                if generic.is_zst() {
+                    panic!("arrays may not contains ZSTs");
+                }
+                Type::Array(Rc::new(IncompleteType::Complete(generic)))
             }
             Type::Map { key, value } if !key.is_complete() || !value.is_complete() => {
                 assert_eq!(explicit_typ.generics.len(), 2);
+                let generic_key = self.load_explicit_type(&explicit_typ.generics[0])?;
+                let generic_value = self.load_explicit_type(&explicit_typ.generics[1])?;
+                if generic_key.is_zst() || generic_value.is_zst() {
+                    panic!("maps may not contains ZSTs");
+                }
                 Type::Map {
                     key: Rc::new(IncompleteType::Complete(
                         self.load_explicit_type(&explicit_typ.generics[0])?,
@@ -730,6 +737,9 @@ impl Codegen {
                 }
                 let mut array_iter = array.iter();
                 let typ = self.expr(array_iter.next().unwrap());
+                if typ.is_zst() {
+                    panic!("ZSTs are not supported in arrays");
+                }
                 self.builder.insert(Op::ArrayPush);
                 for expr in array_iter {
                     let next_typ = self.expr(expr);

@@ -78,6 +78,9 @@ macro_rules! test_fails {
 
 test_fails!(fail_arr, "let arr: array[i32] = ['1']");
 test_fails!(fail_map, "let map: map[i32, char] = #{'1': 2 }");
+test_fails!(zst_array_literals, "fn null() {} let arr = [null()];");
+test_fails!(zst_array_type, "let arr: array[null] = [];");
+test_fails!(zst_map_type, "let map: map[int, null] = #{};");
 
 #[test]
 fn test_for_loop() {
