@@ -885,24 +885,27 @@ impl Codegen {
                 ),
                 _ => panic!("type map does not contain field: {field}"),
             },
-            Type::Array(of) => match field {
-                "pop" => (
-                    ArrayPop,
-                    Type::Function(Rc::new(FnSig {
-                        ret: (*of).clone().unwrap_complete(),
-                        args: [].into(),
-                    })),
-                ),
-                "push" => (
-                    ArrayPush,
-                    Type::Function(Rc::new(FnSig {
-                        ret: Type::Null,
-                        args: [(*of).clone().unwrap_complete()].into(),
-                    })),
-                ),
-                "len" => (ArrayLen, Type::Int),
-                _ => panic!("type Array({of:?}) does not contain field: {field}"),
-            },
+            Type::Array(of_incomplete) => {
+                let of = of_incomplete.unwrap_complete();
+                match field {
+                    "sort" if of == Type::Int => (
+                        ArraySortInt,
+                        Type::Function(Rc::new(FnSig {
+                            ret: Type::Array(of_incomplete),
+                            args: [].into(),
+                        })),
+                    ),
+                    "pop" => {
+                        (ArrayPop, Type::Function(Rc::new(FnSig { ret: of, args: [].into() })))
+                    }
+                    "push" => (
+                        ArrayPush,
+                        Type::Function(Rc::new(FnSig { ret: Type::Null, args: [of].into() })),
+                    ),
+                    "len" => (ArrayLen, Type::Int),
+                    _ => panic!("type Array({of:?}) does not contain field: {field}"),
+                }
+            }
             _ => panic!("type {typ:?} does not contain field: {field}"),
         };
         (LoadField::Builtin(builtin_field), typ)

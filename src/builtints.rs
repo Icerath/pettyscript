@@ -26,6 +26,7 @@ pub enum MethodBuiltin {
     MapRemove(Rc<RefCell<PettyMap>>),
     ArrayPush(Rc<RefCell<Vec<Value>>>),
     ArrayPop(Rc<RefCell<Vec<Value>>>),
+    ArraySortInt(Rc<RefCell<Vec<Value>>>),
 }
 
 impl From<MethodBuiltin> for Value {
@@ -49,6 +50,7 @@ pub enum BuiltinField {
     ArrayPush,
     ArrayPop,
     ArrayLen,
+    ArraySortInt,
 
     MapInsert,
     MapRemove,

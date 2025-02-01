@@ -9,3 +9,6 @@ assert(f"{arr}" == "[]");
 arr.push(2);
 assert(f"{arr}" == "[2]");
 assert([1][0] == 1);
+
+let unsorted = [5, 2, 6, 9, 2, 1];
+assert(f"{unsorted.sort()}" == f"{[1, 2, 2, 5, 6, 9]}");

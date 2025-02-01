@@ -300,6 +300,13 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                                 break 'fn_call;
                             }
                             MethodBuiltin::ArrayPop(arr) => arr.borrow_mut().pop().unwrap(),
+                            MethodBuiltin::ArraySortInt(arr) => {
+                                arr.borrow_mut().sort_unstable_by_key(|key| match key {
+                                    Value::Int(int) => *int,
+                                    _ => unreachable_unchecked(),
+                                });
+                                Value::Array(arr)
+                            }
                         },
                         Callable::Function { label, stack_size } => {
                             self.variable_stacks
@@ -449,6 +456,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
             B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
             B::ArrayPush => MethodBuiltin::ArrayPush(self.pop_arr()).into(),
             B::ArrayPop => MethodBuiltin::ArrayPop(self.pop_arr()).into(),
+            B::ArraySortInt => MethodBuiltin::ArraySortInt(self.pop_arr()).into(),
 
             B::MapGet => MethodBuiltin::MapGet(self.pop_map()).into(),
             B::MapInsert => MethodBuiltin::MapInsert(self.pop_map()).into(),
