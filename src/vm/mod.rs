@@ -371,14 +371,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     };
                     fields.borrow_mut().insert(field, value);
                 }
-                Op::StoreEnumVariant(variant) => {
-                    let Value::Struct { fields } = self.stack.last_mut().unwrap() else {
-                        unreachable_unchecked()
-                    };
-                    fields
-                        .borrow_mut()
-                        .insert(variant, Value::EnumVariant { name: variant, key: 0 });
-                }
+                Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name, key: 0 }),
                 Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
                 Op::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Op::LoadField(field) => {

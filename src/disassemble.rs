@@ -48,7 +48,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::IterRangeInclusive => println!("ITER_RANGE_INCLUSIVE"),
             Op::Load(ident) => println!("LOAD {ident}"),
             Op::Store(ident) => println!("STORE {ident}"),
-            Op::LoadChar(char) => println!("LOAD_CHAR '{char}'"),
+            Op::LoadChar(char) => println!("LOAD_CHAR {char:?}"),
             Op::LoadFalse => println!("LOAD_FALSE"),
             Op::LoadTrue => println!("LOAD_TRUE"),
             Op::Pop => println!("POP"),
@@ -65,7 +65,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::Range => println!("RANGE"),
             Op::RangeInclusive => println!("RANGE_INCLUSIVE"),
             Op::Ret => println!("RET"),
-            Op::StoreEnumVariant(ident) => println!("SET_VARIANT {}", load_ident!(ident)),
+            Op::LoadVariant(ident) => println!("LOAD_VARIANT {}", load_ident!(ident)),
         };
     }
 }

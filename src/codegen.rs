@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::{Builtin, BuiltinField},
@@ -48,7 +48,7 @@ pub enum Type {
     Int,
     Str,
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
-    Enum { name: &'static str, fields: Rc<FxHashSet<&'static str>>, id: u32 },
+    Enum { name: &'static str, fields: Rc<FxHashMap<&'static str, u32>>, id: u32 },
     EnumVariant { id: u32 },
     Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
     Array(Rc<IncompleteType>),
@@ -72,6 +72,7 @@ impl Type {
 enum LoadField {
     Builtin(BuiltinField),
     StructField(StrIdent),
+    EnumVariant(StrIdent),
 }
 
 impl From<StrIdent> for LoadField {
@@ -204,19 +205,11 @@ impl Codegen {
                 let id = COUNTER.fetch_add(1, Ordering::Relaxed);
                 let typ = Type::Enum {
                     name: ident,
-                    fields: Rc::new(variants.iter().copied().collect()),
+                    fields: Rc::new(variants.iter().copied().zip(0u32..).collect()),
                     id,
                 };
-
                 self.scopes.last_mut().unwrap().named_types.insert(ident, Type::EnumVariant { id });
-                self.builder.insert(Op::EmptyStruct);
-
-                for variant in variants {
-                    let variant = self.builder.insert_identifer(variant);
-                    self.builder.insert(Op::StoreEnumVariant(variant));
-                }
-
-                self.store_new(ident, typ, true);
+                self.write_ident_offset(ident, typ, true);
             }
 
             Stmt::Function(Function { ident, params, ret_type, body }) => {
@@ -502,14 +495,20 @@ impl Codegen {
     fn load(&mut self, ident: &'static str) -> Type {
         match self.scopes.last().unwrap().variables.get(ident) {
             Some(var) => {
-                self.builder.insert(Op::Load(var.offset));
+                match &var.typ {
+                    Type::Enum { .. } => {}
+                    _ => self.builder.insert(Op::Load(var.offset)),
+                }
                 var.typ.clone()
             }
             None => {
                 let scope = self.scopes.first().unwrap();
                 let var =
                     scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
-                self.builder.insert(Op::LoadGlobal(var.offset));
+                match &var.typ {
+                    Type::Enum { .. } => {}
+                    _ => self.builder.insert(Op::LoadGlobal(var.offset)),
+                }
                 var.typ.clone()
             }
         }
@@ -786,6 +785,7 @@ impl Codegen {
         match load_field {
             LoadField::Builtin(builtin) => self.builder.insert(Op::LoadBuiltinField(builtin)),
             LoadField::StructField(field) => self.builder.insert(Op::LoadField(field)),
+            LoadField::EnumVariant(variant) => self.builder.insert(Op::LoadVariant(variant)),
         }
     }
 
@@ -798,8 +798,11 @@ impl Codegen {
         use BuiltinField::*;
 
         let (builtin_field, typ) = match typ {
-            Type::Enum { fields, id, .. } if fields.contains(field) => {
-                return (ident!(), Type::EnumVariant { id });
+            Type::Enum { fields, id, .. } if fields.contains_key(field) => {
+                return (
+                    LoadField::EnumVariant(self.builder.insert_identifer(field)),
+                    Type::EnumVariant { id },
+                );
             }
             Type::Struct { name, fields } => match fields.get(field) {
                 Some(field_type) => return (ident!(), field_type.clone()),

@@ -31,7 +31,7 @@ pub enum Op {
     RangeInclusive,
     LoadNull,
     Index,
-    StoreEnumVariant(StrIdent),
+    LoadVariant(StrIdent),
     CreateFunction { stack_size: u16 },
     CreateMap,
     InsertMap,
