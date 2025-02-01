@@ -78,6 +78,7 @@ impl TryFrom<u8> for EqTag {
 
 trait BcRead: Sized {
     fn bc_read(bytes: &mut &[u8]) -> Self;
+    unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self;
 }
 trait BcWrite {
     fn bc_write(&self, buf: &mut Vec<u8>);
@@ -91,6 +92,15 @@ macro_rules! impl_int {
                 let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap());
                 *bytes = &bytes[size..];
                 out
+            }
+
+            unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self {
+                let size = size_of::<Self>();
+                unsafe {
+                    let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap_unchecked());
+                    *bytes = bytes.get_unchecked(size..);
+                    out
+                }
             }
         }
         impl BcWrite for $int {
@@ -106,6 +116,10 @@ macro_rules! impl_from {
         impl BcRead for $ty {
             fn bc_read(bytes: &mut &[u8]) -> Self {
                 Self::try_from($int::bc_read(bytes)).unwrap()
+            }
+
+            unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self {
+                unsafe { Self::try_from($int::bc_read_unchecked(bytes)).unwrap_unchecked() }
             }
         }
         impl BcWrite for $ty {
@@ -129,6 +143,10 @@ impl_from!(EqTag, u8);
 impl BcRead for StrIdent {
     fn bc_read(bytes: &mut &[u8]) -> Self {
         Self { ptr: u32::bc_read(bytes), len: u32::bc_read(bytes) }
+    }
+
+    unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self {
+        unsafe { Self { ptr: u32::bc_read_unchecked(bytes), len: u32::bc_read_unchecked(bytes) } }
     }
 }
 

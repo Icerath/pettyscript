@@ -149,7 +149,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         }
 
         while self.head < self.instructions.len() {
-            let op = Op::bc_read(&self.instructions[self.head..]);
+            let op = Op::bc_read_unchecked(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
                 Op::Abort => panic!("ABORTING"),
