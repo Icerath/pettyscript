@@ -59,6 +59,26 @@ macro_rules! test_expr {
     }};
 }
 
+macro_rules! test_fails {
+    ($name: ident, $src: literal) => {
+        #[test]
+        #[should_panic]
+        fn $name() {
+            let ast = match parse(concat!($src, ";")) {
+                Ok(src) => src,
+                Err(_) => {
+                    eprintln!("Failed to parse");
+                    return;
+                }
+            };
+            codegen::codegen(&ast);
+        }
+    };
+}
+
+test_fails!(fail_arr, "let arr: array[i32] = ['1']");
+test_fails!(fail_map, "let map: map[i32, char] = #{'1': 2 }");
+
 #[test]
 fn test_for_loop() {
     test_expr!(r#"for i in 0..=5 { println(f"{i}"); }"#, "0\n1\n2\n3\n4\n5");
