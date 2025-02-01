@@ -223,11 +223,11 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         unreachable_unchecked()
                     };
                     if start < end {
-                        self.stack.push(Value::RangeInclusive([start + 1, end]));
+                        self.stack.push(Value::Range([start + 1, end]));
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
-                        self.stack.push(Value::RangeInclusive([start, end]));
+                        self.stack.push(Value::Range([start, end]));
                         self.stack.push(Value::Bool(false));
                     }
                 }
