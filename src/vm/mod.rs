@@ -24,7 +24,7 @@ pub type PettyMap = BTreeMap<Value, Value>;
 pub enum Value {
     Null,
     Bool(bool),
-    EnumVariant { name: StrIdent, key: u32 },
+    EnumVariant { name: StrIdent },
     Char(char),
     Int(i64),
     Callable(Callable),
@@ -371,7 +371,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     };
                     fields.borrow_mut().insert(field, value);
                 }
-                Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name, key: 0 }),
+                Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
                 Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
                 Op::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Op::LoadField(field) => {
@@ -496,7 +496,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
 
                 debug_map.finish()
             }
-            Value::EnumVariant { name: StrIdent { ptr, len }, .. } => {
+            Value::EnumVariant { name: StrIdent { ptr, len } } => {
                 write!(f, "{}", &self.consts[*ptr as usize..*ptr as usize + *len as usize])
             }
             Value::Char(char) => write!(f, "{char}"),
