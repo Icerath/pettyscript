@@ -47,7 +47,7 @@ pub enum Type {
     Char,
     Int,
     Str,
-    Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, Type>> },
+    Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, (u32, Type)>> },
     Enum { name: &'static str, fields: Rc<FxHashMap<&'static str, u32>>, id: u32 },
     EnumVariant { id: u32 },
     Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
@@ -71,20 +71,8 @@ impl Type {
 
 enum LoadField {
     Builtin(BuiltinField),
-    StructField(StrIdent),
+    StructField(u32),
     EnumVariant(StrIdent),
-}
-
-impl From<StrIdent> for LoadField {
-    fn from(value: StrIdent) -> Self {
-        Self::StructField(value)
-    }
-}
-
-impl From<BuiltinField> for LoadField {
-    fn from(value: BuiltinField) -> Self {
-        Self::Builtin(value)
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -193,8 +181,8 @@ impl Codegen {
         match node {
             Stmt::Struct(r#struct) => {
                 let mut fields = FxHashMap::default();
-                for (field, typ) in &r#struct.fields {
-                    fields.insert(*field, self.load_explicit_type(typ).unwrap());
+                for (i, (field, typ)) in r#struct.fields.iter().enumerate() {
+                    fields.insert(*field, (i as u32, self.load_explicit_type(typ).unwrap()));
                 }
                 let typ = Type::Struct { name: r#struct.ident, fields: Rc::new(fields) };
                 self.scopes.last_mut().unwrap().named_types.insert(r#struct.ident, typ);
@@ -280,14 +268,13 @@ impl Codegen {
                     }
                     match last {
                         AssignSegment::Field(field) => {
-                            let Type::Struct { .. } = segment_type.clone() else {
+                            let Type::Struct { fields, .. } = segment_type.clone() else {
                                 panic!("Cannot store field into type: {segment_type:?}")
                             };
                             let typ = self.expr(expr);
                             let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
-                            let field = self.builder.insert_identifer(field);
-                            self.builder.insert(Op::StoreField(field));
+                            self.builder.insert(Op::StoreField(fields[field].0));
                         }
                         AssignSegment::Index(_) => todo!(),
                     }
@@ -699,16 +686,15 @@ impl Codegen {
             Expr::InitStruct { ident, fields } => {
                 let struct_type = self.load_name_type(ident).unwrap();
                 let Type::Struct { name: _, fields: type_fields } = &struct_type else { panic!() };
-                self.builder.insert(Op::EmptyStruct);
+                self.builder.insert(Op::CreateStruct { size: type_fields.len() as u32 });
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(ident));
                     let typ = match expr {
                         Some(expr) => self.expr(expr),
                         None => self.load(ident),
                     };
-                    assert_eq!(type_fields.get(ident).unwrap(), &typ);
-                    let ident = self.builder.insert_identifer(ident);
-                    self.builder.insert(Op::StoreField(ident));
+                    assert_eq!(type_fields.get(ident).unwrap().1, typ);
+                    self.builder.insert(Op::StoreField(type_fields[ident].0));
                 }
                 struct_type
             }
@@ -790,11 +776,6 @@ impl Codegen {
     }
 
     fn load_field(&mut self, typ: Type, field: &'static str) -> (LoadField, Type) {
-        macro_rules! ident {
-            () => {
-                LoadField::StructField({ self.builder.insert_identifer(field) })
-            };
-        }
         use BuiltinField::*;
 
         let (builtin_field, typ) = match typ {
@@ -805,7 +786,7 @@ impl Codegen {
                 );
             }
             Type::Struct { name, fields } => match fields.get(field) {
-                Some(field_type) => return (ident!(), field_type.clone()),
+                Some((i, field_type)) => return (LoadField::StructField(*i), field_type.clone()),
                 None => panic!("struct {name} does not contain field: {field}"),
             },
             Type::Str => match field {
@@ -882,7 +863,7 @@ impl Codegen {
             },
             _ => panic!("type {typ:?} does not contain field: {field}"),
         };
-        (builtin_field.into(), typ)
+        (LoadField::Builtin(builtin_field), typ)
     }
 
     fn finish(self) -> Vec<u8> {

@@ -20,6 +20,7 @@ pub type PettyMap = BTreeMap<Value, Value>;
 
 // TODO: Remove Rc<Refcell> with indexes
 // TODO: Replace BTreeMap with HashMap
+// TODO: Avoid extra indirection/allocation for Struct.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
     Null,
@@ -33,7 +34,7 @@ pub enum Value {
     Map(Rc<RefCell<PettyMap>>),
     Range([i64; 2]),
     RangeInclusive([i64; 2]),
-    Struct { fields: Rc<RefCell<BTreeMap<StrIdent, Value>>> },
+    Struct { fields: Rc<RefCell<Box<[Value]>>> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -366,16 +367,21 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                     let Value::Struct { fields } = self.stack.last_mut().unwrap() else {
                         unreachable_unchecked()
                     };
-                    fields.borrow_mut().insert(field, value);
+                    fields.borrow_mut()[field as usize] = value;
                 }
                 Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
-                Op::EmptyStruct => self.stack.push(Value::Struct { fields: Rc::default() }),
+                Op::CreateStruct { size } => {
+                    let fields: Box<[Value]> =
+                        std::iter::repeat_with(|| Value::Null).take(size as usize).collect();
+                    let fields = Rc::new(RefCell::new(fields));
+                    self.stack.push(Value::Struct { fields })
+                }
                 Op::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Op::LoadField(field) => {
                     let Value::Struct { fields } = self.pop_stack() else {
                         unreachable_unchecked()
                     };
-                    let value = match fields.borrow().get(&field) {
+                    let value = match fields.borrow().get(field as usize) {
                         Some(value) => value.clone(),
                         None => unreachable_unchecked(),
                     };
@@ -499,10 +505,9 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
-                for (i, (key, value)) in fields.borrow().iter().enumerate() {
-                    let key = &self.consts[key.ptr as usize..key.ptr as usize + key.len as usize];
+                for (i, value) in fields.borrow().iter().enumerate() {
                     let prefix = if i != 0 { "," } else { "" };
-                    write!(f, "{prefix} {key}: {}", DisplayValue { value, ..*self })?;
+                    write!(f, "{prefix} {}", DisplayValue { value, ..*self })?;
                 }
                 write!(f, " }}")
             }
