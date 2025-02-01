@@ -254,7 +254,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 Value::Bool(bool)
                             }
                             Builtin::Println => {
-                                let Value::String(str) = self.pop_stack() else { panic!() };
+                                let str = self.pop_str();
                                 self.stdout.write_all(str.as_str(self.consts).as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
                                 Value::Null
