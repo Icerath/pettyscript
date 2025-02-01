@@ -61,24 +61,24 @@ impl PettyStr {
 /// # Safety
 /// bytecode must have been generated using codegen
 pub unsafe fn execute_bytecode(bytecode: &[u8]) {
-    let stdout = std::io::stdout().lock();
-    unsafe { execute_bytecode_with(stdout, bytecode).unwrap() }
+    let mut stdout = std::io::stdout().lock();
+    unsafe { execute_bytecode_with(bytecode, &mut stdout).unwrap() }
 }
 
 /// # Safety
 /// bytecode must have been generated using codegen
-pub unsafe fn execute_bytecode_with<W: Write>(stdout: W, bytecode: &[u8]) -> io::Result<()> {
+pub unsafe fn execute_bytecode_with(bytecode: &[u8], stdout: &mut dyn Write) -> io::Result<()> {
     unsafe { VirtualMachine::new(bytecode, stdout).execute() }
 }
 
-struct VirtualMachine<'a, W> {
+struct VirtualMachine<'a, 'io> {
     consts: &'a str,
     instructions: &'a [u8],
     head: usize,
     stack: Vec<Value>,
     call_stack: Vec<usize>,
     variable_stacks: Vec<Box<[Value]>>,
-    stdout: W,
+    stdout: &'io mut dyn Write,
 }
 
 macro_rules! impl_pop_helper {
@@ -92,7 +92,7 @@ macro_rules! impl_pop_helper {
     };
 }
 
-impl<'a, W: Write> VirtualMachine<'a, W> {
+impl<'a, 'io> VirtualMachine<'a, 'io> {
     impl_pop_helper! { pop_int, Int, i64 }
 
     impl_pop_helper! { pop_bool, Bool, bool }
@@ -117,7 +117,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         self.stack.last().unwrap_unchecked()
     }
 
-    fn new(bytecode: &'a [u8], stdout: W) -> Self {
+    fn new(bytecode: &'a [u8], stdout: &'io mut dyn Write) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
         assert_eq!(version, VERSION);
