@@ -51,43 +51,43 @@ enum Token {
 }
 
 fn lexer_next(lexer: Lexer) -> Token {
-    lexer.remaining = lexer.remaining.trim();
-    const first_char = lexer.remaining[0];
+    let rem = lexer.remaining.trim();
+    const first_char = rem[0];
   // FIXME: Provide a better way to handle default values or late initialization
     let token = Token.Ident;
 
     while true {
         let skip = 1;
 
-        if lexer.remaining.starts_with("//") {
+        if rem.starts_with("//") {
             let i = 2;
-            while i < lexer.remaining.len && lexer.remaining[i] != '\n' {
+            while i < rem.len && rem[i] != '\n' {
                 i = i + 1;
             }
-            lexer.remaining = lexer.remaining[i..lexer.remaining.len];
+            rem = rem[i..rem.len];
             continue;
         }
         // Keywords
-        else if lexer.remaining.starts_with("or") { token = Token.Or; skip = 2; }
-        else if lexer.remaining.starts_with("||") { token = Token.Or; skip = 2; }
-        else if lexer.remaining.starts_with("and") { token = Token.And; skip = 3; }
-        else if lexer.remaining.starts_with("&&") { token = Token.And; skip = 2; }
-        else if lexer.remaining.starts_with("if") { token = Token.If; skip = 2; }
-        else if lexer.remaining.starts_with("else") { token = Token.Else; skip = 4; }
-        else if lexer.remaining.starts_with("in") { token = Token.In; skip = 2; }
-        else if lexer.remaining.starts_with("fn") { token = Token.Fn; skip = 2; }
-        else if lexer.remaining.starts_with("for") { token = Token.For; skip = 3; }
-        else if lexer.remaining.starts_with("break") { token = Token.Break; skip = 5; }
-        else if lexer.remaining.starts_with("return") { token = Token.Return; skip = 6; }
-        else if lexer.remaining.starts_with("struct") { token = Token.Struct; skip = 6; }
-        else if lexer.remaining.starts_with("enum") { token = Token.Enum; skip = 4; }
+        else if rem.starts_with("or") { token = Token.Or; skip = 2; }
+        else if rem.starts_with("||") { token = Token.Or; skip = 2; }
+        else if rem.starts_with("and") { token = Token.And; skip = 3; }
+        else if rem.starts_with("&&") { token = Token.And; skip = 2; }
+        else if rem.starts_with("if") { token = Token.If; skip = 2; }
+        else if rem.starts_with("else") { token = Token.Else; skip = 4; }
+        else if rem.starts_with("in") { token = Token.In; skip = 2; }
+        else if rem.starts_with("fn") { token = Token.Fn; skip = 2; }
+        else if rem.starts_with("for") { token = Token.For; skip = 3; }
+        else if rem.starts_with("break") { token = Token.Break; skip = 5; }
+        else if rem.starts_with("return") { token = Token.Return; skip = 6; }
+        else if rem.starts_with("struct") { token = Token.Struct; skip = 6; }
+        else if rem.starts_with("enum") { token = Token.Enum; skip = 4; }
         // Symbols
-        else if lexer.remaining.starts_with("==") { token = Token.EqEq; skip = 2; }
-        else if lexer.remaining.starts_with("!=") { token = Token.BangEq; skip = 2; }
-        else if lexer.remaining.starts_with("<=") { token = Token.LAngleEq; skip = 2; }
-        else if lexer.remaining.starts_with(">=") { token = Token.RAngleEq; skip = 2; }
-        else if lexer.remaining.starts_with("..=") { token = Token.RangeInclusive; skip = 3; }else if first_char == '[' { token = Token.LBracket; }
-        else if lexer.remaining.starts_with("..") { token = Token.Range; skip = 2; }
+        else if rem.starts_with("==") { token = Token.EqEq; skip = 2; }
+        else if rem.starts_with("!=") { token = Token.BangEq; skip = 2; }
+        else if rem.starts_with("<=") { token = Token.LAngleEq; skip = 2; }
+        else if rem.starts_with(">=") { token = Token.RAngleEq; skip = 2; }
+        else if rem.starts_with("..=") { token = Token.RangeInclusive; skip = 3; }else if first_char == '[' { token = Token.LBracket; }
+        else if rem.starts_with("..") { token = Token.Range; skip = 2; }
         else if first_char == ']' { token = Token.RBracket; }
         else if first_char == '(' { token = Token.LParen; }
         else if first_char == ')' { token = Token.RParen; }
@@ -109,7 +109,7 @@ fn lexer_next(lexer: Lexer) -> Token {
         else if first_char == '=' { token = Token.Eq; }
         // Literals
         else if first_char.is_digit() || first_char == '_' {
-            while lexer.remaining[skip].is_digit() {
+            while rem[skip].is_digit() {
                 skip = skip + 1;
             }
             token = Token.Int;
@@ -119,20 +119,20 @@ fn lexer_next(lexer: Lexer) -> Token {
             token = Token.Character;
         } 
         else if first_char == '"' {
-            while lexer.remaining[skip] != '"' {
+            while rem[skip] != '"' {
                 skip = skip + 1;
             }
             skip = skip + 1;
             token = Token.String;
-        } else if lexer.remaining.starts_with("f\"") {
+        } else if rem.starts_with("f\"") {
             skip = skip + 1;
-            while lexer.remaining[skip] != '"' {
+            while rem[skip] != '"' {
                 skip = skip + 1;
             }
             skip = skip + 1;
             token = Token.FString;
         } else if first_char.is_alphabetic() {
-            while lexer.remaining[skip].is_alphabetic() {
+            while rem[skip].is_alphabetic() {
                 skip = skip + 1;
             }
             token = Token.Ident;
@@ -140,7 +140,7 @@ fn lexer_next(lexer: Lexer) -> Token {
             println(f"Invalid Symbol: {first_char}");
             exit(1);
         }
-        lexer.remaining = lexer.remaining[skip..lexer.remaining.len];
+        lexer.remaining = rem[skip..rem.len];
         return token;
     } 
 }
