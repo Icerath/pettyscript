@@ -1,7 +1,7 @@
 use macros::*;
 use rustc_hash::FxHashMap;
 
-use crate::builtints::{Builtin, BuiltinField};
+use crate::builtints::{Builtin, BuiltinField, MethodBuiltin};
 
 pub const VERSION: u32 = 0;
 
@@ -47,6 +47,7 @@ pub enum Op {
     Store(u32),
     LoadGlobal(u32),
     LoadBuiltinField(BuiltinField),
+    CallBuiltinMethod(MethodBuiltin),
     LoadField(u32),
     StoreField(u32),
     Pop,
@@ -137,6 +138,7 @@ impl_int!(i64);
 impl_from!(char, u32);
 impl_from!(Builtin, u16);
 impl_from!(BuiltinField, u16);
+impl_from!(MethodBuiltin, u8);
 impl_from!(EqTag, u8);
 
 impl BcRead for bool {

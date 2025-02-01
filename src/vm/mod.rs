@@ -39,7 +39,6 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Callable {
     Builtin(Builtin),
-    MethodBuiltin(MethodBuiltin),
     Function { label: u32, stack_size: u16 },
 }
 
@@ -259,55 +258,6 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                                 std::process::exit(int)
                             }
                         },
-                        Callable::MethodBuiltin(method) => match method {
-                            MethodBuiltin::CharIsAlphabetic(char) => {
-                                Value::Bool(char.is_alphabetic())
-                            }
-                            MethodBuiltin::CharIsDigit(char) => Value::Bool(char.is_ascii_digit()),
-                            MethodBuiltin::StrTrim { trimmed } => {
-                                Value::String(PettyStr::String(trimmed))
-                            }
-                            MethodBuiltin::StrIsAlphabetic(str) => Value::Bool(
-                                str.as_str(self.consts).chars().all(|c| c.is_ascii_alphabetic()),
-                            ),
-                            MethodBuiltin::StrIsDigit(str) => Value::Bool(
-                                str.as_str(self.consts).chars().all(|c| c.is_ascii_digit()),
-                            ),
-                            MethodBuiltin::StrStartsWith(str) => {
-                                let Value::String(arg) = self.pop_stack() else { panic!() };
-                                let arg = arg.as_str(self.consts);
-                                let str = str.as_str(self.consts);
-                                Value::Bool(str.starts_with(arg))
-                            }
-                            MethodBuiltin::MapGet(map) => {
-                                let key = self.pop_stack();
-                                map.borrow().get(&key).unwrap().clone()
-                            }
-                            MethodBuiltin::MapInsert(map) => {
-                                let value = self.pop_stack();
-                                let key = self.pop_stack();
-                                map.borrow_mut().insert(key, value);
-                                break 'fn_call;
-                            }
-                            MethodBuiltin::MapRemove(map) => {
-                                let key = self.pop_stack();
-                                map.borrow_mut().remove(&key);
-                                break 'fn_call;
-                            }
-                            MethodBuiltin::ArrayPush(arr) => {
-                                let value = self.pop_stack();
-                                arr.borrow_mut().push(value);
-                                break 'fn_call;
-                            }
-                            MethodBuiltin::ArrayPop(arr) => arr.borrow_mut().pop().unwrap(),
-                            MethodBuiltin::ArraySortInt(arr) => {
-                                arr.borrow_mut().sort_unstable_by_key(|key| match key {
-                                    Value::Int(int) => *int,
-                                    _ => unreachable_unchecked(),
-                                });
-                                Value::Array(arr)
-                            }
-                        },
                         Callable::Function { label, stack_size } => {
                             self.variable_stacks
                                 .push((0..stack_size).map(|_| Value::Bool(false)).collect());
@@ -369,6 +319,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let fields = Rc::new(RefCell::new(fields));
                     self.stack.push(Value::Struct { fields })
                 }
+                Op::CallBuiltinMethod(method) => self.call_builtin_method(method),
                 Op::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Op::LoadField(field) => {
                     let Value::Struct { fields } = self.pop_stack() else {
@@ -438,29 +389,65 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
         }
     }
 
+    unsafe fn call_builtin_method(&mut self, method: MethodBuiltin) {
+        use MethodBuiltin as M;
+
+        let value = match method {
+            M::CharIsDigit => Value::Bool(self.pop_char().is_ascii_digit()),
+            M::CharIsAlphabetic => Value::Bool(self.pop_char().is_alphabetic()),
+            M::StrTrim => {
+                let str = self.pop_str();
+                Value::String(PettyStr::String(Rc::new(str.as_str(self.consts).trim().into())))
+            }
+            M::StrStartsWith => {
+                let pat = self.pop_str();
+                let str = self.pop_str();
+
+                let pat = pat.as_str(self.consts);
+                let str = str.as_str(self.consts);
+
+                Value::Bool(str.starts_with(pat))
+            }
+
+            M::ArrayPop => self.pop_arr().borrow_mut().pop().unwrap(),
+            M::ArrayPush => {
+                let value = self.pop_stack();
+                self.pop_arr().borrow_mut().push(value);
+                return;
+            }
+            M::ArraySortInt => {
+                let arr = self.pop_arr();
+                arr.borrow_mut().sort();
+                Value::Array(arr)
+            }
+            M::MapInsert => {
+                let value = self.pop_stack();
+                let key = self.pop_stack();
+                let map = self.pop_map();
+                map.borrow_mut().insert(key, value);
+                return;
+            }
+            M::MapGet => {
+                let key = self.pop_stack();
+                let map = self.pop_map();
+                map.borrow().get(&key).unwrap().clone()
+            }
+            M::MapRemove => {
+                let key = self.pop_stack();
+                let map = self.pop_map();
+                map.borrow_mut().remove(&key);
+                return;
+            }
+            _ => todo!("{method:?}"),
+        };
+        self.stack.push(value);
+    }
+
     unsafe fn load_builtin_field(&mut self, field: BuiltinField) {
         use BuiltinField as B;
         let val = match field {
             B::StrLen => Value::Int(self.pop_str().as_str(self.consts).len() as i64),
-            B::StrIsAlphabetic => MethodBuiltin::StrIsAlphabetic(self.pop_str()).into(),
-            B::StrIsDigit => MethodBuiltin::StrIsDigit(self.pop_str()).into(),
-            B::StrStartsWith => MethodBuiltin::StrStartsWith(self.pop_str()).into(),
-            B::StrTrim => MethodBuiltin::StrTrim {
-                trimmed: Rc::new(self.pop_str().as_str(self.consts).trim().into()),
-            }
-            .into(),
-
-            B::CharIsDigit => MethodBuiltin::CharIsDigit(self.pop_char()).into(),
-            B::CharIsAlphabetic => MethodBuiltin::CharIsAlphabetic(self.pop_char()).into(),
-
             B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
-            B::ArrayPush => MethodBuiltin::ArrayPush(self.pop_arr()).into(),
-            B::ArrayPop => MethodBuiltin::ArrayPop(self.pop_arr()).into(),
-            B::ArraySortInt => MethodBuiltin::ArraySortInt(self.pop_arr()).into(),
-
-            B::MapGet => MethodBuiltin::MapGet(self.pop_map()).into(),
-            B::MapInsert => MethodBuiltin::MapInsert(self.pop_map()).into(),
-            B::MapRemove => MethodBuiltin::MapRemove(self.pop_map()).into(),
         };
         self.stack.push(val);
     }
@@ -509,7 +496,6 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 write!(f, "Function at {label}")
             }
             Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
-            Value::Callable(Callable::MethodBuiltin(method)) => write!(f, "Method: {method:?}"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
             Value::Range([start, end]) => write!(f, "{}..{}", start, end),

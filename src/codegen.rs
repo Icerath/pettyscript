@@ -6,7 +6,7 @@ use std::{
 use rustc_hash::FxHashMap;
 
 use crate::{
-    builtints::{Builtin, BuiltinField},
+    builtints::{Builtin, BuiltinField, MethodBuiltin},
     bytecode::{BytecodeBuilder, EqTag, Op, StrIdent},
     parser::*,
 };
@@ -72,6 +72,11 @@ impl Type {
             _ => false,
         }
     }
+}
+
+enum LoadMethod {
+    Builtin(MethodBuiltin),
+    //StructMethod(u32),
 }
 
 enum LoadField {
@@ -707,11 +712,12 @@ impl Codegen {
                 self.builder.insert(Op::FnCall);
                 ret_type
             }
+            Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
             Expr::FieldAccess { expr, field } => {
                 let typ = self.expr(expr);
-                let (load_field, typ) = self.load_field(typ.clone(), field);
+                let (load_field, field_typ) = self.load_field(typ, field);
                 self.insert_load_field(load_field);
-                typ
+                field_typ
             }
             Expr::Index { expr, index } => {
                 let container_typ = self.expr(expr);
@@ -771,6 +777,20 @@ impl Codegen {
                 typ
             }
         }
+    }
+
+    fn method_call(&mut self, expr: &Expr, method: &'static str, args: &[Expr]) -> Type {
+        let typ = self.expr(expr);
+        let (op, method) = self.load_method(typ, method);
+        assert_eq!(args.len(), method.args.len(), "{method:?}");
+        for (arg, param_typ) in args.iter().zip(method.args) {
+            let arg_typ = self.expr(arg);
+            assert_eq!(param_typ, arg_typ);
+        }
+        match op {
+            LoadMethod::Builtin(builtin) => self.builder.insert(Op::CallBuiltinMethod(builtin)),
+        }
+        method.ret
     }
 
     fn eq_tag(&self, typ: Type) -> EqTag {
@@ -837,75 +857,11 @@ impl Codegen {
             },
             Type::Str => match field {
                 "len" => (StrLen, Type::Int),
-                "trim" => {
-                    (StrTrim, Type::Function(Rc::new(FnSig { ret: Type::Str, args: [].into() })))
-                }
-                "starts_with" => (
-                    StrStartsWith,
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [Type::Str].into() })),
-                ),
-                "is_digit" => (
-                    StrIsDigit,
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                ),
-                "is_alphabetic" => (
-                    StrIsAlphabetic,
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                ),
                 _ => panic!("type str does not contain field: {field}"),
-            },
-            Type::Char => match field {
-                "is_digit" => (
-                    CharIsDigit,
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                ),
-                "is_alphabetic" => (
-                    CharIsAlphabetic,
-                    Type::Function(Rc::new(FnSig { ret: Type::Bool, args: [].into() })),
-                ),
-                _ => panic!("type char does not contain field: {field}"),
-            },
-            Type::Map { key, value } => match field {
-                "insert" => (
-                    MapInsert,
-                    Type::Function(Rc::new(FnSig {
-                        ret: Type::Null,
-                        args: [key.unwrap_complete(), value.unwrap_complete()].into(),
-                    })),
-                ),
-                "remove" => (
-                    MapRemove,
-                    Type::Function(Rc::new(FnSig {
-                        ret: Type::Null,
-                        args: [key.unwrap_complete()].into(),
-                    })),
-                ),
-                "get" => (
-                    MapGet,
-                    Type::Function(Rc::new(FnSig {
-                        ret: value.unwrap_complete(),
-                        args: [key.unwrap_complete()].into(),
-                    })),
-                ),
-                _ => panic!("type map does not contain field: {field}"),
             },
             Type::Array(of_incomplete) => {
                 let of = of_incomplete.unwrap_complete();
                 match field {
-                    "sort" if of == Type::Int => (
-                        ArraySortInt,
-                        Type::Function(Rc::new(FnSig {
-                            ret: Type::Array(of_incomplete),
-                            args: [].into(),
-                        })),
-                    ),
-                    "pop" => {
-                        (ArrayPop, Type::Function(Rc::new(FnSig { ret: of, args: [].into() })))
-                    }
-                    "push" => (
-                        ArrayPush,
-                        Type::Function(Rc::new(FnSig { ret: Type::Null, args: [of].into() })),
-                    ),
                     "len" => (ArrayLen, Type::Int),
                     _ => panic!("type Array({of:?}) does not contain field: {field}"),
                 }
@@ -913,6 +869,58 @@ impl Codegen {
             _ => panic!("type {typ:?} does not contain field: {field}"),
         };
         (LoadField::Builtin(builtin_field), typ)
+    }
+
+    fn load_method(&mut self, typ: Type, method: &'static str) -> (LoadMethod, FnSig) {
+        // TODO: Should these function signatures contain self as their first argument?
+
+        use MethodBuiltin::*;
+
+        let (builtin_field, fn_sig) = match typ {
+            Type::Enum { .. } => todo!("enum methods"),
+            Type::Struct { .. } => todo!("struct methods"),
+            Type::Str => match method {
+                "trim" => (StrTrim, FnSig { ret: Type::Str, args: [].into() }),
+                "starts_with" => {
+                    (StrStartsWith, FnSig { ret: Type::Bool, args: [Type::Str].into() })
+                }
+                "is_digit" => (StrIsDigit, FnSig { ret: Type::Bool, args: [].into() }),
+                "is_alphabetic" => (StrIsAlphabetic, FnSig { ret: Type::Bool, args: [].into() }),
+                _ => panic!("type str does not contain method: {method}"),
+            },
+            Type::Char => match method {
+                "is_digit" => (CharIsDigit, FnSig { ret: Type::Bool, args: [].into() }),
+                "is_alphabetic" => (CharIsAlphabetic, FnSig { ret: Type::Bool, args: [].into() }),
+                _ => panic!("type char does not contain method: {method}"),
+            },
+            Type::Map { key, value } => match method {
+                "insert" => (MapInsert, FnSig {
+                    ret: Type::Null,
+                    args: [key.unwrap_complete(), value.unwrap_complete()].into(),
+                }),
+                "remove" => {
+                    (MapRemove, FnSig { ret: Type::Null, args: [key.unwrap_complete()].into() })
+                }
+                "get" => (MapGet, FnSig {
+                    ret: value.unwrap_complete(),
+                    args: [key.unwrap_complete()].into(),
+                }),
+                _ => panic!("type map does not contain method: {method}"),
+            },
+            Type::Array(of_incomplete) => {
+                let of = of_incomplete.unwrap_complete();
+                match method {
+                    "sort" if of == Type::Int => {
+                        (ArraySortInt, FnSig { ret: Type::Array(of_incomplete), args: [].into() })
+                    }
+                    "pop" => (ArrayPop, FnSig { ret: of, args: [].into() }),
+                    "push" => (ArrayPush, FnSig { ret: Type::Null, args: [of].into() }),
+                    _ => panic!("type Array({of:?}) does not contain method: {method}"),
+                }
+            }
+            _ => panic!("type {typ:?} does not contain method: {method}"),
+        };
+        (LoadMethod::Builtin(builtin_field), fn_sig)
     }
 
     fn finish(self) -> Vec<u8> {

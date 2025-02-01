@@ -1,7 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
-use crate::vm::{Callable, PettyMap, PettyStr, Value};
-
 #[derive(
     macros::NumVariants, macros::AllVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
 )]
@@ -13,32 +9,8 @@ pub enum Builtin {
     Assert,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MethodBuiltin {
-    StrTrim { trimmed: Rc<Box<str>> },
-    StrStartsWith(PettyStr),
-    StrIsDigit(PettyStr),
-    StrIsAlphabetic(PettyStr),
-    CharIsDigit(char),
-    CharIsAlphabetic(char),
-    MapGet(Rc<RefCell<PettyMap>>),
-    MapInsert(Rc<RefCell<PettyMap>>),
-    MapRemove(Rc<RefCell<PettyMap>>),
-    ArrayPush(Rc<RefCell<Vec<Value>>>),
-    ArrayPop(Rc<RefCell<Vec<Value>>>),
-    ArraySortInt(Rc<RefCell<Vec<Value>>>),
-}
-
-impl From<MethodBuiltin> for Value {
-    fn from(value: MethodBuiltin) -> Self {
-        Self::Callable(Callable::MethodBuiltin(value))
-    }
-}
-
 #[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u16)]
-pub enum BuiltinField {
-    StrLen,
+pub enum MethodBuiltin {
     StrTrim,
     StrStartsWith,
     StrIsDigit,
@@ -47,14 +19,31 @@ pub enum BuiltinField {
     CharIsDigit,
     CharIsAlphabetic,
 
-    ArrayPush,
-    ArrayPop,
-    ArrayLen,
-    ArraySortInt,
-
+    MapGet,
     MapInsert,
     MapRemove,
-    MapGet,
+
+    ArrayPush,
+    ArrayPop,
+    ArraySortInt,
+}
+
+impl TryFrom<u8> for MethodBuiltin {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value as usize >= Self::VARIANT_COUNT {
+            return Err(());
+        }
+        Ok(unsafe { std::mem::transmute::<u8, Self>(value) })
+    }
+}
+
+#[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u16)]
+pub enum BuiltinField {
+    StrLen,
+    ArrayLen,
 }
 
 impl TryFrom<u16> for BuiltinField {

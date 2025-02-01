@@ -94,6 +94,7 @@ pub struct Block {
 pub enum Expr {
     Index { expr: Box<Expr>, index: Box<Expr> },
     FieldAccess { expr: Box<Expr>, field: &'static str },
+    MethodCall { expr: Box<Expr>, method: &'static str, args: Box<[Expr]> },
     Literal(Literal),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
@@ -304,6 +305,24 @@ impl<'a> Parser<'a> {
         Ok(root)
     }
 
+    fn parse_separated_exprs(
+        &mut self,
+        sep: TokenKind,
+        terminator: TokenKind,
+    ) -> Result<Vec<Expr>> {
+        let mut args = vec![];
+        while self.peek()?.kind() != terminator {
+            let expr = self.parse_root_expr()?;
+            args.push(expr);
+            if self.peek()?.kind() == terminator {
+                break;
+            }
+            self.expect_token(sep)?;
+        }
+        self.skip();
+        Ok(args)
+    }
+
     fn parse_leaf_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
         let mut expr = self.parse_unary_expr(allow_struct_init)?;
 
@@ -311,22 +330,20 @@ impl<'a> Parser<'a> {
             match self.peek()? {
                 Token::LParen => {
                     self.skip();
-                    let mut args = vec![];
-                    while self.peek()? != Token::RParen {
-                        let expr = self.parse_root_expr()?;
-                        args.push(expr);
-                        if self.peek()? == Token::RParen {
-                            break;
-                        }
-                        self.expect_token(Token::Comma)?;
-                    }
-                    self.skip();
+                    let args = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RParen)?;
                     expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
                 }
-                Token::Dot => {
+                Token::Dot => 'block: {
                     self.skip();
                     let field = self.parse_ident()?;
-                    expr = Expr::FieldAccess { expr: Box::new(expr), field };
+                    if self.peek()? != Token::LParen {
+                        expr = Expr::FieldAccess { expr: Box::new(expr), field };
+                        break 'block;
+                    }
+                    self.skip();
+                    let args = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RParen)?;
+                    expr =
+                        Expr::MethodCall { expr: Box::new(expr), method: field, args: args.into() }
                 }
                 Token::LBracket => {
                     self.skip();
