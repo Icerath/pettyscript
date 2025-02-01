@@ -366,11 +366,15 @@ impl Codegen {
                     Type::Bool => {}
                     other => panic!("Cannot use type {other:?} in if stmts"),
                 }
-                let final_end_label = self.builder.create_label();
+                let not_lone_if = !else_ifs.is_empty() || r#else.is_some();
+
+                let final_end_label = if not_lone_if { self.builder.create_label() } else { 0 };
                 let mut next_label = self.builder.create_label();
                 self.builder.insert(Op::CJump(next_label));
                 self.gen_block(&first.body.stmts);
-                self.builder.insert(Op::Jump(final_end_label));
+                if not_lone_if {
+                    self.builder.insert(Op::Jump(final_end_label));
+                }
                 for elseif in else_ifs {
                     self.builder.insert_label(next_label);
                     let typ = self.expr(&elseif.condition);
@@ -381,13 +385,17 @@ impl Codegen {
                     next_label = self.builder.create_label();
                     self.builder.insert(Op::CJump(next_label));
                     self.gen_block(&elseif.body.stmts);
-                    self.builder.insert(Op::Jump(final_end_label));
+                    if not_lone_if {
+                        self.builder.insert(Op::Jump(final_end_label));
+                    }
                 }
                 self.builder.insert_label(next_label);
                 if let Some(block) = r#else {
                     self.gen_block(&block.stmts);
                 }
-                self.builder.insert_label(final_end_label);
+                if not_lone_if {
+                    self.builder.insert_label(final_end_label);
+                }
             }
             Stmt::Expr(expr) => {
                 // TODO: Pop will need an explicit type
