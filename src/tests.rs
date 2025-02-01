@@ -128,8 +128,8 @@ fn test_maps() {
         "{Bob: 32, Alice: 34}"
     );
     test_expr!(
-        r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}"); hi.remove("Bob"); println(f"{hi}"); println(f"{hi.get("Bob")}");"#,
-        "32\n{}\nnull"
+        r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}"); hi.remove("Bob"); println(f"{hi}");"#,
+        "32\n{}"
     );
     test_expr!(
         r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}");"#,

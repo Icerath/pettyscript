@@ -296,8 +296,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                             }
                             MethodBuiltin::MapGet(map) => {
                                 let key = self.pop_stack();
-                                // TODO: Is this the right output for unknown key?
-                                map.borrow().get(&key).cloned().unwrap_or(Value::Null)
+                                map.borrow().get(&key).unwrap().clone()
                             }
                             MethodBuiltin::MapInsert(map) => {
                                 let value = self.pop_stack();
@@ -315,10 +314,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 arr.borrow_mut().push(value);
                                 Value::Null
                             }
-                            MethodBuiltin::ArrayPop(arr) => {
-                                // TODO: Is this the right output for an empty array?
-                                arr.borrow_mut().pop().unwrap_or(Value::Null)
-                            }
+                            MethodBuiltin::ArrayPop(arr) => arr.borrow_mut().pop().unwrap(),
                         },
                         Callable::Function { label, stack_size } => {
                             self.variable_stacks
