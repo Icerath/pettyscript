@@ -407,7 +407,11 @@ impl Codegen {
                 );
                 self.builder.insert(Op::Ret);
             }
-            _ => todo!("{node:?}"),
+            Stmt::Block(block) => {
+                for stmt in &block.stmts {
+                    self.r#gen(stmt);
+                }
+            }
         }
     }
 
