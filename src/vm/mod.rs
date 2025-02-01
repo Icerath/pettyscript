@@ -337,8 +337,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let Value::Int(rhs) = self.pop_stack() else { unreachable_unchecked() };
                     self.stack.push(Value::Int(lhs + rhs));
                 }
-                Op::LoadTrue => self.stack.push(Value::Bool(true)),
-                Op::LoadFalse => self.stack.push(Value::Bool(false)),
+                Op::LoadBool(bool) => self.stack.push(Value::Bool(bool)),
                 Op::CreateFunction { stack_size } => {
                     self.stack.push(Value::Callable(Callable::Function {
                         label: self.head as u32 + 5 + 5,

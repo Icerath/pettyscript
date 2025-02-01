@@ -36,8 +36,7 @@ pub enum Op {
     InsertMap,
     CreateArray,
     ArrayPush,
-    LoadTrue,
-    LoadFalse,
+    LoadBool(bool),
     LoadChar(char),
     LoadInt(i64),
     LoadIntSmall(i16),
@@ -79,6 +78,7 @@ trait BcRead: Sized {
     fn bc_read(bytes: &mut &[u8]) -> Self;
     unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self;
 }
+
 trait BcWrite {
     fn bc_write(&self, buf: &mut Vec<u8>);
 }
@@ -138,6 +138,26 @@ impl_from!(char, u32);
 impl_from!(Builtin, u16);
 impl_from!(BuiltinField, u16);
 impl_from!(EqTag, u8);
+
+impl BcRead for bool {
+    fn bc_read(bytes: &mut &[u8]) -> Self {
+        match u8::bc_read(bytes) {
+            0 => false,
+            1 => true,
+            _ => panic!(),
+        }
+    }
+
+    unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self {
+        (unsafe { u8::bc_read_unchecked(bytes) } & 1) == 1
+    }
+}
+
+impl BcWrite for bool {
+    fn bc_write(&self, buf: &mut Vec<u8>) {
+        u8::from(*self).bc_write(buf);
+    }
+}
 
 impl BcRead for StrIdent {
     fn bc_read(bytes: &mut &[u8]) -> Self {

@@ -554,12 +554,8 @@ impl Codegen {
                         value: Rc::new(IncompleteType::Complete(val_typ)),
                     }
                 }
-                Literal::Bool(true) => {
-                    self.builder.insert(Op::LoadTrue);
-                    Type::Bool
-                }
-                Literal::Bool(false) => {
-                    self.builder.insert(Op::LoadFalse);
+                Literal::Bool(bool) => {
+                    self.builder.insert(Op::LoadBool(*bool));
                     Type::Bool
                 }
                 Literal::Char(char) => {
