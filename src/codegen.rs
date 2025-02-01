@@ -23,7 +23,7 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
 
     if let Some(var) = codegen.scopes.last().unwrap().variables.get("main") {
         codegen.builder.insert(Op::Load(var.offset));
-        codegen.builder.insert(Op::FnCall { numargs: 0 });
+        codegen.builder.insert(Op::FnCall);
         codegen.builder.insert(Op::Pop);
     }
     let last_scope = codegen.scopes.pop().unwrap();
@@ -683,7 +683,7 @@ impl Codegen {
                     }
                     other => panic!("Cannot call {other:?}"),
                 };
-                self.builder.insert(Op::FnCall { numargs: args.len() as u8 });
+                self.builder.insert(Op::FnCall);
                 ret_type
             }
             Expr::FieldAccess { expr, field } => {

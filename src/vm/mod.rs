@@ -248,33 +248,29 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         self.head = label as usize;
                     }
                 }
-                Op::FnCall { numargs } => 'fn_call: {
+                Op::FnCall => 'fn_call: {
                     let Value::Callable(callable) = self.pop_stack() else { panic!() };
                     let value = match callable {
                         Callable::Builtin(builtin) => match builtin {
                             Builtin::Assert => {
-                                assert_eq!(numargs, 1);
                                 let bool = self.pop_bool();
                                 assert!(bool, "RUNTIME ASSERTION FAILED");
                                 Value::Bool(bool)
                             }
                             Builtin::Println => {
-                                assert_eq!(numargs, 1);
                                 let Value::String(str) = self.pop_stack() else { panic!() };
                                 self.stdout.write_all(str.as_str(self.consts).as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
                                 Value::Null
                             }
                             Builtin::ReadFile => {
-                                assert_eq!(numargs, 1);
                                 let str = self.pop_str();
                                 let string =
                                     std::fs::read_to_string(str.as_str(self.consts)).unwrap();
                                 Value::String(PettyStr::String(Rc::new(string.into())))
                             }
                             Builtin::Exit => {
-                                assert!(numargs <= 1);
-                                let int = if numargs == 1 { self.pop_int() as i32 } else { 0 };
+                                let int = self.pop_int() as i32;
                                 std::process::exit(int)
                             }
                         },
@@ -293,39 +289,33 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 str.as_str(self.consts).chars().all(|c| c.is_ascii_digit()),
                             ),
                             MethodBuiltin::StrStartsWith(str) => {
-                                assert_eq!(numargs, 1);
                                 let Value::String(arg) = self.pop_stack() else { panic!() };
                                 let arg = arg.as_str(self.consts);
                                 let str = str.as_str(self.consts);
                                 Value::Bool(str.starts_with(arg))
                             }
                             MethodBuiltin::MapGet(map) => {
-                                assert_eq!(numargs, 1);
                                 let key = self.pop_stack();
                                 // TODO: Is this the right output for unknown key?
                                 map.borrow().get(&key).cloned().unwrap_or(Value::Null)
                             }
                             MethodBuiltin::MapInsert(map) => {
-                                assert_eq!(numargs, 2);
                                 let value = self.pop_stack();
                                 let key = self.pop_stack();
                                 map.borrow_mut().insert(key, value);
                                 Value::Null
                             }
                             MethodBuiltin::MapRemove(map) => {
-                                assert_eq!(numargs, 1);
                                 let key = self.pop_stack();
                                 map.borrow_mut().remove(&key);
                                 Value::Null
                             }
                             MethodBuiltin::ArrayPush(arr) => {
-                                assert_eq!(numargs, 1);
                                 let value = self.pop_stack();
                                 arr.borrow_mut().push(value);
                                 Value::Null
                             }
                             MethodBuiltin::ArrayPop(arr) => {
-                                assert_eq!(numargs, 0);
                                 // TODO: Is this the right output for an empty array?
                                 arr.borrow_mut().pop().unwrap_or(Value::Null)
                             }
