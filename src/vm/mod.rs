@@ -140,10 +140,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
-    unsafe fn read_str(&self, ptr: u32, len: u32) -> &str {
-        unsafe { self.consts.get_unchecked(ptr as usize..ptr as usize + len as usize) }
-    }
-
     unsafe fn execute(&mut self) -> io::Result<()> {
         while self.head < self.instructions.len() {
             let op = Op::bc_read_unchecked(&self.instructions[self.head..]);
@@ -152,20 +148,13 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::Abort => panic!("ABORTING"),
                 Op::BuildFstr { num_segments } => {
                     let mut builder = String::new();
-                    let remaining = self.pop_stack();
                     for _ in 0..num_segments {
                         let value = self.pop_stack();
-                        let Value::String(PettyStr::Literal { ptr, len }) = self.pop_stack() else {
-                            panic!()
-                        };
-                        builder.push_str(self.read_str(ptr, len));
                         let _ = write!(builder, "{}", DisplayValue {
                             value: &value,
                             consts: self.consts
                         });
                     }
-                    let Value::String(PettyStr::Literal { ptr, len }) = remaining else { panic!() };
-                    builder.push_str(self.read_str(ptr, len));
                     self.stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
                 }
                 Op::CreateMap => self.stack.push(Value::Map(Rc::default())),

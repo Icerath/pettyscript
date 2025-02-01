@@ -580,9 +580,13 @@ impl Codegen {
                     Type::Str
                 }
                 Literal::FString(fstring) => {
+                    let mut num_segments = fstring.segments.len() as u16;
                     for (str, expr) in &fstring.segments {
                         let [ptr, len] = self.builder.insert_string(str);
-                        self.builder.insert(Op::LoadString { ptr, len });
+                        if len != 0 {
+                            self.builder.insert(Op::LoadString { ptr, len });
+                            num_segments += 1;
+                        }
                         let typ = self.expr(expr);
 
                         if typ == Type::Null {
@@ -593,9 +597,11 @@ impl Codegen {
                         }
                     }
                     let [ptr, len] = self.builder.insert_string(fstring.remaining);
-                    self.builder.insert(Op::LoadString { ptr, len });
-                    self.builder
-                        .insert(Op::BuildFstr { num_segments: fstring.segments.len() as u16 });
+                    if len != 0 {
+                        self.builder.insert(Op::LoadString { ptr, len });
+                        num_segments += 1;
+                    }
+                    self.builder.insert(Op::BuildFstr { num_segments });
                     Type::Str
                 }
                 Literal::Ident(ident) => self.load(ident),
