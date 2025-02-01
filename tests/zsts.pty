@@ -11,4 +11,6 @@ x = hi.x;
 fn takes_null(x: null) {}
 takes_null(x);
 
+let y: null;
+
 // TODO: How do we handle builtins expecting values?
