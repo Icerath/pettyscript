@@ -14,10 +14,11 @@ pub fn disassemble(bytecode: &[u8]) {
     let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
     reader.bytes = &reader.bytes[len_consts..];
 
-    macro_rules! load_ident {
-        ($ident: ident) => {
-            &consts[$ident.ptr as usize..$ident.ptr as usize + $ident.len as usize]
-        };
+    macro_rules! load_str {
+        ($ptr: expr, $len: expr) => {{
+            let ptr = $ptr;
+            &consts[ptr as usize..ptr as usize + $len as usize]
+        }};
     }
 
     while reader.head < reader.bytes.len() {
@@ -52,20 +53,24 @@ pub fn disassemble(bytecode: &[u8]) {
             Op::LoadFalse => println!("LOAD_FALSE"),
             Op::LoadTrue => println!("LOAD_TRUE"),
             Op::Pop => println!("POP"),
-            Op::LoadField(field) => println!("LOAD_FIELD {}", load_ident!(field)),
+            Op::LoadField(field) => println!("LOAD_FIELD {}", load_str!(field.ptr, field.len)),
             Op::LoadBuiltinField(field) => println!("LOAD_FIELD {}", field as u8),
-            Op::StoreField(field) => println!("STORE_FIELD {}", load_ident!(field)),
+            Op::StoreField(field) => println!("STORE_FIELD {}", load_str!(field.ptr, field.len)),
             Op::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
             Op::LoadIntSmall(int) => println!("LOAD_INT_SMALL {int}"),
             Op::LoadInt(int) => println!("LOAD_INT {int}"),
             Op::LoadNull => println!("LOAD_NULL"),
-            Op::LoadString { ptr, len } => println!("LOAD_STR {ptr} {len}"),
+            Op::LoadString { ptr, len } => {
+                println!("LOAD_STR {:?}", load_str!(ptr, len))
+            }
             Op::Mod => println!("MODULO"),
             Op::Not => println!("NOT"),
             Op::Range => println!("RANGE"),
             Op::RangeInclusive => println!("RANGE_INCLUSIVE"),
             Op::Ret => println!("RET"),
-            Op::LoadVariant(ident) => println!("LOAD_VARIANT {}", load_ident!(ident)),
+            Op::LoadVariant(ident) => {
+                println!("LOAD_VARIANT {}", load_str!(ident.ptr, ident.len))
+            }
         };
     }
 }
