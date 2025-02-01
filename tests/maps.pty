@@ -1,0 +1,15 @@
+let a: map[str, int] = #{};
+a.insert("Bob", 32); a.insert("Alice", 34);
+assert(f"{a}" == "{Bob: 32, Alice: 34}");
+
+let b: map[str, int] = #{};
+b.insert("Bob", 32);
+assert(b.get("Bob") == 32);
+b.remove("Bob");
+assert(f"{b}" == "{}");
+
+let c: map[str, int] = #{};
+c.insert("Bob", 32);
+assert(f"{c.get("Bob")}" == "32");
+
+assert(f"{#{ "Bob": 32 }}" == "{Bob: 32}");

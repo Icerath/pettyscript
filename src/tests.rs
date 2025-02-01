@@ -122,23 +122,6 @@ fn test_while_loops() {
 }
 
 #[test]
-fn test_maps() {
-    test_expr!(
-        r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); hi.insert("Alice", 34); println(f"{hi}")"#,
-        "{Bob: 32, Alice: 34}"
-    );
-    test_expr!(
-        r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}"); hi.remove("Bob"); println(f"{hi}");"#,
-        "32\n{}"
-    );
-    test_expr!(
-        r#"let hi: map[str, int] = #{}; hi.insert("Bob", 32); println(f"{hi.get("Bob")}");"#,
-        "32"
-    );
-    test_expr!(r#"println(f"{#{ "Bob": 32 }}")"#, "{Bob: 32}");
-}
-
-#[test]
 fn test_if_stmt() {
     test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
     test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
