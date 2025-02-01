@@ -29,7 +29,6 @@ pub enum Op {
     Less(EqTag),
     Range,
     RangeInclusive,
-    LoadNull,
     Index,
     LoadVariant(StrIdent),
     CreateFunction { stack_size: u16 },

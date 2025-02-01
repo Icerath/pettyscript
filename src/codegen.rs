@@ -24,7 +24,6 @@ pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
     if let Some(var) = codegen.scopes.last().unwrap().variables.get("main") {
         codegen.builder.insert(Op::Load(var.offset));
         codegen.builder.insert(Op::FnCall);
-        codegen.builder.insert(Op::Pop);
     }
     let last_scope = codegen.scopes.pop().unwrap();
     codegen.builder.set_global_stack_size(last_scope.variables.len() as u32);
@@ -54,7 +53,13 @@ pub enum Type {
     Array(Rc<IncompleteType>),
     Function(Rc<FnSig>),
 }
+
 impl Type {
+    pub fn is_zst(&self) -> bool {
+        // TODO: Empty structs should probably also be zsts
+        matches!(self, Self::Null)
+    }
+
     pub fn matches(&self, other: &Type) -> bool {
         if self == other {
             return true;
@@ -73,6 +78,7 @@ enum LoadField {
     Builtin(BuiltinField),
     StructField(u32),
     EnumVariant(StrIdent),
+    ZstField,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -234,7 +240,6 @@ impl Codegen {
                 self.scopes.pop().unwrap();
 
                 if ret == Type::Null {
-                    self.builder.insert(Op::LoadNull);
                     self.builder.insert(Op::Ret);
                 } else {
                     // FIXME: Instead produce a compile error when this is possible
@@ -373,19 +378,15 @@ impl Codegen {
                 }
             }
             Stmt::Expr(expr) => {
-                // TODO: Pop will need an explicit type
-                let _ = self.expr(expr);
-                self.builder.insert(Op::Pop);
+                let typ = self.expr(expr);
+                if !typ.is_zst() {
+                    self.builder.insert(Op::Pop);
+                }
             }
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
             Stmt::Return(Return(expr)) => {
-                let typ = if let Some(expr) = expr {
-                    self.expr(expr)
-                } else {
-                    self.builder.insert(Op::LoadNull);
-                    Type::Null
-                };
+                let typ = if let Some(expr) = expr { self.expr(expr) } else { Type::Null };
                 let scope = self.scopes.last().unwrap();
                 assert!(
                     scope.ret == typ,
@@ -405,10 +406,10 @@ impl Codegen {
         });
         let ty = match expr {
             Some(expr) => self.expr(expr),
-            None => {
+            None => 'block: {
                 let expected = expected.clone().unwrap();
                 let op = match expected {
-                    Type::Null => Op::LoadNull,
+                    Type::Null => break 'block Type::Null,
                     Type::Int => Op::LoadIntSmall(0),
                     Type::Str => Op::LoadString { ptr: 0, len: 0 },
                     _ => todo!("{expected:?}"),
@@ -686,6 +687,7 @@ impl Codegen {
             Expr::InitStruct { ident, fields } => {
                 let struct_type = self.load_name_type(ident).unwrap();
                 let Type::Struct { name: _, fields: type_fields } = &struct_type else { panic!() };
+                // TODO: Reduce struct size for zst fields.
                 self.builder.insert(Op::CreateStruct { size: type_fields.len() as u32 });
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(ident));
@@ -772,6 +774,7 @@ impl Codegen {
             LoadField::Builtin(builtin) => self.builder.insert(Op::LoadBuiltinField(builtin)),
             LoadField::StructField(field) => self.builder.insert(Op::LoadField(field)),
             LoadField::EnumVariant(variant) => self.builder.insert(Op::LoadVariant(variant)),
+            LoadField::ZstField => {}
         }
     }
 

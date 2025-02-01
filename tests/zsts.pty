@@ -1,0 +1,3 @@
+// Add null global builtin / keyword.
+struct Hi { x: null }
+fn takes_null(x: null) {}

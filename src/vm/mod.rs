@@ -23,7 +23,6 @@ pub type PettyMap = BTreeMap<Value, Value>;
 // TODO: Avoid extra indirection/allocation for Struct.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
-    Null,
     Bool(bool),
     EnumVariant { name: StrIdent },
     Char(char),
@@ -135,7 +134,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
         let global_scope = Builtin::ALL
             .map(|b| Value::Callable(Callable::Builtin(b)))
             .into_iter()
-            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Null))
+            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Bool(false)))
             .collect();
         let variable_stacks: Vec<Box<[Value]>> = vec![global_scope];
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
@@ -258,7 +257,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 let str = self.pop_str();
                                 self.stdout.write_all(str.as_str(self.consts).as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
-                                Value::Null
+                                break 'fn_call;
                             }
                             Builtin::ReadFile => {
                                 let str = self.pop_str();
@@ -299,23 +298,23 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                                 let value = self.pop_stack();
                                 let key = self.pop_stack();
                                 map.borrow_mut().insert(key, value);
-                                Value::Null
+                                break 'fn_call;
                             }
                             MethodBuiltin::MapRemove(map) => {
                                 let key = self.pop_stack();
                                 map.borrow_mut().remove(&key);
-                                Value::Null
+                                break 'fn_call;
                             }
                             MethodBuiltin::ArrayPush(arr) => {
                                 let value = self.pop_stack();
                                 arr.borrow_mut().push(value);
-                                Value::Null
+                                break 'fn_call;
                             }
                             MethodBuiltin::ArrayPop(arr) => arr.borrow_mut().pop().unwrap(),
                         },
                         Callable::Function { label, stack_size } => {
                             self.variable_stacks
-                                .push((0..stack_size).map(|_| Value::Null).collect());
+                                .push((0..stack_size).map(|_| Value::Bool(false)).collect());
                             let here = self.head;
                             self.call_stack.push(here);
                             self.head = label as usize;
@@ -357,7 +356,6 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                         stack_size,
                     }))
                 }
-                Op::LoadNull => self.stack.push(Value::Null),
                 Op::Ret => {
                     self.head = self.call_stack.pop().unwrap();
                     self.variable_stacks.pop().unwrap();
@@ -372,7 +370,7 @@ impl<'a, W: Write> VirtualMachine<'a, W> {
                 Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
                 Op::CreateStruct { size } => {
                     let fields: Box<[Value]> =
-                        std::iter::repeat_with(|| Value::Null).take(size as usize).collect();
+                        std::iter::repeat_with(|| Value::Bool(false)).take(size as usize).collect();
                     let fields = Rc::new(RefCell::new(fields));
                     self.stack.push(Value::Struct { fields })
                 }
@@ -516,7 +514,6 @@ impl fmt::Display for DisplayValue<'_, '_> {
             }
             Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
             Value::Callable(Callable::MethodBuiltin(method)) => write!(f, "Method: {method:?}"),
-            Value::Null => write!(f, "null"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
             Value::Range([start, end]) => write!(f, "{}..{}", start, end),
