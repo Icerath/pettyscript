@@ -140,10 +140,12 @@ fn builtin_type(builtin: Builtin) -> Type {
 
 impl Codegen {
     fn insert_builtins(&mut self) {
-        for builtin in Builtin::ALL {
-            self.write_ident_offset(builtin.name(), builtin_type(builtin), true);
-        }
         let scope = self.scopes.first_mut().unwrap();
+        for builtin in Builtin::ALL {
+            let offset = scope.variables.len() as u32;
+            let builtin_var = Variable { offset, typ: builtin_type(builtin), is_const: true };
+            scope.variables.insert(builtin.name(), builtin_var);
+        }
         // FIXME: Should these types be inserted into the interner?
         scope.named_types.insert("int", Type::Int);
         scope.named_types.insert("str", Type::Str);
