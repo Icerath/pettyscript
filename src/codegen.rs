@@ -632,47 +632,7 @@ impl Codegen<'_> {
                 }
             }
             Expr::Binary { op, exprs } => 'block: {
-                let op = match op {
-                    BinOp::Range => Op::Range,
-                    BinOp::RangeInclusive => Op::RangeInclusive,
-                    BinOp::Mod => Op::Mod,
-                    BinOp::Add => {
-                        let lhs = self.expr(&exprs[0])?;
-                        let rhs = self.expr(&exprs[1])?;
-                        assert_eq!(lhs, Type::Int);
-                        assert_eq!(rhs, Type::Int);
-                        self.builder.insert(Op::AddInt);
-                        break 'block Type::Int;
-                    }
-                    BinOp::Eq => {
-                        let lhs = self.expr(&exprs[0])?;
-                        let rhs = self.expr(&exprs[1])?;
-                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq);
-                        break 'block Type::Bool;
-                    }
-                    BinOp::Greater => {
-                        let lhs = self.expr(&exprs[0])?;
-                        let rhs = self.expr(&exprs[1])?;
-                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Greater);
-                        break 'block Type::Bool;
-                    }
-                    BinOp::Less => {
-                        let lhs = self.expr(&exprs[0])?;
-                        let rhs = self.expr(&exprs[1])?;
-                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Less);
-                        break 'block Type::Bool;
-                    }
-                    BinOp::Neq => {
-                        let lhs = self.expr(&exprs[0])?;
-                        let rhs = self.expr(&exprs[1])?;
-                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq);
-                        self.builder.insert(Op::Not);
-                        break 'block Type::Bool;
-                    }
+                match op {
                     BinOp::And => {
                         let end_label = self.builder.create_label();
                         let lhs = self.expr(&exprs[0])?;
@@ -698,11 +658,45 @@ impl Codegen<'_> {
                         self.builder.insert_label(end_label);
                         break 'block Type::Bool;
                     }
+                    _ => {}
+                };
+                let lhs = self.expr(&exprs[0])?;
+                let rhs = self.expr(&exprs[1])?;
+
+                let op = match op {
+                    BinOp::Range => Op::Range,
+                    BinOp::RangeInclusive => Op::RangeInclusive,
+                    BinOp::Mod => Op::Mod,
+                    BinOp::Add => {
+                        assert_eq!(lhs, Type::Int);
+                        assert_eq!(rhs, Type::Int);
+                        self.builder.insert(Op::AddInt);
+                        break 'block Type::Int;
+                    }
+                    BinOp::Eq => {
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Eq);
+                        break 'block Type::Bool;
+                    }
+                    BinOp::Greater => {
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Greater);
+                        break 'block Type::Bool;
+                    }
+                    BinOp::Less => {
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Less);
+                        break 'block Type::Bool;
+                    }
+                    BinOp::Neq => {
+                        assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
+                        self.builder.insert(Op::Eq);
+                        self.builder.insert(Op::Not);
+                        break 'block Type::Bool;
+                    }
                     _ => todo!("{op:?}"),
                 };
-                let lhs_ty = self.expr(&exprs[0])?;
-                let rhs_ty = self.expr(&exprs[1])?;
-                let typ = match (lhs_ty, rhs_ty, op) {
+                let typ = match (lhs, rhs, op) {
                     (Type::Int, Type::Int, Op::Range) => Type::Range,
                     (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
                     (_, _, Op::Range | Op::RangeInclusive) => panic!(),
