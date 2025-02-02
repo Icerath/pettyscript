@@ -113,12 +113,10 @@ fn lexer_next(lexer: Lexer) -> Token {
                 skip = skip + 1;
             }
             token = Token.Int;
-        }
-        else if first_char == '\'' {
+        } else if first_char == '\'' {
             skip = skip + 2;
             token = Token.Character;
-        } 
-        else if first_char == '"' {
+        } else if first_char == '"' {
             while rem[skip] != '"' {
                 skip = skip + 1;
             }
