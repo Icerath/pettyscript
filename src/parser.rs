@@ -32,8 +32,8 @@ pub enum Stmt {
     IfChain(IfChain),
     Expr(Expr),
     Block(Block),
-    Let(VarDecl),
-    Const(VarDecl),
+    Let(Spanned<VarDecl>),
+    Const(Spanned<VarDecl>),
     Assign(Assign),
     Continue,
     Break,
@@ -490,23 +490,29 @@ impl<'a> Parser<'a> {
         Ok(IfStmt { condition, body })
     }
 
-    fn parse_let_decl(&mut self) -> Result<VarDecl> {
+    fn parse_let_decl(&mut self) -> Result<Spanned<VarDecl>> {
         self.expect_token(Token::Let)?;
         self.parse_var_decl()
     }
 
-    fn parse_const_decl(&mut self) -> Result<VarDecl> {
+    fn parse_const_decl(&mut self) -> Result<Spanned<VarDecl>> {
         self.expect_token(Token::Const)?;
         self.parse_var_decl()
     }
 
-    fn parse_var_decl(&mut self) -> Result<VarDecl> {
+    fn parse_var_decl(&mut self) -> Result<Spanned<VarDecl>> {
+        let start = self.lexer.span().start;
         let ident = Ident::parse(self)?;
         if self.peek()? == Token::Colon {
             self.skip();
             let typ = ExplicitType::parse(self)?;
             let expr = match self.bump()? {
-                Token::Semicolon => return Ok(VarDecl { ident, typ: Some(typ), expr: None }),
+                Token::Semicolon => {
+                    return Ok(Spanned {
+                        inner: VarDecl { ident, typ: Some(typ), expr: None },
+                        span: start..self.lexer.span().end,
+                    });
+                }
                 Token::Eq => self.parse_root_expr()?,
                 got => {
                     return Err(
@@ -515,12 +521,18 @@ impl<'a> Parser<'a> {
                 }
             };
             self.expect_semicolon()?;
-            return Ok(VarDecl { ident, typ: Some(typ), expr: Some(expr) });
+            return Ok(Spanned {
+                inner: VarDecl { ident, typ: Some(typ), expr: Some(expr) },
+                span: start..self.lexer.span().end,
+            });
         }
         self.expect_any(&[TokenKind::Eq, TokenKind::Colon])?;
         let expr = self.parse_root_expr()?;
         self.expect_semicolon()?;
-        Ok(VarDecl { ident, typ: None, expr: Some(expr) })
+        Ok(Spanned {
+            inner: VarDecl { ident, typ: None, expr: Some(expr) },
+            span: start..self.lexer.span().end,
+        })
     }
 
     fn parse_assignment(&mut self) -> Result<Assign> {

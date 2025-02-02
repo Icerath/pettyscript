@@ -3,7 +3,8 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use miette::Result;
+use logos::Span;
+use miette::{LabeledSpan, Result};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -50,29 +51,50 @@ pub enum Type {
     Struct { name: &'static str, fields: Rc<FxHashMap<&'static str, (u32, Type)>> },
     Enum { name: &'static str, fields: Rc<FxHashMap<&'static str, u32>>, id: u32 },
     EnumVariant { id: u32 },
-    Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
-    Array(Rc<IncompleteType>),
+    Map { key: Rc<Type>, value: Rc<Type> },
+    Array(Rc<Type>),
     Tuple(Rc<[Type]>),
     Function(Rc<FnSig>),
+    Unknown,
 }
 
 impl Type {
+    fn is_fully_known(&self) -> bool {
+        match self {
+            Self::Array(typ) => typ.is_fully_known(),
+            Self::Map { key, value } => key.is_fully_known() && value.is_fully_known(),
+            Self::Unknown => false,
+            _ => true,
+        }
+    }
+
+    fn try_combine(&self, other: &Type) -> Option<Type> {
+        if self == other {
+            return Some(self.clone());
+        }
+        Some(match (self, other) {
+            (Self::Array(lhs), Self::Array(rhs)) => Self::Array(Rc::new(lhs.try_combine(rhs)?)),
+            (Self::Map { key: lk, value: lv }, Self::Map { key: rk, value: rv }) => {
+                Self::Map { key: Rc::new(lk.try_combine(rk)?), value: Rc::new(lv.try_combine(rv)?) }
+            }
+            (Self::Unknown, typ) | (typ, Self::Unknown) => typ.clone(),
+            _ => return None,
+        })
+    }
+
     pub fn is_zst(&self) -> bool {
         // TODO: Empty structs should probably also be zsts
         matches!(self, Self::Null)
     }
+}
 
-    pub fn matches(&self, other: &Type) -> bool {
-        if self == other {
-            return true;
-        }
-        match (self, other) {
-            (Self::Array(lhs), Self::Array(rhs)) => lhs.is_complete() ^ rhs.is_complete(),
-            (Self::Map { key: lk, value: lv }, Self::Map { key: rk, value: rv }) => {
-                (lk.is_complete() ^ rk.is_complete()) && (lv.is_complete() ^ rv.is_complete())
-            }
-            _ => false,
-        }
+trait RcExt<T: Clone> {
+    fn clone_inner(&self) -> T;
+}
+
+impl<T: Clone> RcExt<T> for Rc<T> {
+    fn clone_inner(&self) -> T {
+        (**self).clone()
     }
 }
 
@@ -86,26 +108,6 @@ enum LoadField {
     StructField(u32),
     EnumVariant(StrIdent),
     ZstField,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum IncompleteType {
-    Complete(Type),
-    Generic,
-}
-
-impl IncompleteType {
-    pub fn is_complete(&self) -> bool {
-        matches!(self, Self::Complete(_))
-    }
-
-    #[track_caller]
-    pub fn unwrap_complete(&self) -> Type {
-        match self {
-            Self::Complete(typ) => typ.clone(),
-            Self::Generic => panic!(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -161,10 +163,10 @@ impl Codegen<'_> {
         scope.named_types.insert("bool", Type::Bool);
         scope.named_types.insert("char", Type::Char);
         scope.named_types.insert("null", Type::Null);
-        scope.named_types.insert("array", Type::Array(Rc::new(IncompleteType::Generic)));
+        scope.named_types.insert("array", Type::Array(Rc::new(Type::Unknown)));
         scope.named_types.insert("map", Type::Map {
-            key: Rc::new(IncompleteType::Generic),
-            value: Rc::new(IncompleteType::Generic),
+            key: Rc::new(Type::Unknown),
+            value: Rc::new(Type::Unknown),
         });
     }
 
@@ -175,12 +177,22 @@ impl Codegen<'_> {
         Ok(())
     }
 
-    fn store_new(&mut self, ident: &'static str, typ: Type, is_const: bool) {
+    fn store_new(&mut self, ident: Ident, typ: Type, is_const: bool, span: Span) -> Result<()> {
+        if !typ.is_fully_known() {
+            let span = LabeledSpan::at(span, "");
+            return Err(miette::miette!(
+                labels = [span],
+                help = format!("consider giving `{ident}` an explicit type"),
+                "type annotation needed",
+            )
+            .with_source_code(self.src.to_string()));
+        }
+        assert!(typ.is_fully_known());
         if typ.is_zst() {
             if ident != "_" {
                 let _ = self.write_ident_offset(ident, typ, is_const);
             }
-            return;
+            return Ok(());
         }
         if ident == "_" {
             self.builder.insert(Op::Pop);
@@ -188,6 +200,7 @@ impl Codegen<'_> {
             let offset = self.write_ident_offset(ident, typ, is_const);
             self.builder.insert(Op::Store(offset));
         }
+        Ok(())
     }
 
     fn write_ident_offset(&mut self, ident: &'static str, typ: Type, is_const: bool) -> u32 {
@@ -250,7 +263,7 @@ impl Codegen<'_> {
 
                 for (ident, explicit_typ) in params {
                     let typ = self.load_explicit_type(explicit_typ).unwrap();
-                    self.store_new(ident, typ, false);
+                    self.store_new(ident, typ, false, ident.span.clone())?;
                 }
                 for stmt in &body.stmts {
                     self.r#gen(stmt)?;
@@ -351,7 +364,7 @@ impl Codegen<'_> {
                 self.builder.insert(iter_op);
                 self.builder.insert(Op::CJump(end_label));
 
-                self.store_new(ident, ident_typ, false);
+                self.store_new(ident, ident_typ, false, 0..0)?;
 
                 for stmt in &body.stmts {
                     self.r#gen(stmt)?;
@@ -427,12 +440,13 @@ impl Codegen<'_> {
         Ok(())
     }
 
-    fn var_decl(&mut self, var_decl: &VarDecl, is_const: bool) -> Result<()> {
-        let VarDecl { ident, typ, expr } = var_decl;
+    fn var_decl(&mut self, var_decl: &Spanned<VarDecl>, is_const: bool) -> Result<()> {
+        let span = var_decl.span.clone();
+        let VarDecl { ident, typ, expr } = &**var_decl;
         let expected = typ.as_ref().map(|typ| {
             self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
         });
-        let ty = match expr {
+        let mut typ = match expr {
             Some(expr) => self.expr(expr)?,
             None => 'block: {
                 let expected = expected.clone().unwrap();
@@ -447,10 +461,9 @@ impl Codegen<'_> {
             }
         };
         if let Some(expected) = &expected {
-            assert!(ty.matches(expected));
+            typ = typ.try_combine(expected).unwrap_or_else(|| panic!("{typ:?} - {expected:?}"));
         }
-        let typ = if let Some(expected) = expected { expected } else { ty };
-        self.store_new(ident, typ, is_const);
+        self.store_new(ident, typ, is_const, span)?;
         Ok(())
     }
 
@@ -483,18 +496,18 @@ impl Codegen<'_> {
     }
 
     #[must_use]
-    fn load_explicit_type(&self, explicit_typ: &ExplicitType) -> Option<Type> {
+    fn load_explicit_type(&self, explicit_typ: &Spanned<ExplicitType>) -> Option<Type> {
         let typ = self.load_name_type(*explicit_typ.ident)?;
         Some(match typ {
-            Type::Array(typ) if *typ == IncompleteType::Generic => {
+            Type::Array(typ) if *typ == Type::Unknown => {
                 assert_eq!(explicit_typ.generics.len(), 1);
                 let generic = self.load_explicit_type(&explicit_typ.generics[0])?;
                 if generic.is_zst() {
                     panic!("arrays may not contains ZSTs");
                 }
-                Type::Array(Rc::new(IncompleteType::Complete(generic)))
+                Type::Array(Rc::new(generic))
             }
-            Type::Map { key, value } if !key.is_complete() || !value.is_complete() => {
+            Type::Map { key, value } if *key == Type::Unknown || *value == Type::Unknown => {
                 assert_eq!(explicit_typ.generics.len(), 2);
                 let generic_key = self.load_explicit_type(&explicit_typ.generics[0])?;
                 let generic_value = self.load_explicit_type(&explicit_typ.generics[1])?;
@@ -502,16 +515,12 @@ impl Codegen<'_> {
                     panic!("maps may not contains ZSTs");
                 }
                 Type::Map {
-                    key: Rc::new(IncompleteType::Complete(
-                        self.load_explicit_type(&explicit_typ.generics[0])?,
-                    )),
-                    value: Rc::new(IncompleteType::Complete(
-                        self.load_explicit_type(&explicit_typ.generics[1])?,
-                    )),
+                    key: Rc::new(self.load_explicit_type(&explicit_typ.generics[0])?),
+                    value: Rc::new(self.load_explicit_type(&explicit_typ.generics[1])?),
                 }
             }
             other => {
-                assert_eq!(explicit_typ.generics.len(), 0);
+                assert_eq!(explicit_typ.generics.len(), 0, "{other:?}");
                 other
             }
         })
@@ -561,8 +570,8 @@ impl Codegen<'_> {
                         self.builder.insert(Op::CreateMap);
                         if map.is_empty() {
                             break 'block Type::Map {
-                                key: Rc::new(IncompleteType::Generic),
-                                value: Rc::new(IncompleteType::Generic),
+                                key: Rc::new(Type::Unknown),
+                                value: Rc::new(Type::Unknown),
                             };
                         }
                         let mut entries = map.iter();
@@ -577,10 +586,7 @@ impl Codegen<'_> {
                             self.builder.insert(Op::InsertMap);
                         }
 
-                        Type::Map {
-                            key: Rc::new(IncompleteType::Complete(key_typ)),
-                            value: Rc::new(IncompleteType::Complete(val_typ)),
-                        }
+                        Type::Map { key: Rc::new(key_typ), value: Rc::new(val_typ) }
                     }
                     Literal::Bool(bool) => {
                         self.builder.insert(Op::LoadBool(*bool));
@@ -761,7 +767,7 @@ impl Codegen<'_> {
                 self.builder.insert(Op::CreateArray);
 
                 if array.is_empty() {
-                    break 'block Type::Array(Rc::new(IncompleteType::Generic));
+                    break 'block Type::Array(Rc::new(Type::Unknown));
                 }
                 let mut array_iter = array.iter();
                 let typ = self.expr(array_iter.next().unwrap())?;
@@ -774,7 +780,7 @@ impl Codegen<'_> {
                     assert_eq!(next_typ, typ);
                     self.builder.insert(Op::ArrayPush);
                 }
-                Type::Array(Rc::new(IncompleteType::Complete(typ)))
+                Type::Array(Rc::new(typ))
             }
             Expr::Unary { op, expr } => {
                 let typ = self.expr(expr)?;
@@ -830,7 +836,7 @@ impl Codegen<'_> {
                 _ => panic!("Cannot index str with type: {index:?}"),
             },
             Type::Array(of) => match index {
-                Type::Int => (*of).clone().unwrap_complete(),
+                Type::Int => of.clone_inner(),
                 _ => panic!("Cannot index Array({of:?}) with type: {index:?}"),
             },
             _ => panic!("Cannot index {container:?}"),
@@ -867,13 +873,10 @@ impl Codegen<'_> {
                 "len" => (StrLen, Type::Int),
                 _ => panic!("type str does not contain field: {field}"),
             },
-            Type::Array(of_incomplete) => {
-                let of = of_incomplete.unwrap_complete();
-                match field {
-                    "len" => (ArrayLen, Type::Int),
-                    _ => panic!("type Array({of:?}) does not contain field: {field}"),
-                }
-            }
+            Type::Array(of) => match field {
+                "len" => (ArrayLen, Type::Int),
+                _ => panic!("type Array({of:?}) does not contain field: {field}"),
+            },
             _ => panic!("type {typ:?} does not contain field: {field}"),
         };
         (LoadField::Builtin(builtin_field), typ)
@@ -904,28 +907,24 @@ impl Codegen<'_> {
             Type::Map { key, value } => match method {
                 "insert" => (MapInsert, FnSig {
                     ret: Type::Null,
-                    args: [key.unwrap_complete(), value.unwrap_complete()].into(),
+                    args: [(*key).clone(), (*value).clone()].into(),
                 }),
                 "remove" => {
-                    (MapRemove, FnSig { ret: Type::Null, args: [key.unwrap_complete()].into() })
+                    (MapRemove, FnSig { ret: Type::Null, args: [key.clone_inner()].into() })
                 }
-                "get" => (MapGet, FnSig {
-                    ret: value.unwrap_complete(),
-                    args: [key.unwrap_complete()].into(),
-                }),
+                "get" => {
+                    (MapGet, FnSig { ret: value.clone_inner(), args: [key.clone_inner()].into() })
+                }
                 _ => panic!("type map does not contain method: {method}"),
             },
-            Type::Array(of_incomplete) => {
-                let of = of_incomplete.unwrap_complete();
-                match method {
-                    "sort" if of == Type::Int => {
-                        (ArraySortInt, FnSig { ret: Type::Array(of_incomplete), args: [].into() })
-                    }
-                    "pop" => (ArrayPop, FnSig { ret: of, args: [].into() }),
-                    "push" => (ArrayPush, FnSig { ret: Type::Null, args: [of].into() }),
-                    _ => panic!("type Array({of:?}) does not contain method: {method}"),
+            Type::Array(of) => match method {
+                "sort" if *of == Type::Int => {
+                    (ArraySortInt, FnSig { ret: Type::Array(of), args: [].into() })
                 }
-            }
+                "pop" => (ArrayPop, FnSig { ret: of.clone_inner(), args: [].into() }),
+                "push" => (ArrayPush, FnSig { ret: Type::Null, args: [of.clone_inner()].into() }),
+                _ => panic!("type Array({of:?}) does not contain method: {method}"),
+            },
             _ => panic!("type {typ:?} does not contain method: {method}"),
         };
         (LoadMethod::Builtin(builtin_field), fn_sig)

@@ -91,6 +91,7 @@ test_fails!(fail_map, "let map: map[i32, char] = #{'1': 2 }");
 test_fails!(zst_array_literals, "let arr = [null];");
 test_fails!(zst_array_type, "let arr: array[null] = [];");
 test_fails!(zst_map_type, "let map: map[int, null] = #{};");
+test_fails!(test_illegal_arrays, "let array = []; array.push(1);");
 
 #[test]
 fn test_for_loop() {
