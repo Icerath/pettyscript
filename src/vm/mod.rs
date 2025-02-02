@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     builtints::{Builtin, BuiltinField, MethodBuiltin},
-    bytecode::{EqTag, Op, StrIdent, VERSION},
+    bytecode::{Op, StrIdent, VERSION},
 };
 
 pub type PettyMap = BTreeMap<Value, Value>;
@@ -277,16 +277,16 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs % rhs));
                 }
-                Op::Greater(tag) => {
-                    let is_greater = self.cmp(tag) == Ordering::Greater;
+                Op::Greater => {
+                    let is_greater = self.cmp() == Ordering::Greater;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Less(tag) => {
-                    let is_greater = self.cmp(tag) == Ordering::Less;
+                Op::Less => {
+                    let is_greater = self.cmp() == Ordering::Less;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Eq(tag) => {
-                    let is_greater = self.cmp(tag) == Ordering::Equal;
+                Op::Eq => {
+                    let is_greater = self.cmp() == Ordering::Equal;
                     self.stack.push(Value::Bool(is_greater))
                 }
                 Op::AddInt => {
@@ -367,30 +367,28 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
         Ok(())
     }
 
-    unsafe fn cmp(&mut self, tag: EqTag) -> Ordering {
+    unsafe fn cmp(&mut self) -> Ordering {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
         macro_rules! glue {
-            ($typ: tt) => {{
-                let Value::$typ(lhs) = lhs else { unreachable_unchecked() };
+            ($typ: tt, $lhs: ident) => {{
                 let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
-                lhs.cmp(&rhs)
+                $lhs.cmp(&rhs)
             }};
         }
-        match tag {
-            EqTag::Int => glue!(Int),
-            EqTag::Bool => glue!(Bool),
-            EqTag::Char => glue!(Char),
-            EqTag::Str => {
-                let Value::String(lhs) = lhs else { unreachable_unchecked() };
+        match lhs {
+            Value::Int(lhs) => glue!(Int, lhs),
+            Value::Bool(lhs) => glue!(Bool, lhs),
+            Value::Char(lhs) => glue!(Char, lhs),
+            Value::String(lhs) => {
                 let Value::String(rhs) = rhs else { unreachable_unchecked() };
                 lhs.as_str(self.consts).cmp(rhs.as_str(self.consts))
             }
-            EqTag::Array => {
-                let Value::Array(lhs) = lhs else { unreachable_unchecked() };
+            Value::Array(lhs) => {
                 let Value::Array(rhs) = rhs else { unreachable_unchecked() };
                 lhs.borrow().cmp(&*rhs.borrow())
             }
+            _ => unreachable_unchecked(),
         }
     }
 

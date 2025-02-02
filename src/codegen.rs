@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::{Builtin, BuiltinField, MethodBuiltin},
-    bytecode::{BytecodeBuilder, EqTag, Op, StrIdent},
+    bytecode::{BytecodeBuilder, Op, StrIdent},
     errors,
     parser::*,
 };
@@ -648,28 +648,28 @@ impl Codegen<'_> {
                         let lhs = self.expr(&exprs[0])?;
                         let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq(self.eq_tag(lhs)));
+                        self.builder.insert(Op::Eq);
                         break 'block Type::Bool;
                     }
                     BinOp::Greater => {
                         let lhs = self.expr(&exprs[0])?;
                         let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Greater(self.eq_tag(lhs)));
+                        self.builder.insert(Op::Greater);
                         break 'block Type::Bool;
                     }
                     BinOp::Less => {
                         let lhs = self.expr(&exprs[0])?;
                         let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Less(self.eq_tag(lhs)));
+                        self.builder.insert(Op::Less);
                         break 'block Type::Bool;
                     }
                     BinOp::Neq => {
                         let lhs = self.expr(&exprs[0])?;
                         let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq(self.eq_tag(lhs)));
+                        self.builder.insert(Op::Eq);
                         self.builder.insert(Op::Not);
                         break 'block Type::Bool;
                     }
@@ -811,17 +811,6 @@ impl Codegen<'_> {
             LoadMethod::Builtin(builtin) => self.builder.insert(Op::CallBuiltinMethod(builtin)),
         }
         Ok(method.ret)
-    }
-
-    fn eq_tag(&self, typ: Type) -> EqTag {
-        match typ {
-            Type::Int => EqTag::Int,
-            Type::Str => EqTag::Str,
-            Type::Bool => EqTag::Bool,
-            Type::Char => EqTag::Char,
-            Type::Tuple(_) => EqTag::Array,
-            _ => panic!("Cannot compare instances of type: {typ:?}"),
-        }
     }
 
     fn can_cmp(&self, lhs: &Type, rhs: &Type) -> bool {
