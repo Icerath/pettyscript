@@ -497,6 +497,10 @@ impl Codegen<'_> {
 
     #[must_use]
     fn load_explicit_type(&self, explicit_typ: &Spanned<ExplicitType>) -> Option<Type> {
+        if *explicit_typ.ident == "_" {
+            assert!(explicit_typ.generics.is_empty());
+            return Some(Type::Unknown);
+        }
         let typ = self.load_name_type(*explicit_typ.ident)?;
         Some(match typ {
             Type::Array(typ) if *typ == Type::Unknown => {
