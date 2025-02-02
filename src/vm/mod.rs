@@ -386,6 +386,11 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                 let Value::String(rhs) = rhs else { unreachable_unchecked() };
                 lhs.as_str(self.consts).cmp(rhs.as_str(self.consts))
             }
+            EqTag::Array => {
+                let Value::Array(lhs) = lhs else { unreachable_unchecked() };
+                let Value::Array(rhs) = rhs else { unreachable_unchecked() };
+                lhs.borrow().cmp(&*rhs.borrow())
+            }
         }
     }
 

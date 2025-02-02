@@ -1,0 +1,6 @@
+// TODO: Support tuple destructuring
+// TODO: Fix ugly literal syntax
+// TODO: Tuple index (or maybe field access like Rusts .0?)
+
+assert(#[1, 2] == #[1, 2]);
+assert(f"{#[1, 2]}" == "[1, 2]");

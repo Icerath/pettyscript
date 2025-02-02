@@ -130,6 +130,7 @@ pub enum Literal {
     FString(FString),
     Ident(Ident),
     Map(Box<[[Expr; 2]]>),
+    Tuple(Box<[Expr]>),
 }
 
 #[derive(Debug)]
@@ -441,6 +442,12 @@ impl<'a> Parser<'a> {
         }
         self.skip();
         Ok(Literal::Map(entries.into()))
+    }
+
+    fn parse_tuple_literal(&mut self) -> Result<Literal> {
+        self.expect_token(Token::LBracket)?;
+        let exprs = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RBracket)?;
+        Ok(Literal::Tuple(exprs.into()))
     }
 
     fn parse_fstring(&mut self, str: &str) -> Result<FString> {
@@ -864,7 +871,13 @@ impl Parse for Literal {
             Token::FString(str) => return stream.parse_fstring(str).map(Literal::FString),
             Token::True => Literal::Bool(true),
             Token::False => Literal::Bool(false),
-            Token::Hash if stream.peek()? == Token::LBrace => stream.parse_map_literal()?,
+            Token::Hash => match stream.peek()? {
+                Token::LBrace => stream.parse_map_literal(),
+                Token::LBracket => stream.parse_tuple_literal(),
+                got => {
+                    Err(stream.expect_failed(got.kind(), &[TokenKind::LBrace, TokenKind::LParen]))
+                }
+            }?,
             got => {
                 return Err(stream.expect_failed(got.kind(), &[
                     TokenKind::Int,

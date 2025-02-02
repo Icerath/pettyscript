@@ -62,6 +62,7 @@ pub enum EqTag {
     Str,
     Char,
     Bool,
+    Array,
 }
 
 impl TryFrom<u8> for EqTag {

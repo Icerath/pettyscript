@@ -52,6 +52,7 @@ pub enum Type {
     EnumVariant { id: u32 },
     Map { key: Rc<IncompleteType>, value: Rc<IncompleteType> },
     Array(Rc<IncompleteType>),
+    Tuple(Rc<[Type]>),
     Function(Rc<FnSig>),
 }
 
@@ -547,6 +548,15 @@ impl Codegen<'_> {
             Expr::Literal(literal) => 'block: {
                 let span = literal.span.clone();
                 match &**literal {
+                    Literal::Tuple(tuple) => {
+                        self.builder.insert(Op::CreateArray);
+                        let mut arg_types = vec![];
+                        for expr in tuple {
+                            arg_types.push(self.expr(expr)?);
+                            self.builder.insert(Op::ArrayPush);
+                        }
+                        Type::Tuple(arg_types.into())
+                    }
                     Literal::Map(map) => {
                         self.builder.insert(Op::CreateMap);
                         if map.is_empty() {
@@ -809,19 +819,24 @@ impl Codegen<'_> {
             Type::Str => EqTag::Str,
             Type::Bool => EqTag::Bool,
             Type::Char => EqTag::Char,
+            Type::Tuple(_) => EqTag::Array,
             _ => panic!("Cannot compare instances of type: {typ:?}"),
         }
     }
 
-    #[expect(clippy::match_like_matches_macro)]
     fn can_cmp(&self, lhs: &Type, rhs: &Type) -> bool {
         match (lhs, rhs) {
             (Type::Int, Type::Int) => true,
             (Type::Char, Type::Char) => true,
             (Type::Str, Type::Str) => true,
             (Type::Bool, Type::Bool) => true,
+            (Type::Tuple(lhs), Type::Tuple(rhs)) => self.can_cmp_tuples(lhs, rhs),
             _ => false,
         }
+    }
+
+    fn can_cmp_tuples(&self, lhs: &[Type], rhs: &[Type]) -> bool {
+        (lhs.len() == rhs.len()) && lhs.iter().zip(rhs).all(|(lhs, rhs)| self.can_cmp(lhs, rhs))
     }
 
     fn index_type(&self, container: Type, index: Type) -> Type {
