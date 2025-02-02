@@ -12,7 +12,7 @@ pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
     Parser::new(src).parse_root()
 }
 
-type Ident = &'static str;
+pub type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
 
 #[derive(Debug, Clone, Copy)]

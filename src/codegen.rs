@@ -3,6 +3,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use miette::LabeledSpan;
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -277,7 +278,7 @@ impl Codegen<'_> {
                     self.store(root);
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
-                    let mut segment_type = self.load(root);
+                    let mut segment_type = self.load(root.clone());
                     for segment in rest {
                         match segment {
                             AssignSegment::Index(_) => todo!(),
@@ -512,8 +513,8 @@ impl Codegen<'_> {
     }
 
     #[must_use]
-    fn load(&mut self, ident: &'static str) -> Type {
-        match self.scopes.last().unwrap().variables.get(ident) {
+    fn load(&mut self, ident: Spanned<Ident>) -> Type {
+        match self.scopes.last().unwrap().variables.get(*ident) {
             Some(var) => {
                 match &var.typ {
                     Type::Enum { .. } => {}
@@ -524,8 +525,16 @@ impl Codegen<'_> {
             }
             None => {
                 let scope = self.scopes.first().unwrap();
-                let var =
-                    scope.variables.get(ident).unwrap_or_else(|| panic!("Unknown ident: {ident}"));
+                let var = scope.variables.get(*ident).unwrap_or_else(|| {
+                    let span = LabeledSpan::at(ident.span.clone(), "not found in this scope");
+                    let err = miette::miette!(
+                        labels = vec![span],
+                        "cannot find value `{}` in this scope",
+                        ident.inner
+                    )
+                    .with_source_code(self.src.to_owned());
+                    panic!("{err:?}");
+                });
                 match &var.typ {
                     Type::Enum { .. } => {}
                     typ if typ.is_zst() => {}
@@ -539,80 +548,83 @@ impl Codegen<'_> {
     #[must_use]
     fn expr(&mut self, expr: &Expr) -> Type {
         match expr {
-            Expr::Literal(literal) => match &**literal {
-                Literal::Map(map) => {
-                    self.builder.insert(Op::CreateMap);
-                    if map.is_empty() {
-                        return Type::Map {
-                            key: Rc::new(IncompleteType::Generic),
-                            value: Rc::new(IncompleteType::Generic),
-                        };
-                    }
-                    let mut entries = map.iter();
-                    let [key, val] = entries.next().unwrap();
-                    let key_typ = self.expr(key);
-                    let val_typ = self.expr(val);
-                    self.builder.insert(Op::InsertMap);
-
-                    for [key, val] in entries {
-                        assert_eq!(self.expr(key), key_typ);
-                        assert_eq!(self.expr(val), val_typ);
+            Expr::Literal(literal) => {
+                let span = literal.span.clone();
+                match &**literal {
+                    Literal::Map(map) => {
+                        self.builder.insert(Op::CreateMap);
+                        if map.is_empty() {
+                            return Type::Map {
+                                key: Rc::new(IncompleteType::Generic),
+                                value: Rc::new(IncompleteType::Generic),
+                            };
+                        }
+                        let mut entries = map.iter();
+                        let [key, val] = entries.next().unwrap();
+                        let key_typ = self.expr(key);
+                        let val_typ = self.expr(val);
                         self.builder.insert(Op::InsertMap);
-                    }
 
-                    Type::Map {
-                        key: Rc::new(IncompleteType::Complete(key_typ)),
-                        value: Rc::new(IncompleteType::Complete(val_typ)),
+                        for [key, val] in entries {
+                            assert_eq!(self.expr(key), key_typ);
+                            assert_eq!(self.expr(val), val_typ);
+                            self.builder.insert(Op::InsertMap);
+                        }
+
+                        Type::Map {
+                            key: Rc::new(IncompleteType::Complete(key_typ)),
+                            value: Rc::new(IncompleteType::Complete(val_typ)),
+                        }
                     }
-                }
-                Literal::Bool(bool) => {
-                    self.builder.insert(Op::LoadBool(*bool));
-                    Type::Bool
-                }
-                Literal::Char(char) => {
-                    self.builder.insert(Op::LoadChar(*char));
-                    Type::Char
-                }
-                Literal::Int(int) => {
-                    let op = match (*int).try_into() {
-                        Ok(small) => Op::LoadIntSmall(small),
-                        Err(_) => Op::LoadInt(*int),
-                    };
-                    self.builder.insert(op);
-                    Type::Int
-                }
-                Literal::String(string) => {
-                    let [ptr, len] = self.builder.insert_string(string);
-                    self.builder.insert(Op::LoadString { ptr, len });
-                    Type::Str
-                }
-                Literal::FString(fstring) => {
-                    let mut num_segments = fstring.segments.len() as u16;
-                    for (str, expr) in &fstring.segments {
-                        let [ptr, len] = self.builder.insert_string(str);
+                    Literal::Bool(bool) => {
+                        self.builder.insert(Op::LoadBool(*bool));
+                        Type::Bool
+                    }
+                    Literal::Char(char) => {
+                        self.builder.insert(Op::LoadChar(*char));
+                        Type::Char
+                    }
+                    Literal::Int(int) => {
+                        let op = match (*int).try_into() {
+                            Ok(small) => Op::LoadIntSmall(small),
+                            Err(_) => Op::LoadInt(*int),
+                        };
+                        self.builder.insert(op);
+                        Type::Int
+                    }
+                    Literal::String(string) => {
+                        let [ptr, len] = self.builder.insert_string(string);
+                        self.builder.insert(Op::LoadString { ptr, len });
+                        Type::Str
+                    }
+                    Literal::FString(fstring) => {
+                        let mut num_segments = fstring.segments.len() as u16;
+                        for (str, expr) in &fstring.segments {
+                            let [ptr, len] = self.builder.insert_string(str);
+                            if len != 0 {
+                                self.builder.insert(Op::LoadString { ptr, len });
+                                num_segments += 1;
+                            }
+                            let typ = self.expr(expr);
+
+                            if typ == Type::Null {
+                                let [ptr, len] = self.builder.insert_string("null");
+                                self.builder.insert(Op::LoadString { ptr, len });
+                            } else if typ.is_zst() {
+                                todo!()
+                            }
+                        }
+                        let [ptr, len] = self.builder.insert_string(fstring.remaining);
                         if len != 0 {
                             self.builder.insert(Op::LoadString { ptr, len });
                             num_segments += 1;
                         }
-                        let typ = self.expr(expr);
-
-                        if typ == Type::Null {
-                            let [ptr, len] = self.builder.insert_string("null");
-                            self.builder.insert(Op::LoadString { ptr, len });
-                        } else if typ.is_zst() {
-                            todo!()
-                        }
+                        self.builder.insert(Op::BuildFstr { num_segments });
+                        Type::Str
                     }
-                    let [ptr, len] = self.builder.insert_string(fstring.remaining);
-                    if len != 0 {
-                        self.builder.insert(Op::LoadString { ptr, len });
-                        num_segments += 1;
-                    }
-                    self.builder.insert(Op::BuildFstr { num_segments });
-                    Type::Str
+                    Literal::Ident(ident) => self.load(Spanned { inner: ident, span }),
                 }
-                Literal::Ident(ident) => self.load(ident),
-            },
+            }
             Expr::Binary { op, exprs } => 'block: {
                 let op = match op {
                     BinOp::Range => Op::Range,
@@ -736,7 +748,7 @@ impl Codegen<'_> {
                     assert!(type_fields.contains_key(**ident));
                     let typ = match expr {
                         Some(expr) => self.expr(expr),
-                        None => self.load(ident),
+                        None => self.load(ident.clone()),
                     };
                     assert_eq!(type_fields.get(**ident).unwrap().1, typ);
                     if !typ.is_zst() {
