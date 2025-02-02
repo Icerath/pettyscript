@@ -42,7 +42,7 @@ pub enum Stmt {
 #[derive(Debug, PartialEq)]
 pub struct ExplicitType {
     pub ident: Spanned<Ident>,
-    pub generics: Box<[ExplicitType]>,
+    pub generics: Box<[Spanned<ExplicitType>]>,
 }
 
 impl ExplicitType {
@@ -58,7 +58,7 @@ pub struct Return(pub Option<Expr>);
 #[derive(Debug)]
 pub struct VarDecl {
     pub ident: Spanned<Ident>,
-    pub typ: Option<ExplicitType>,
+    pub typ: Option<Spanned<ExplicitType>>,
     pub expr: Option<Expr>,
 }
 
@@ -79,7 +79,7 @@ pub enum AssignSegment {
 #[derive(Debug)]
 pub struct Struct {
     pub ident: Spanned<Ident>,
-    pub fields: Box<[(Spanned<Ident>, ExplicitType)]>,
+    pub fields: Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>,
 }
 
 #[derive(Debug)]
@@ -91,8 +91,8 @@ pub struct Enum {
 #[derive(Debug)]
 pub struct Function {
     pub ident: Spanned<Ident>,
-    pub params: Box<[(Spanned<Ident>, ExplicitType)]>,
-    pub ret_type: Option<ExplicitType>,
+    pub params: Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>,
+    pub ret_type: Option<Spanned<ExplicitType>>,
     pub body: Spanned<Block>,
 }
 
@@ -436,25 +436,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_explicit_type(&mut self) -> Result<ExplicitType> {
-        let ident = Ident::parse(self)?;
-        if self.peek()? != Token::LBracket {
-            return Ok(ExplicitType { ident, generics: [].into() });
-        }
-        self.skip();
-        let mut generics = vec![];
-        while self.peek()?.kind() != TokenKind::RBracket {
-            let typ = self.parse_explicit_type()?;
-            generics.push(typ);
-            if self.peek()?.kind() == TokenKind::RBracket {
-                break;
-            }
-            self.expect_token(Token::Comma)?;
-        }
-        self.skip();
-        Ok(ExplicitType { ident, generics: generics.into() })
-    }
-
     fn parse_map_literal(&mut self) -> Result<Literal> {
         // We expect hash too, but it's already parsed by `parse_literal`
         self.expect_token(Token::LBrace)?;
@@ -536,7 +517,7 @@ impl<'a> Parser<'a> {
         let ident = Ident::parse(self)?;
         if self.peek()? == Token::Colon {
             self.skip();
-            let typ = self.parse_explicit_type()?;
+            let typ = ExplicitType::parse(self)?;
             let expr = match self.bump()? {
                 Token::Semicolon => return Ok(VarDecl { ident, typ: Some(typ), expr: None }),
                 Token::Eq => self.parse_root_expr()?,
@@ -594,12 +575,12 @@ impl<'a> Parser<'a> {
     fn parse_separated_ident_types(
         &mut self,
         terminator: TokenKind,
-    ) -> Result<Box<[(Spanned<Ident>, ExplicitType)]>> {
+    ) -> Result<Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
             let ident = Ident::parse(self)?;
             self.expect_token(Token::Colon)?;
-            let typ = self.parse_explicit_type()?;
+            let typ = ExplicitType::parse(self)?;
             params.push((ident, typ));
             if self.peek()?.kind() == terminator {
                 break;
@@ -799,7 +780,7 @@ impl Parse for Function {
         let mut ret_type = None;
         if stream.peek()? == Token::ThinArrow {
             stream.skip();
-            ret_type = Some(stream.parse_explicit_type()?);
+            ret_type = Some(ExplicitType::parse(stream)?);
         }
 
         let body = Block::parse(stream)?;
@@ -872,5 +853,26 @@ impl Parse for Ident {
             Token::Ident(ident) => Ok(ident),
             _ => unreachable!(),
         }
+    }
+}
+
+impl Parse for ExplicitType {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        let ident = Ident::parse(stream)?;
+        if stream.peek()? != Token::LBracket {
+            return Ok(ExplicitType { ident, generics: [].into() });
+        }
+        stream.skip();
+        let mut generics = vec![];
+        while stream.peek()?.kind() != TokenKind::RBracket {
+            let typ = ExplicitType::parse(stream)?;
+            generics.push(typ);
+            if stream.peek()?.kind() == TokenKind::RBracket {
+                break;
+            }
+            stream.expect_token(Token::Comma)?;
+        }
+        stream.skip();
+        Ok(ExplicitType { ident, generics: generics.into() })
     }
 }
