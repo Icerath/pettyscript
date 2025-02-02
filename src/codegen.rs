@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use miette::LabeledSpan;
+use miette::{LabeledSpan, Result};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -12,13 +12,13 @@ use crate::{
     parser::*,
 };
 
-pub fn codegen(ast: Ast) -> Vec<u8> {
+pub fn codegen(ast: Ast) -> Result<Vec<u8>> {
     let mut codegen = Codegen { src: ast.src, ..Codegen::default() };
     codegen.scopes.push(FunctionScope::new(Type::Null));
 
     codegen.insert_builtins();
     for node in ast.body {
-        codegen.r#gen(node);
+        codegen.r#gen(node)?;
     }
 
     if let Some(var) = codegen.scopes.last().unwrap().variables.get("main") {
@@ -28,7 +28,7 @@ pub fn codegen(ast: Ast) -> Vec<u8> {
     let last_scope = codegen.scopes.pop().unwrap();
     codegen.builder.set_global_stack_size(last_scope.variables.len() as u32);
 
-    codegen.finish()
+    Ok(codegen.finish())
 }
 
 #[derive(Debug, PartialEq)]
@@ -166,10 +166,11 @@ impl Codegen<'_> {
         });
     }
 
-    fn gen_block(&mut self, ast: &[Spanned<Stmt>]) {
+    fn gen_block(&mut self, ast: &[Spanned<Stmt>]) -> Result<()> {
         for node in ast {
-            self.r#gen(node);
+            self.r#gen(node)?;
         }
+        Ok(())
     }
 
     fn store_new(&mut self, ident: &'static str, typ: Type, is_const: bool) {
@@ -198,7 +199,7 @@ impl Codegen<'_> {
         offset
     }
 
-    fn r#gen(&mut self, node: &Spanned<Stmt>) {
+    fn r#gen(&mut self, node: &Spanned<Stmt>) -> Result<()> {
         match &node.inner {
             Stmt::Struct(r#struct) => {
                 let mut fields = FxHashMap::default();
@@ -250,7 +251,7 @@ impl Codegen<'_> {
                     self.store_new(ident, typ, false);
                 }
                 for stmt in &body.stmts {
-                    self.r#gen(stmt);
+                    self.r#gen(stmt)?;
                 }
                 let num_scope_vars = self.scopes.last().unwrap().variables.len();
                 // TODO: Remove extra space for ZSTs
@@ -266,11 +267,11 @@ impl Codegen<'_> {
 
                 self.builder.insert_label(function_end);
             }
-            Stmt::Let(var_decl) => self.var_decl(var_decl, false),
-            Stmt::Const(var_decl) => self.var_decl(var_decl, true),
+            Stmt::Let(var_decl) => self.var_decl(var_decl, false)?,
+            Stmt::Const(var_decl) => self.var_decl(var_decl, true)?,
             Stmt::Assign(Assign { root, segments, expr }) => {
                 if segments.is_empty() {
-                    let ty = self.expr(expr);
+                    let ty = self.expr(expr)?;
                     let expected = self.load_var_type(root);
                     if *expected != ty {
                         panic!("Type Error: expected {expected:?}, Got: {ty:?}");
@@ -278,7 +279,7 @@ impl Codegen<'_> {
                     self.store(root);
                 } else {
                     let (last, rest) = segments.split_last().unwrap();
-                    let mut segment_type = self.load(root.clone());
+                    let mut segment_type = self.load(root.clone())?;
                     for segment in rest {
                         match segment {
                             AssignSegment::Index(_) => todo!(),
@@ -294,7 +295,7 @@ impl Codegen<'_> {
                             let Type::Struct { fields, .. } = segment_type.clone() else {
                                 panic!("Cannot store field into type: {segment_type:?}")
                             };
-                            let typ = self.expr(expr);
+                            let typ = self.expr(expr)?;
                             let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
                             if !typ.is_zst() {
@@ -314,12 +315,12 @@ impl Codegen<'_> {
                 let prev_break = self.break_label.replace(end_label);
 
                 self.builder.insert_label(start_label);
-                match self.expr(expr) {
+                match self.expr(expr)? {
                     Type::Bool => {}
                     other => panic!("Cannot use type: {other:?} in while loop"),
                 }
                 self.builder.insert(Op::CJump(end_label));
-                self.gen_block(&body.stmts);
+                self.gen_block(&body.stmts)?;
                 self.builder.insert(Op::Jump(start_label));
                 self.builder.insert_label(end_label);
 
@@ -333,7 +334,7 @@ impl Codegen<'_> {
                 let prev_continue = self.continue_label.replace(start_label);
                 let prev_break = self.break_label.replace(end_label);
 
-                let iter = self.expr(iter);
+                let iter = self.expr(iter)?;
                 let ident_typ = match &iter {
                     Type::Range | Type::RangeInclusive => Type::Int,
                     _ => panic!(),
@@ -351,7 +352,7 @@ impl Codegen<'_> {
                 self.store_new(ident, ident_typ, false);
 
                 for stmt in &body.stmts {
-                    self.r#gen(stmt);
+                    self.r#gen(stmt)?;
                 }
 
                 self.builder.insert(Op::Jump(start_label));
@@ -361,7 +362,7 @@ impl Codegen<'_> {
                 self.break_label = prev_break;
             }
             Stmt::IfChain(IfChain { first, else_ifs, r#else }) => {
-                let typ = self.expr(&first.condition);
+                let typ = self.expr(&first.condition)?;
                 match typ {
                     Type::Bool => {}
                     other => panic!("Cannot use type {other:?} in if stmts"),
@@ -371,34 +372,34 @@ impl Codegen<'_> {
                 let final_end_label = if not_lone_if { self.builder.create_label() } else { 0 };
                 let mut next_label = self.builder.create_label();
                 self.builder.insert(Op::CJump(next_label));
-                self.gen_block(&first.body.stmts);
+                self.gen_block(&first.body.stmts)?;
                 if not_lone_if {
                     self.builder.insert(Op::Jump(final_end_label));
                 }
                 for elseif in else_ifs {
                     self.builder.insert_label(next_label);
-                    let typ = self.expr(&elseif.condition);
+                    let typ = self.expr(&elseif.condition)?;
                     match typ {
                         Type::Bool => {}
                         other => panic!("Cannot use type {other:?} in if stmts"),
                     }
                     next_label = self.builder.create_label();
                     self.builder.insert(Op::CJump(next_label));
-                    self.gen_block(&elseif.body.stmts);
+                    self.gen_block(&elseif.body.stmts)?;
                     if not_lone_if {
                         self.builder.insert(Op::Jump(final_end_label));
                     }
                 }
                 self.builder.insert_label(next_label);
                 if let Some(block) = r#else {
-                    self.gen_block(&block.stmts);
+                    self.gen_block(&block.stmts)?;
                 }
                 if not_lone_if {
                     self.builder.insert_label(final_end_label);
                 }
             }
             Stmt::Expr(expr) => {
-                let typ = self.expr(expr);
+                let typ = self.expr(expr)?;
                 if !typ.is_zst() {
                     self.builder.insert(Op::Pop);
                 }
@@ -406,7 +407,7 @@ impl Codegen<'_> {
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
             Stmt::Return(expr) => {
-                let typ = if let Some(expr) = &expr.0 { self.expr(expr) } else { Type::Null };
+                let typ = if let Some(expr) = &expr.0 { self.expr(expr)? } else { Type::Null };
                 let scope = self.scopes.last().unwrap();
                 assert!(
                     scope.ret == typ,
@@ -417,19 +418,20 @@ impl Codegen<'_> {
             }
             Stmt::Block(block) => {
                 for stmt in &block.stmts {
-                    self.r#gen(stmt);
+                    self.r#gen(stmt)?;
                 }
             }
         }
+        Ok(())
     }
 
-    fn var_decl(&mut self, var_decl: &VarDecl, is_const: bool) {
+    fn var_decl(&mut self, var_decl: &VarDecl, is_const: bool) -> Result<()> {
         let VarDecl { ident, typ, expr } = var_decl;
         let expected = typ.as_ref().map(|typ| {
             self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
         });
         let ty = match expr {
-            Some(expr) => self.expr(expr),
+            Some(expr) => self.expr(expr)?,
             None => 'block: {
                 let expected = expected.clone().unwrap();
                 let op = match expected {
@@ -447,6 +449,7 @@ impl Codegen<'_> {
         }
         let typ = if let Some(expected) = expected { expected } else { ty };
         self.store_new(ident, typ, is_const);
+        Ok(())
     }
 
     fn store(&mut self, ident: &'static str) {
@@ -512,9 +515,8 @@ impl Codegen<'_> {
         })
     }
 
-    #[must_use]
-    fn load(&mut self, ident: Spanned<Ident>) -> Type {
-        match self.scopes.last().unwrap().variables.get(*ident) {
+    fn load(&mut self, ident: Spanned<Ident>) -> Result<Type> {
+        Ok(match self.scopes.last().unwrap().variables.get(*ident) {
             Some(var) => {
                 match &var.typ {
                     Type::Enum { .. } => {}
@@ -525,16 +527,15 @@ impl Codegen<'_> {
             }
             None => {
                 let scope = self.scopes.first().unwrap();
-                let var = scope.variables.get(*ident).unwrap_or_else(|| {
+                let var = scope.variables.get(*ident).ok_or_else(|| {
                     let span = LabeledSpan::at(ident.span.clone(), "not found in this scope");
-                    let err = miette::miette!(
+                    miette::miette!(
                         labels = vec![span],
                         "cannot find value `{}` in this scope",
                         ident.inner
                     )
-                    .with_source_code(self.src.to_owned());
-                    panic!("{err:?}");
-                });
+                    .with_source_code(self.src.to_owned())
+                })?;
                 match &var.typ {
                     Type::Enum { .. } => {}
                     typ if typ.is_zst() => {}
@@ -542,32 +543,31 @@ impl Codegen<'_> {
                 }
                 var.typ.clone()
             }
-        }
+        })
     }
 
-    #[must_use]
-    fn expr(&mut self, expr: &Expr) -> Type {
-        match expr {
-            Expr::Literal(literal) => {
+    fn expr(&mut self, expr: &Expr) -> Result<Type> {
+        Ok(match expr {
+            Expr::Literal(literal) => 'block: {
                 let span = literal.span.clone();
                 match &**literal {
                     Literal::Map(map) => {
                         self.builder.insert(Op::CreateMap);
                         if map.is_empty() {
-                            return Type::Map {
+                            break 'block Type::Map {
                                 key: Rc::new(IncompleteType::Generic),
                                 value: Rc::new(IncompleteType::Generic),
                             };
                         }
                         let mut entries = map.iter();
                         let [key, val] = entries.next().unwrap();
-                        let key_typ = self.expr(key);
-                        let val_typ = self.expr(val);
+                        let key_typ = self.expr(key)?;
+                        let val_typ = self.expr(val)?;
                         self.builder.insert(Op::InsertMap);
 
                         for [key, val] in entries {
-                            assert_eq!(self.expr(key), key_typ);
-                            assert_eq!(self.expr(val), val_typ);
+                            assert_eq!(self.expr(key)?, key_typ);
+                            assert_eq!(self.expr(val)?, val_typ);
                             self.builder.insert(Op::InsertMap);
                         }
 
@@ -605,7 +605,7 @@ impl Codegen<'_> {
                                 self.builder.insert(Op::LoadString { ptr, len });
                                 num_segments += 1;
                             }
-                            let typ = self.expr(expr);
+                            let typ = self.expr(expr)?;
 
                             if typ == Type::Null {
                                 let [ptr, len] = self.builder.insert_string("null");
@@ -622,7 +622,7 @@ impl Codegen<'_> {
                         self.builder.insert(Op::BuildFstr { num_segments });
                         Type::Str
                     }
-                    Literal::Ident(ident) => self.load(Spanned { inner: ident, span }),
+                    Literal::Ident(ident) => self.load(Spanned { inner: ident, span })?,
                 }
             }
             Expr::Binary { op, exprs } => 'block: {
@@ -631,37 +631,37 @@ impl Codegen<'_> {
                     BinOp::RangeInclusive => Op::RangeInclusive,
                     BinOp::Mod => Op::Mod,
                     BinOp::Add => {
-                        let lhs = self.expr(&exprs[0]);
-                        let rhs = self.expr(&exprs[1]);
+                        let lhs = self.expr(&exprs[0])?;
+                        let rhs = self.expr(&exprs[1])?;
                         assert_eq!(lhs, Type::Int);
                         assert_eq!(rhs, Type::Int);
                         self.builder.insert(Op::AddInt);
                         break 'block Type::Int;
                     }
                     BinOp::Eq => {
-                        let lhs = self.expr(&exprs[0]);
-                        let rhs = self.expr(&exprs[1]);
+                        let lhs = self.expr(&exprs[0])?;
+                        let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
                         self.builder.insert(Op::Eq(self.eq_tag(lhs)));
                         break 'block Type::Bool;
                     }
                     BinOp::Greater => {
-                        let lhs = self.expr(&exprs[0]);
-                        let rhs = self.expr(&exprs[1]);
+                        let lhs = self.expr(&exprs[0])?;
+                        let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
                         self.builder.insert(Op::Greater(self.eq_tag(lhs)));
                         break 'block Type::Bool;
                     }
                     BinOp::Less => {
-                        let lhs = self.expr(&exprs[0]);
-                        let rhs = self.expr(&exprs[1]);
+                        let lhs = self.expr(&exprs[0])?;
+                        let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
                         self.builder.insert(Op::Less(self.eq_tag(lhs)));
                         break 'block Type::Bool;
                     }
                     BinOp::Neq => {
-                        let lhs = self.expr(&exprs[0]);
-                        let rhs = self.expr(&exprs[1]);
+                        let lhs = self.expr(&exprs[0])?;
+                        let rhs = self.expr(&exprs[1])?;
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
                         self.builder.insert(Op::Eq(self.eq_tag(lhs)));
                         self.builder.insert(Op::Not);
@@ -669,33 +669,33 @@ impl Codegen<'_> {
                     }
                     BinOp::And => {
                         let end_label = self.builder.create_label();
-                        let lhs = self.expr(&exprs[0]);
+                        let lhs = self.expr(&exprs[0])?;
                         assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
                         self.builder.insert(Op::Dup);
                         self.builder.insert(Op::CJump(end_label));
                         self.builder.insert(Op::Pop);
-                        let rhs = self.expr(&exprs[1]);
+                        let rhs = self.expr(&exprs[1])?;
                         assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
                         break 'block Type::Bool;
                     }
                     BinOp::Or => {
                         let end_label = self.builder.create_label();
-                        let lhs = self.expr(&exprs[0]);
+                        let lhs = self.expr(&exprs[0])?;
                         assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
                         self.builder.insert(Op::Dup);
                         self.builder.insert(Op::Not);
                         self.builder.insert(Op::CJump(end_label));
                         self.builder.insert(Op::Pop);
-                        let rhs = self.expr(&exprs[1]);
+                        let rhs = self.expr(&exprs[1])?;
                         assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
                         break 'block Type::Bool;
                     }
                     _ => todo!("{op:?}"),
                 };
-                let lhs_ty = self.expr(&exprs[0]);
-                let rhs_ty = self.expr(&exprs[1]);
+                let lhs_ty = self.expr(&exprs[0])?;
+                let rhs_ty = self.expr(&exprs[1])?;
                 let typ = match (lhs_ty, rhs_ty, op) {
                     (Type::Int, Type::Int, Op::Range) => Type::Range,
                     (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
@@ -710,9 +710,9 @@ impl Codegen<'_> {
             Expr::FnCall { function, args } => {
                 let mut arg_types = vec![];
                 for arg in args {
-                    arg_types.push(self.expr(arg));
+                    arg_types.push(self.expr(arg)?);
                 }
-                let typ = self.expr(function);
+                let typ = self.expr(function)?;
                 let ret_type = match typ {
                     Type::Function(fn_type) => {
                         assert_eq!(fn_type.args.len(), arg_types.len(), "{function:?}");
@@ -726,16 +726,16 @@ impl Codegen<'_> {
                 self.builder.insert(Op::FnCall);
                 ret_type
             }
-            Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
+            Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args)?,
             Expr::FieldAccess { expr, field } => {
-                let typ = self.expr(expr);
+                let typ = self.expr(expr)?;
                 let (load_field, field_typ) = self.load_field(typ, field);
                 self.insert_load_field(load_field);
                 field_typ
             }
             Expr::Index { expr, index } => {
-                let container_typ = self.expr(expr);
-                let index_typ = self.expr(index);
+                let container_typ = self.expr(expr)?;
+                let index_typ = self.expr(index)?;
                 self.builder.insert(Op::Index);
                 self.index_type(container_typ, index_typ)
             }
@@ -747,8 +747,8 @@ impl Codegen<'_> {
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(**ident));
                     let typ = match expr {
-                        Some(expr) => self.expr(expr),
-                        None => self.load(ident.clone()),
+                        Some(expr) => self.expr(expr)?,
+                        None => self.load(ident.clone())?,
                     };
                     assert_eq!(type_fields.get(**ident).unwrap().1, typ);
                     if !typ.is_zst() {
@@ -764,20 +764,20 @@ impl Codegen<'_> {
                     break 'block Type::Array(Rc::new(IncompleteType::Generic));
                 }
                 let mut array_iter = array.iter();
-                let typ = self.expr(array_iter.next().unwrap());
+                let typ = self.expr(array_iter.next().unwrap())?;
                 if typ.is_zst() {
                     panic!("ZSTs are not supported in arrays");
                 }
                 self.builder.insert(Op::ArrayPush);
                 for expr in array_iter {
-                    let next_typ = self.expr(expr);
+                    let next_typ = self.expr(expr)?;
                     assert_eq!(next_typ, typ);
                     self.builder.insert(Op::ArrayPush);
                 }
                 Type::Array(Rc::new(IncompleteType::Complete(typ)))
             }
             Expr::Unary { op, expr } => {
-                let typ = self.expr(expr);
+                let typ = self.expr(expr)?;
                 if *op == UnaryOp::Not && typ != Type::Bool {
                     panic!("Cannot use ! operator on {typ:?}");
                 }
@@ -790,21 +790,21 @@ impl Codegen<'_> {
                 }
                 typ
             }
-        }
+        })
     }
 
-    fn method_call(&mut self, expr: &Expr, method: &'static str, args: &[Expr]) -> Type {
-        let typ = self.expr(expr);
+    fn method_call(&mut self, expr: &Expr, method: &'static str, args: &[Expr]) -> Result<Type> {
+        let typ = self.expr(expr)?;
         let (op, method) = self.load_method(typ, method);
         assert_eq!(args.len(), method.args.len(), "{method:?}");
         for (arg, param_typ) in args.iter().zip(method.args) {
-            let arg_typ = self.expr(arg);
+            let arg_typ = self.expr(arg)?;
             assert_eq!(param_typ, arg_typ);
         }
         match op {
             LoadMethod::Builtin(builtin) => self.builder.insert(Op::CallBuiltinMethod(builtin)),
         }
-        method.ret
+        Ok(method.ret)
     }
 
     fn eq_tag(&self, typ: Type) -> EqTag {

@@ -14,6 +14,7 @@ pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
 
 pub type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
+type Params = Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ast<'src, 'ast> {
@@ -79,7 +80,7 @@ pub enum AssignSegment {
 #[derive(Debug)]
 pub struct Struct {
     pub ident: Spanned<Ident>,
-    pub fields: Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>,
+    pub fields: Params,
 }
 
 #[derive(Debug)]
@@ -91,7 +92,7 @@ pub struct Enum {
 #[derive(Debug)]
 pub struct Function {
     pub ident: Spanned<Ident>,
-    pub params: Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>,
+    pub params: Params,
     pub ret_type: Option<Spanned<ExplicitType>>,
     pub body: Spanned<Block>,
 }
@@ -551,10 +552,7 @@ impl<'a> Parser<'a> {
         Ok(params.into())
     }
 
-    fn parse_separated_ident_types(
-        &mut self,
-        terminator: TokenKind,
-    ) -> Result<Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>> {
+    fn parse_separated_ident_types(&mut self, terminator: TokenKind) -> Result<Params> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
             let ident = Ident::parse(self)?;

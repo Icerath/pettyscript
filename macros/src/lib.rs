@@ -24,7 +24,7 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
                 let src = include_str!(#src);
                 let ast = parse(&src).unwrap();
                 let ast = Ast { src: src, body: &ast };
-                let code = codegen::codegen(ast);
+                let code = codegen::codegen(ast).unwrap();
                 exec_vm(&code);
             }
         });

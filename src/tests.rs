@@ -20,7 +20,7 @@ fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
     let ast = Ast { src, body: &ast };
-    let code = codegen::codegen(ast);
+    let code = codegen::codegen(ast).unwrap();
     let result = exec_vm(&code);
 
     let expected: String = (1..=100)
@@ -45,7 +45,7 @@ fn test_lexer_example() {
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();
     let ast = Ast { src, body: &ast };
-    let code = codegen::codegen(ast);
+    let code = codegen::codegen(ast).unwrap();
     let result = exec_vm(&code);
 
     let mut expected = String::new();
@@ -61,7 +61,7 @@ macro_rules! test_expr {
         let src = concat!($expr, ";");
         let ast = parse(src).unwrap();
         let ast = Ast { src, body: &ast };
-        let bytecode = codegen::codegen(ast);
+        let bytecode = codegen::codegen(ast).unwrap();
         let output = exec_vm(&bytecode);
         assert_eq!(output, $expected);
     }};
@@ -81,7 +81,7 @@ macro_rules! test_fails {
                 }
             };
             let ast = Ast { src, body: &ast };
-            codegen::codegen(ast);
+            codegen::codegen(ast).unwrap();
         }
     };
 }

@@ -25,12 +25,12 @@ struct Args {
     disassemble: bool,
 }
 
-fn main() {
+fn main() -> miette::Result<()> {
     let args = Args::parse();
     let content = std::fs::read_to_string(args.path).unwrap();
-    let ast = parse(&content).unwrap();
+    let ast = parse(&content)?;
     let ast = Ast { src: &content, body: &ast };
-    let bytecode = codegen::codegen(ast);
+    let bytecode = codegen::codegen(ast)?;
     if let Some(path) = args.output_bytecode {
         std::fs::write(path, &bytecode).unwrap();
     }
@@ -40,4 +40,5 @@ fn main() {
         // Safety: codegen must produce correct bytecode.
         unsafe { vm::execute_bytecode(&bytecode) };
     }
+    Ok(())
 }
