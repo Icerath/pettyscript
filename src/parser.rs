@@ -1,4 +1,6 @@
-use logos::{Lexer, Logos};
+use std::ops::{Deref, DerefMut};
+
+use logos::{Logos, Span};
 use miette::{Error, LabeledSpan, Result};
 
 use crate::{
@@ -6,14 +8,16 @@ use crate::{
     lexer::{Token, TokenKind},
 };
 
-pub fn parse(src: &str) -> Result<Box<[Stmt]>> {
+pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
     Parser::new(src).parse_root()
 }
+
+type Lexer<'a> = logos::Lexer<'a, Token>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ast<'src, 'ast> {
     pub src: &'src str,
-    pub body: &'ast [Stmt],
+    pub body: &'ast [Spanned<Stmt>],
 }
 
 #[derive(Debug)]
@@ -88,12 +92,12 @@ pub struct Function {
     pub ident: &'static str,
     pub params: Box<[(&'static str, ExplicitType)]>,
     pub ret_type: Option<ExplicitType>,
-    pub body: Block,
+    pub body: Spanned<Block>,
 }
 
 #[derive(Debug)]
 pub struct Block {
-    pub stmts: Box<[Stmt]>,
+    pub stmts: Box<[Spanned<Stmt>]>,
 }
 
 #[derive(Debug)]
@@ -186,31 +190,31 @@ pub enum UnaryOp {
 pub struct ForLoop {
     pub ident: &'static str,
     pub iter: Expr,
-    pub body: Block,
+    pub body: Spanned<Block>,
 }
 
 #[derive(Debug)]
 pub struct WhileLoop {
     pub expr: Expr,
-    pub body: Block,
+    pub body: Spanned<Block>,
 }
 
 #[derive(Debug)]
 pub struct IfChain {
     pub first: IfStmt,
     pub else_ifs: Box<[IfStmt]>,
-    pub r#else: Option<Block>,
+    pub r#else: Option<Spanned<Block>>,
 }
 
 #[derive(Debug)]
 pub struct IfStmt {
     pub condition: Expr,
-    pub body: Block,
+    pub body: Spanned<Block>,
 }
 
 #[derive(Clone)]
 struct Parser<'a> {
-    lexer: Lexer<'a, Token>,
+    lexer: Lexer<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -218,66 +222,20 @@ impl<'a> Parser<'a> {
         Self { lexer: Token::lexer(content) }
     }
 
-    fn parse_root(mut self) -> Result<Box<[Stmt]>> {
+    fn parse_root(mut self) -> Result<Box<[Spanned<Stmt>]>> {
         let mut stmts = vec![];
         while self.lexer.clone().next().is_some() {
             if self.peek()? == Token::Semicolon {
                 self.skip();
                 continue;
             }
-            stmts.push(self.parse_stmt()?);
+            stmts.push(Stmt::parse(&mut self)?);
         }
         Ok(stmts.into_boxed_slice())
     }
 
     fn src(&self) -> String {
         self.lexer.source().to_owned()
-    }
-
-    fn parse_stmt(&mut self) -> Result<Stmt> {
-        loop {
-            break Ok(match self.peek()? {
-                Token::Semicolon => {
-                    self.skip();
-                    continue;
-                }
-                Token::Return => Stmt::Return(self.parse_return_stmt()?),
-                Token::Break => {
-                    self.skip();
-                    self.expect_semicolon()?;
-                    Stmt::Break
-                }
-                Token::Continue => {
-                    self.skip();
-                    self.expect_semicolon()?;
-                    Stmt::Continue
-                }
-                Token::Let => Stmt::Let(self.parse_let_decl()?),
-                Token::Const => Stmt::Const(self.parse_const_decl()?),
-                Token::Struct => Stmt::Struct(self.parse_struct()?),
-                Token::Enum => Stmt::Enum(self.parse_enum()?),
-                Token::Fn => Stmt::Function(self.parse_fn()?),
-                Token::For => Stmt::ForLoop(self.parse_for_loop()?),
-                Token::While => Stmt::WhileLoop(self.parse_while_loop()?),
-                Token::If => Stmt::IfChain(self.parse_if_chain()?),
-                Token::LBrace => Stmt::Block(self.parse_block()?),
-                Token::Ident(_) => {
-                    let prev = self.clone();
-                    let Ok(assign) = self.parse_assignment() else {
-                        *self = prev;
-                        let expr = self.parse_root_expr()?;
-                        self.expect_semicolon()?;
-                        break Ok(Stmt::Expr(expr));
-                    };
-                    Stmt::Assign(assign)
-                }
-                _ => {
-                    let expr = self.parse_root_expr()?;
-                    self.expect_semicolon()?;
-                    Stmt::Expr(expr)
-                }
-            });
-        }
     }
 
     fn parse_root_expr(&mut self) -> Result<Expr> {
@@ -556,57 +514,11 @@ impl<'a> Parser<'a> {
         Ok(FString { segments: segments.into(), remaining })
     }
 
-    fn parse_for_loop(&mut self) -> Result<ForLoop> {
-        self.expect_token(Token::For)?;
-        let ident = self.parse_ident()?;
-        self.expect_token(Token::In)?;
-        let iter = self.parse_expr(0, false)?;
-        let body = self.parse_block()?;
-        Ok(ForLoop { ident, iter, body })
-    }
-
-    fn parse_while_loop(&mut self) -> Result<WhileLoop> {
-        self.expect_token(Token::While)?;
-        let expr = self.parse_expr(0, false)?;
-        let body = self.parse_block()?;
-        Ok(WhileLoop { expr, body })
-    }
-
-    fn parse_if_chain(&mut self) -> Result<IfChain> {
-        let first = self.parse_if_stmt()?;
-
-        let mut else_ifs = vec![];
-        let mut r#else = None;
-        while let Token::Else = self.peek()? {
-            self.skip();
-            match self.peek()? {
-                Token::If => else_ifs.push(self.parse_if_stmt()?),
-                Token::LBrace => {
-                    r#else = Some(self.parse_block()?);
-                    break;
-                }
-                got => {
-                    self.skip();
-                    return Err(self.expect_failed(got.kind(), &[TokenKind::If, TokenKind::LBrace]));
-                }
-            }
-        }
-        Ok(IfChain { first, else_ifs: else_ifs.into(), r#else })
-    }
-
     fn parse_if_stmt(&mut self) -> Result<IfStmt> {
         self.expect_token(Token::If)?;
         let condition = self.parse_expr(0, false)?;
-        let body = self.parse_block()?;
+        let body = Block::parse(self)?;
         Ok(IfStmt { condition, body })
-    }
-
-    fn parse_return_stmt(&mut self) -> Result<Return> {
-        self.expect_token(Token::Return)?;
-        let expr =
-            if self.peek()? == Token::Semicolon { None } else { Some(self.parse_root_expr()?) };
-        self.expect_semicolon()?;
-        Ok(Return(expr))
     }
 
     fn parse_let_decl(&mut self) -> Result<VarDecl> {
@@ -665,42 +577,6 @@ impl<'a> Parser<'a> {
         Ok(Assign { root, segments: segments.into(), expr })
     }
 
-    fn parse_struct(&mut self) -> Result<Struct> {
-        self.expect_token(Token::Struct)?;
-        let ident = self.parse_ident()?;
-        self.expect_token(Token::LBrace)?;
-        let fields = self.parse_separated_ident_types(TokenKind::RBrace)?;
-        self.expect_token(Token::RBrace)?;
-        Ok(Struct { ident, fields })
-    }
-
-    fn parse_enum(&mut self) -> Result<Enum> {
-        self.expect_token(Token::Enum)?;
-        let ident = self.parse_ident()?;
-        self.expect_token(Token::LBrace)?;
-        let variants = self.parse_separated_idents(TokenKind::RBrace)?;
-        self.expect_token(Token::RBrace)?;
-        Ok(Enum { ident, variants })
-    }
-
-    fn parse_fn(&mut self) -> Result<Function> {
-        self.expect_token(Token::Fn)?;
-        let ident = self.parse_ident()?;
-        self.expect_token(Token::LParen)?;
-        let params = self.parse_separated_ident_types(TokenKind::RParen)?;
-        self.expect_token(Token::RParen)?;
-
-        let mut ret_type = None;
-        if self.peek()? == Token::ThinArrow {
-            self.skip();
-            ret_type = Some(self.parse_explicit_type()?);
-        }
-
-        let body = self.parse_block()?;
-
-        Ok(Function { ident, params, ret_type, body })
-    }
-
     fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[&'static str]>> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
@@ -730,21 +606,6 @@ impl<'a> Parser<'a> {
             self.expect_token(Token::Comma)?;
         }
         Ok(params.into())
-    }
-
-    fn parse_block(&mut self) -> Result<Block> {
-        self.expect_token(Token::LBrace)?;
-        let mut stmts = vec![];
-        while self.peek()? != Token::RBrace {
-            if self.peek()? == Token::Semicolon {
-                self.skip();
-                continue;
-            }
-            stmts.push(self.parse_stmt()?);
-        }
-        let stmts = stmts.into_boxed_slice();
-        self.expect_token(Token::RBrace)?;
-        Ok(Block { stmts })
     }
 
     fn parse_ident(&mut self) -> Result<&'static str> {
@@ -812,5 +673,199 @@ impl<'a> Parser<'a> {
 
     fn peek(&self) -> Result<Token> {
         self.clone().bump()
+    }
+}
+
+#[derive(Debug)]
+pub struct Spanned<T> {
+    pub inner: T,
+    pub span: Span,
+}
+
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+trait Parse: Sized {
+    fn parse(stream: &mut Parser) -> Result<Spanned<Self>> {
+        let mut copy = stream.lexer.clone();
+        _ = copy.next();
+        let start = copy.span().start;
+        let inner = Self::parse_inner(stream)?;
+        let span = start..stream.lexer.span().end;
+        Ok(Spanned { inner, span })
+    }
+    fn parse_inner(stream: &mut Parser) -> Result<Self>;
+}
+
+impl Parse for Stmt {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        loop {
+            break Ok(match stream.peek()? {
+                Token::Semicolon => {
+                    stream.skip();
+                    continue;
+                }
+                Token::Return => Stmt::Return(Return::parse_inner(stream)?),
+                Token::Break => {
+                    stream.skip();
+                    stream.expect_semicolon()?;
+                    Stmt::Break
+                }
+                Token::Continue => {
+                    stream.skip();
+                    stream.expect_semicolon()?;
+                    Stmt::Continue
+                }
+                Token::Let => Stmt::Let(stream.parse_let_decl()?),
+                Token::Const => Stmt::Const(stream.parse_const_decl()?),
+                Token::Struct => Stmt::Struct(Struct::parse_inner(stream)?),
+                Token::Enum => Stmt::Enum(Enum::parse_inner(stream)?),
+                Token::Fn => Stmt::Function(Function::parse_inner(stream)?),
+                Token::For => Stmt::ForLoop(ForLoop::parse_inner(stream)?),
+                Token::While => Stmt::WhileLoop(WhileLoop::parse_inner(stream)?),
+                Token::If => Stmt::IfChain(IfChain::parse_inner(stream)?),
+                Token::LBrace => Stmt::Block(Block::parse_inner(stream)?),
+                Token::Ident(_) => {
+                    let prev = stream.clone();
+                    let Ok(assign) = stream.parse_assignment() else {
+                        *stream = prev;
+                        let expr = stream.parse_root_expr()?;
+                        stream.expect_semicolon()?;
+                        break Ok(Stmt::Expr(expr));
+                    };
+                    Stmt::Assign(assign)
+                }
+                _ => {
+                    let expr = stream.parse_root_expr()?;
+                    stream.expect_semicolon()?;
+                    Stmt::Expr(expr)
+                }
+            });
+        }
+    }
+}
+
+impl Parse for Return {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Return)?;
+        let expr =
+            if stream.peek()? == Token::Semicolon { None } else { Some(stream.parse_root_expr()?) };
+        stream.expect_semicolon()?;
+        Ok(Return(expr))
+    }
+}
+
+impl Parse for IfChain {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        let first = stream.parse_if_stmt()?;
+
+        let mut else_ifs = vec![];
+        let mut r#else = None;
+        while let Token::Else = stream.peek()? {
+            stream.skip();
+            match stream.peek()? {
+                Token::If => else_ifs.push(stream.parse_if_stmt()?),
+                Token::LBrace => {
+                    r#else = Some(Block::parse(stream)?);
+                    break;
+                }
+                got => {
+                    stream.skip();
+                    return Err(
+                        stream.expect_failed(got.kind(), &[TokenKind::If, TokenKind::LBrace])
+                    );
+                }
+            }
+        }
+        Ok(IfChain { first, else_ifs: else_ifs.into(), r#else })
+    }
+}
+
+impl Parse for Function {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Fn)?;
+        let ident = stream.parse_ident()?;
+        stream.expect_token(Token::LParen)?;
+        let params = stream.parse_separated_ident_types(TokenKind::RParen)?;
+        stream.expect_token(Token::RParen)?;
+
+        let mut ret_type = None;
+        if stream.peek()? == Token::ThinArrow {
+            stream.skip();
+            ret_type = Some(stream.parse_explicit_type()?);
+        }
+
+        let body = Block::parse(stream)?;
+        Ok(Function { ident, params, ret_type, body })
+    }
+}
+
+impl Parse for WhileLoop {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::While)?;
+        let expr = stream.parse_expr(0, false)?;
+        let body = Block::parse(stream)?;
+        Ok(WhileLoop { expr, body })
+    }
+}
+
+impl Parse for ForLoop {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::For)?;
+        let ident = stream.parse_ident()?;
+        stream.expect_token(Token::In)?;
+        let iter = stream.parse_expr(0, false)?;
+        let body = Block::parse(stream)?;
+        Ok(ForLoop { ident, iter, body })
+    }
+}
+
+impl Parse for Struct {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Struct)?;
+        let ident = stream.parse_ident()?;
+        stream.expect_token(Token::LBrace)?;
+        let fields = stream.parse_separated_ident_types(TokenKind::RBrace)?;
+        stream.expect_token(Token::RBrace)?;
+        Ok(Struct { ident, fields })
+    }
+}
+
+impl Parse for Enum {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Enum)?;
+        let ident = stream.parse_ident()?;
+        stream.expect_token(Token::LBrace)?;
+        let variants = stream.parse_separated_idents(TokenKind::RBrace)?;
+        stream.expect_token(Token::RBrace)?;
+        Ok(Enum { ident, variants })
+    }
+}
+
+impl Parse for Block {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::LBrace)?;
+        let mut stmts = vec![];
+        while stream.peek()? != Token::RBrace {
+            if stream.peek()? == Token::Semicolon {
+                stream.skip();
+                continue;
+            }
+            stmts.push(Stmt::parse(stream)?);
+        }
+        let stmts = stmts.into_boxed_slice();
+        stream.expect_token(Token::RBrace)?;
+        Ok(Block { stmts })
     }
 }

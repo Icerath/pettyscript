@@ -165,7 +165,7 @@ impl Codegen<'_> {
         });
     }
 
-    fn gen_block(&mut self, ast: &[Stmt]) {
+    fn gen_block(&mut self, ast: &[Spanned<Stmt>]) {
         for node in ast {
             self.r#gen(node);
         }
@@ -197,8 +197,8 @@ impl Codegen<'_> {
         offset
     }
 
-    fn r#gen(&mut self, node: &Stmt) {
-        match node {
+    fn r#gen(&mut self, node: &Spanned<Stmt>) {
+        match &node.inner {
             Stmt::Struct(r#struct) => {
                 let mut fields = FxHashMap::default();
                 for (i, (field, typ)) in r#struct.fields.iter().enumerate() {
@@ -402,8 +402,8 @@ impl Codegen<'_> {
             }
             Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
             Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
-            Stmt::Return(Return(expr)) => {
-                let typ = if let Some(expr) = expr { self.expr(expr) } else { Type::Null };
+            Stmt::Return(expr) => {
+                let typ = if let Some(expr) = &expr.0 { self.expr(expr) } else { Type::Null };
                 let scope = self.scopes.last().unwrap();
                 assert!(
                     scope.ret == typ,
