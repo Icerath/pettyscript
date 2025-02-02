@@ -2,6 +2,7 @@ mod builtints;
 mod bytecode;
 mod codegen;
 mod disassemble;
+mod errors;
 mod intern;
 mod lexer;
 mod parser;

@@ -3,12 +3,13 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use miette::{LabeledSpan, Result};
+use miette::Result;
 use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::{Builtin, BuiltinField, MethodBuiltin},
     bytecode::{BytecodeBuilder, EqTag, Op, StrIdent},
+    errors,
     parser::*,
 };
 
@@ -527,15 +528,10 @@ impl Codegen<'_> {
             }
             None => {
                 let scope = self.scopes.first().unwrap();
-                let var = scope.variables.get(*ident).ok_or_else(|| {
-                    let span = LabeledSpan::at(ident.span.clone(), "not found in this scope");
-                    miette::miette!(
-                        labels = vec![span],
-                        "cannot find value `{}` in this scope",
-                        ident.inner
-                    )
-                    .with_source_code(self.src.to_owned())
-                })?;
+                let var = scope
+                    .variables
+                    .get(*ident)
+                    .ok_or_else(|| errors::unknown_ident(self.src, ident))?;
                 match &var.typ {
                     Type::Enum { .. } => {}
                     typ if typ.is_zst() => {}
