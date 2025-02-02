@@ -1,5 +1,5 @@
 use logos::{Lexer, Logos};
-use miette::{Context, Error, LabeledSpan, Result};
+use miette::{Error, LabeledSpan, Result};
 
 use crate::{
     intern::intern,
@@ -781,7 +781,20 @@ impl<'a> Parser<'a> {
     }
 
     fn bump(&mut self) -> Result<Token> {
-        self.lexer.next().context("EOF Error")?.map_err(|_| miette::miette!("Lexer Error"))
+        let span = self.lexer.span();
+        match self.lexer.next() {
+            Some(Ok(tok)) => Ok(tok),
+            Some(Err(_)) => {
+                let span = LabeledSpan::at_offset(span.end, "here");
+                Err(miette::miette!(labels = vec![span], "Lexer Error")
+                    .with_source_code(self.src()))
+            }
+            None => {
+                let span = LabeledSpan::at(span, "here");
+                Err(miette::miette!(labels = vec![span], "Lexer Error")
+                    .with_source_code(self.src()))
+            }
+        }
     }
 
     fn skip(&mut self) {
