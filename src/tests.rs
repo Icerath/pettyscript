@@ -1,6 +1,10 @@
 use std::borrow::Cow;
 
-use crate::{codegen, parser::parse, vm};
+use crate::{
+    codegen,
+    parser::{Ast, parse},
+    vm,
+};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
@@ -15,7 +19,8 @@ macros::generate_integration_tests! {}
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
-    let code = codegen::codegen(&ast);
+    let ast = Ast { src, body: &ast };
+    let code = codegen::codegen(ast);
     let result = exec_vm(&code);
 
     let expected: String = (1..=100)
@@ -39,7 +44,8 @@ fn test_lexer_example() {
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();
-    let code = codegen::codegen(&ast);
+    let ast = Ast { src, body: &ast };
+    let code = codegen::codegen(ast);
     let result = exec_vm(&code);
 
     let mut expected = String::new();
@@ -52,8 +58,10 @@ fn test_lexer_example() {
 
 macro_rules! test_expr {
     ($expr: literal, $expected: expr) => {{
-        let ast = parse(concat!($expr, ";")).unwrap();
-        let bytecode = codegen::codegen(&ast);
+        let src = concat!($expr, ";");
+        let ast = parse(src).unwrap();
+        let ast = Ast { src, body: &ast };
+        let bytecode = codegen::codegen(ast);
         let output = exec_vm(&bytecode);
         assert_eq!(output, $expected);
     }};
@@ -64,14 +72,16 @@ macro_rules! test_fails {
         #[test]
         #[should_panic]
         fn $name() {
-            let ast = match parse(concat!($src, ";")) {
-                Ok(src) => src,
+            let src = concat!($src, ";");
+            let ast = match parse(src) {
+                Ok(ast) => ast,
                 Err(_) => {
                     eprintln!("Failed to parse");
                     return;
                 }
             };
-            codegen::codegen(&ast);
+            let ast = Ast { src, body: &ast };
+            codegen::codegen(ast);
         }
     };
 }

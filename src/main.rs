@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use disassemble::disassemble;
-use parser::parse;
+use parser::{Ast, parse};
 
 #[derive(clap::Parser)]
 struct Args {
@@ -29,7 +29,8 @@ fn main() {
     let args = Args::parse();
     let content = std::fs::read_to_string(args.path).unwrap();
     let ast = parse(&content).unwrap();
-    let bytecode = codegen::codegen(&ast);
+    let ast = Ast { src: &content, body: &ast };
+    let bytecode = codegen::codegen(ast);
     if let Some(path) = args.output_bytecode {
         std::fs::write(path, &bytecode).unwrap();
     }

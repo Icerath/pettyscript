@@ -10,6 +10,12 @@ pub fn parse(src: &str) -> Result<Box<[Stmt]>> {
     Parser::new(src).parse_root()
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Ast<'src, 'ast> {
+    pub src: &'src str,
+    pub body: &'ast [Stmt],
+}
+
 #[derive(Debug)]
 pub enum Stmt {
     Struct(Struct),

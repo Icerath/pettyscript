@@ -11,13 +11,12 @@ use crate::{
     parser::*,
 };
 
-pub fn codegen(ast: &[Stmt]) -> Vec<u8> {
-    let mut codegen = Codegen::default();
-
-    // return type doesn't matter
+pub fn codegen(ast: Ast) -> Vec<u8> {
+    let mut codegen = Codegen { src: ast.src, ..Codegen::default() };
     codegen.scopes.push(FunctionScope::new(Type::Null));
+
     codegen.insert_builtins();
-    for node in ast {
+    for node in ast.body {
         codegen.r#gen(node);
     }
 
@@ -127,7 +126,8 @@ impl FunctionScope {
 }
 
 #[derive(Default)]
-struct Codegen {
+struct Codegen<'src> {
+    src: &'src str,
     scopes: Vec<FunctionScope>,
     builder: BytecodeBuilder,
     continue_label: Option<u32>,
@@ -143,7 +143,7 @@ fn builtin_type(builtin: Builtin) -> Type {
     }))
 }
 
-impl Codegen {
+impl Codegen<'_> {
     fn insert_builtins(&mut self) {
         let scope = self.scopes.first_mut().unwrap();
         for builtin in Builtin::ALL {
