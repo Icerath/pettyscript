@@ -202,10 +202,10 @@ impl Codegen<'_> {
             Stmt::Struct(r#struct) => {
                 let mut fields = FxHashMap::default();
                 for (i, (field, typ)) in r#struct.fields.iter().enumerate() {
-                    fields.insert(*field, (i as u32, self.load_explicit_type(typ).unwrap()));
+                    fields.insert(**field, (i as u32, self.load_explicit_type(typ).unwrap()));
                 }
-                let typ = Type::Struct { name: r#struct.ident, fields: Rc::new(fields) };
-                self.scopes.last_mut().unwrap().named_types.insert(r#struct.ident, typ);
+                let typ = Type::Struct { name: *r#struct.ident, fields: Rc::new(fields) };
+                self.scopes.last_mut().unwrap().named_types.insert(*r#struct.ident, typ);
             }
             Stmt::Enum(Enum { ident, variants }) => {
                 // Each enum it of a different type
@@ -213,7 +213,9 @@ impl Codegen<'_> {
                 let id = COUNTER.fetch_add(1, Ordering::Relaxed);
                 let typ = Type::Enum {
                     name: ident,
-                    fields: Rc::new(variants.iter().copied().zip(0u32..).collect()),
+                    fields: Rc::new(
+                        variants.iter().map(|span| &span.inner).copied().zip(0u32..).collect(),
+                    ),
                     id,
                 };
                 self.scopes.last_mut().unwrap().named_types.insert(ident, Type::EnumVariant { id });
@@ -295,7 +297,7 @@ impl Codegen<'_> {
                             let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
                             if !typ.is_zst() {
-                                self.builder.insert(Op::StoreField(fields[field].0));
+                                self.builder.insert(Op::StoreField(fields[**field].0));
                             }
                         }
                         AssignSegment::Index(_) => todo!(),
@@ -476,7 +478,7 @@ impl Codegen<'_> {
 
     #[must_use]
     fn load_explicit_type(&self, explicit_typ: &ExplicitType) -> Option<Type> {
-        let typ = self.load_name_type(explicit_typ.ident)?;
+        let typ = self.load_name_type(*explicit_typ.ident)?;
         Some(match typ {
             Type::Array(typ) if *typ == IncompleteType::Generic => {
                 assert_eq!(explicit_typ.generics.len(), 1);
@@ -731,14 +733,14 @@ impl Codegen<'_> {
                 // TODO: Reduce struct size for zst fields.
                 self.builder.insert(Op::CreateStruct { size: type_fields.len() as u32 });
                 for StructInitField { ident, expr } in fields {
-                    assert!(type_fields.contains_key(ident));
+                    assert!(type_fields.contains_key(**ident));
                     let typ = match expr {
                         Some(expr) => self.expr(expr),
                         None => self.load(ident),
                     };
-                    assert_eq!(type_fields.get(ident).unwrap().1, typ);
+                    assert_eq!(type_fields.get(**ident).unwrap().1, typ);
                     if !typ.is_zst() {
-                        self.builder.insert(Op::StoreField(type_fields[ident].0));
+                        self.builder.insert(Op::StoreField(type_fields[**ident].0));
                     }
                 }
                 struct_type

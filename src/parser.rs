@@ -12,6 +12,7 @@ pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
     Parser::new(src).parse_root()
 }
 
+type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
 
 #[derive(Debug, Clone, Copy)]
@@ -40,14 +41,14 @@ pub enum Stmt {
 
 #[derive(Debug, PartialEq)]
 pub struct ExplicitType {
-    pub ident: &'static str,
+    pub ident: Spanned<Ident>,
     pub generics: Box<[ExplicitType]>,
 }
 
 impl ExplicitType {
     #[expect(unused, reason = "TODO: Inferred types")]
     pub fn is_inferred(&self) -> bool {
-        self.ident == "_"
+        *self.ident == "_"
     }
 }
 
@@ -56,41 +57,41 @@ pub struct Return(pub Option<Expr>);
 
 #[derive(Debug)]
 pub struct VarDecl {
-    pub ident: &'static str,
+    pub ident: Spanned<Ident>,
     pub typ: Option<ExplicitType>,
     pub expr: Option<Expr>,
 }
 
 #[derive(Debug)]
 pub struct Assign {
-    pub root: &'static str,
+    pub root: Spanned<Ident>,
     pub segments: Box<[AssignSegment]>,
     pub expr: Expr,
 }
 
 #[derive(Debug)]
 pub enum AssignSegment {
-    Field(&'static str),
+    Field(Spanned<Ident>),
     #[expect(unused)]
     Index(Expr),
 }
 
 #[derive(Debug)]
 pub struct Struct {
-    pub ident: &'static str,
-    pub fields: Box<[(&'static str, ExplicitType)]>,
+    pub ident: Spanned<Ident>,
+    pub fields: Box<[(Spanned<Ident>, ExplicitType)]>,
 }
 
 #[derive(Debug)]
 pub struct Enum {
-    pub ident: &'static str,
-    pub variants: Box<[&'static str]>,
+    pub ident: Spanned<Ident>,
+    pub variants: Box<[Spanned<Ident>]>,
 }
 
 #[derive(Debug)]
 pub struct Function {
-    pub ident: &'static str,
-    pub params: Box<[(&'static str, ExplicitType)]>,
+    pub ident: Spanned<Ident>,
+    pub params: Box<[(Spanned<Ident>, ExplicitType)]>,
     pub ret_type: Option<ExplicitType>,
     pub body: Spanned<Block>,
 }
@@ -103,19 +104,19 @@ pub struct Block {
 #[derive(Debug)]
 pub enum Expr {
     Index { expr: Box<Expr>, index: Box<Expr> },
-    FieldAccess { expr: Box<Expr>, field: &'static str },
-    MethodCall { expr: Box<Expr>, method: &'static str, args: Box<[Expr]> },
+    FieldAccess { expr: Box<Expr>, field: Spanned<Ident> },
+    MethodCall { expr: Box<Expr>, method: Spanned<Ident>, args: Box<[Expr]> },
     Literal(Literal),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Expr]> },
-    InitStruct { ident: &'static str, fields: Box<[StructInitField]> },
+    InitStruct { ident: Ident, fields: Box<[StructInitField]> },
     Array(Box<[Expr]>),
 }
 
 #[derive(Debug)]
 pub struct StructInitField {
-    pub ident: &'static str,
+    pub ident: Spanned<Ident>,
     pub expr: Option<Expr>,
 }
 
@@ -124,16 +125,16 @@ pub enum Literal {
     Bool(bool),
     Int(i64),
     Char(char),
-    String(&'static str),
+    String(Ident),
     FString(FString),
-    Ident(&'static str),
+    Ident(Ident),
     Map(Box<[[Expr; 2]]>),
 }
 
 #[derive(Debug)]
 pub struct FString {
-    pub segments: Box<[(&'static str, Expr)]>,
-    pub remaining: &'static str,
+    pub segments: Box<[(Ident, Expr)]>,
+    pub remaining: Ident,
 }
 
 #[derive(Debug, PartialEq)]
@@ -188,7 +189,7 @@ pub enum UnaryOp {
 
 #[derive(Debug)]
 pub struct ForLoop {
-    pub ident: &'static str,
+    pub ident: Spanned<Ident>,
     pub iter: Expr,
     pub body: Spanned<Block>,
 }
@@ -299,7 +300,7 @@ impl<'a> Parser<'a> {
                 }
                 Token::Dot => 'block: {
                     self.skip();
-                    let field = self.parse_ident()?;
+                    let field = Ident::parse(self)?;
                     if self.peek()? != Token::LParen {
                         expr = Expr::FieldAccess { expr: Box::new(expr), field };
                         break 'block;
@@ -329,11 +330,11 @@ impl<'a> Parser<'a> {
         self.parse_struct_init(ident)
     }
 
-    fn parse_struct_init(&mut self, ident: &'static str) -> Result<Expr> {
+    fn parse_struct_init(&mut self, ident: Ident) -> Result<Expr> {
         self.expect_token(Token::LBrace)?;
         let mut fields = vec![];
         while self.peek()? != Token::RBrace {
-            let ident = self.parse_ident()?;
+            let ident = Ident::parse(self)?;
             if self.peek()? == Token::RBrace {
                 fields.push(StructInitField { ident, expr: None });
                 break;
@@ -436,7 +437,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_explicit_type(&mut self) -> Result<ExplicitType> {
-        let ident = self.parse_ident()?;
+        let ident = Ident::parse(self)?;
         if self.peek()? != Token::LBracket {
             return Ok(ExplicitType { ident, generics: [].into() });
         }
@@ -532,7 +533,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl(&mut self) -> Result<VarDecl> {
-        let ident = self.parse_ident()?;
+        let ident = Ident::parse(self)?;
         if self.peek()? == Token::Colon {
             self.skip();
             let typ = self.parse_explicit_type()?;
@@ -555,13 +556,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assignment(&mut self) -> Result<Assign> {
-        let root = self.parse_ident()?;
+        let root = Ident::parse(self)?;
         let mut segments = vec![];
         loop {
             match self.bump()? {
                 Token::Eq => break,
                 Token::Dot => {
-                    let field = self.parse_ident()?;
+                    let field = Ident::parse(self)?;
                     segments.push(AssignSegment::Field(field));
                 }
                 Token::LBracket => {
@@ -577,10 +578,10 @@ impl<'a> Parser<'a> {
         Ok(Assign { root, segments: segments.into(), expr })
     }
 
-    fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[&'static str]>> {
+    fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[Spanned<Ident>]>> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
-            let ident = self.parse_ident()?;
+            let ident = Ident::parse(self)?;
             params.push(ident);
             if self.peek()?.kind() == terminator {
                 break;
@@ -593,10 +594,10 @@ impl<'a> Parser<'a> {
     fn parse_separated_ident_types(
         &mut self,
         terminator: TokenKind,
-    ) -> Result<Box<[(&'static str, ExplicitType)]>> {
+    ) -> Result<Box<[(Spanned<Ident>, ExplicitType)]>> {
         let mut params = vec![];
         while self.peek()?.kind() != terminator {
-            let ident = self.parse_ident()?;
+            let ident = Ident::parse(self)?;
             self.expect_token(Token::Colon)?;
             let typ = self.parse_explicit_type()?;
             params.push((ident, typ));
@@ -606,11 +607,6 @@ impl<'a> Parser<'a> {
             self.expect_token(Token::Comma)?;
         }
         Ok(params.into())
-    }
-
-    fn parse_ident(&mut self) -> Result<&'static str> {
-        let Token::Ident(ident) = self.expect_token(TokenKind::Ident)? else { unreachable!() };
-        Ok(ident)
     }
 
     fn expect_token(&mut self, expected: impl Into<TokenKind>) -> Result<Token> {
@@ -676,7 +672,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Spanned<T> {
     pub inner: T,
     pub span: Span,
@@ -795,7 +791,7 @@ impl Parse for IfChain {
 impl Parse for Function {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::Fn)?;
-        let ident = stream.parse_ident()?;
+        let ident = Ident::parse(stream)?;
         stream.expect_token(Token::LParen)?;
         let params = stream.parse_separated_ident_types(TokenKind::RParen)?;
         stream.expect_token(Token::RParen)?;
@@ -823,7 +819,7 @@ impl Parse for WhileLoop {
 impl Parse for ForLoop {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::For)?;
-        let ident = stream.parse_ident()?;
+        let ident = Ident::parse(stream)?;
         stream.expect_token(Token::In)?;
         let iter = stream.parse_expr(0, false)?;
         let body = Block::parse(stream)?;
@@ -834,7 +830,7 @@ impl Parse for ForLoop {
 impl Parse for Struct {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::Struct)?;
-        let ident = stream.parse_ident()?;
+        let ident = Ident::parse(stream)?;
         stream.expect_token(Token::LBrace)?;
         let fields = stream.parse_separated_ident_types(TokenKind::RBrace)?;
         stream.expect_token(Token::RBrace)?;
@@ -845,7 +841,7 @@ impl Parse for Struct {
 impl Parse for Enum {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::Enum)?;
-        let ident = stream.parse_ident()?;
+        let ident = Ident::parse(stream)?;
         stream.expect_token(Token::LBrace)?;
         let variants = stream.parse_separated_idents(TokenKind::RBrace)?;
         stream.expect_token(Token::RBrace)?;
@@ -867,5 +863,14 @@ impl Parse for Block {
         let stmts = stmts.into_boxed_slice();
         stream.expect_token(Token::RBrace)?;
         Ok(Block { stmts })
+    }
+}
+
+impl Parse for Ident {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        match stream.expect_token(TokenKind::Ident)? {
+            Token::Ident(ident) => Ok(ident),
+            _ => unreachable!(),
+        }
     }
 }
