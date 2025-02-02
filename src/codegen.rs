@@ -539,7 +539,7 @@ impl Codegen<'_> {
     #[must_use]
     fn expr(&mut self, expr: &Expr) -> Type {
         match expr {
-            Expr::Literal(literal) => match literal {
+            Expr::Literal(literal) => match &**literal {
                 Literal::Map(map) => {
                     self.builder.insert(Op::CreateMap);
                     if map.is_empty() {

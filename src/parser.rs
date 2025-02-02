@@ -106,7 +106,7 @@ pub enum Expr {
     Index { expr: Box<Expr>, index: Box<Expr> },
     FieldAccess { expr: Box<Expr>, field: Spanned<Ident> },
     MethodCall { expr: Box<Expr>, method: Spanned<Ident>, args: Box<[Expr]> },
-    Literal(Literal),
+    Literal(Spanned<Literal>),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Expr]> },
@@ -323,7 +323,7 @@ impl<'a> Parser<'a> {
             return Ok(expr);
         }
         let Token::LBrace = self.peek()? else { return Ok(expr) };
-        let Expr::Literal(Literal::Ident(ident)) = expr else {
+        let Expr::Literal(Spanned { inner: Literal::Ident(ident), .. }) = expr else {
             // This is actually an error, but it is better handled later.
             return Ok(expr);
         };
@@ -412,28 +412,7 @@ impl<'a> Parser<'a> {
             self.expect_token(Token::RParen)?;
             return Ok(expr);
         }
-        self.parse_literal().map(Expr::Literal)
-    }
-
-    fn parse_literal(&mut self) -> Result<Literal> {
-        Ok(match self.bump()? {
-            Token::Int(int) => Literal::Int(int),
-            Token::Char(char) => Literal::Char(char),
-            Token::Ident(ident) => Literal::Ident(ident),
-            Token::String(str) => Literal::String(str),
-            Token::FString(str) => return self.parse_fstring(str).map(Literal::FString),
-            Token::True => Literal::Bool(true),
-            Token::False => Literal::Bool(false),
-            Token::Hash if self.peek()? == Token::LBrace => self.parse_map_literal()?,
-            got => {
-                return Err(self.expect_failed(got.kind(), &[
-                    TokenKind::Int,
-                    TokenKind::Char,
-                    TokenKind::String,
-                    TokenKind::Ident,
-                ]));
-            }
-        })
+        Literal::parse(self).map(Expr::Literal)
     }
 
     fn parse_map_literal(&mut self) -> Result<Literal> {
@@ -874,5 +853,28 @@ impl Parse for ExplicitType {
         }
         stream.skip();
         Ok(ExplicitType { ident, generics: generics.into() })
+    }
+}
+
+impl Parse for Literal {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        Ok(match stream.bump()? {
+            Token::Int(int) => Literal::Int(int),
+            Token::Char(char) => Literal::Char(char),
+            Token::Ident(ident) => Literal::Ident(ident),
+            Token::String(str) => Literal::String(str),
+            Token::FString(str) => return stream.parse_fstring(str).map(Literal::FString),
+            Token::True => Literal::Bool(true),
+            Token::False => Literal::Bool(false),
+            Token::Hash if stream.peek()? == Token::LBrace => stream.parse_map_literal()?,
+            got => {
+                return Err(stream.expect_failed(got.kind(), &[
+                    TokenKind::Int,
+                    TokenKind::Char,
+                    TokenKind::String,
+                    TokenKind::Ident,
+                ]));
+            }
+        })
     }
 }
