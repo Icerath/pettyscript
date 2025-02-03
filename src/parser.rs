@@ -40,6 +40,12 @@ pub enum Stmt {
     Return(Return),
 }
 
+#[derive(Debug)]
+pub enum Pat {
+    Ident(Ident),
+    Array(Box<[Spanned<Pat>]>),
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ExplicitType {
     pub ident: Spanned<Ident>,
@@ -58,7 +64,7 @@ pub struct Return(pub Option<Expr>);
 
 #[derive(Debug)]
 pub struct VarDecl {
-    pub ident: Spanned<Ident>,
+    pub pat: Spanned<Pat>,
     pub typ: Option<Spanned<ExplicitType>>,
     pub expr: Option<Expr>,
 }
@@ -502,14 +508,14 @@ impl<'a> Parser<'a> {
 
     fn parse_var_decl(&mut self) -> Result<Spanned<VarDecl>> {
         let start = self.lexer.span().start;
-        let ident = Ident::parse(self)?;
+        let pat = Pat::parse(self)?;
         if self.peek()? == Token::Colon {
             self.skip();
             let typ = ExplicitType::parse(self)?;
             let expr = match self.bump()? {
                 Token::Semicolon => {
                     return Ok(Spanned {
-                        inner: VarDecl { ident, typ: Some(typ), expr: None },
+                        inner: VarDecl { pat, typ: Some(typ), expr: None },
                         span: start..self.lexer.span().end,
                     });
                 }
@@ -522,7 +528,7 @@ impl<'a> Parser<'a> {
             };
             self.expect_semicolon()?;
             return Ok(Spanned {
-                inner: VarDecl { ident, typ: Some(typ), expr: Some(expr) },
+                inner: VarDecl { pat, typ: Some(typ), expr: Some(expr) },
                 span: start..self.lexer.span().end,
             });
         }
@@ -530,7 +536,7 @@ impl<'a> Parser<'a> {
         let expr = self.parse_root_expr()?;
         self.expect_semicolon()?;
         Ok(Spanned {
-            inner: VarDecl { ident, typ: None, expr: Some(expr) },
+            inner: VarDecl { pat, typ: None, expr: Some(expr) },
             span: start..self.lexer.span().end,
         })
     }
@@ -899,5 +905,26 @@ impl Parse for Literal {
                 ]));
             }
         })
+    }
+}
+
+impl Parse for Pat {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        match stream.bump()? {
+            Token::LBracket => {
+                let mut arr = vec![];
+                while stream.peek()? != Token::RBracket {
+                    arr.push(Pat::parse(stream)?);
+                    if stream.peek()? == Token::RBracket {
+                        stream.skip();
+                        break;
+                    }
+                    stream.expect_token(Token::Comma)?;
+                }
+                Ok(Self::Array(arr.into()))
+            }
+            Token::Ident(ident) => Ok(Self::Ident(ident)),
+            got => Err(stream.expect_failed(got.kind(), &[TokenKind::Ident, TokenKind::LBracket])),
+        }
     }
 }

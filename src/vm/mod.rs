@@ -170,6 +170,10 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let Value::Array(arr) = arr else { panic!() };
                     arr.borrow_mut().push(value);
                 }
+                Op::ArrayConcatStack => {
+                    let arr = self.pop_arr();
+                    self.stack.extend_from_slice(&arr.borrow());
+                }
                 Op::LoadGlobal(offset) => {
                     unsafe { assert_unchecked(!self.variable_stacks.is_empty()) };
                     let stack = &self.variable_stacks[0];

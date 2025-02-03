@@ -441,8 +441,7 @@ impl Codegen<'_> {
     }
 
     fn var_decl(&mut self, var_decl: &Spanned<VarDecl>, is_const: bool) -> Result<()> {
-        let span = var_decl.span.clone();
-        let VarDecl { ident, typ, expr } = &**var_decl;
+        let VarDecl { pat, typ, expr } = &**var_decl;
         let expected = typ.as_ref().map(|typ| {
             self.load_explicit_type(typ).unwrap_or_else(|| panic!("Unknown type: {typ:?}"))
         });
@@ -463,8 +462,23 @@ impl Codegen<'_> {
         if let Some(expected) = &expected {
             typ = typ.try_combine(expected).unwrap_or_else(|| panic!("{typ:?} - {expected:?}"));
         }
-        self.store_new(ident, typ, is_const, span)?;
+        self.store_pat(pat, typ, is_const)?;
         Ok(())
+    }
+
+    fn store_pat(&mut self, pat: &Spanned<Pat>, typ: Type, is_const: bool) -> Result<()> {
+        match &**pat {
+            Pat::Array(sections) => {
+                let Type::Tuple(exprs) = typ else { panic!("{typ:?}") };
+                assert_eq!(exprs.len(), sections.len());
+                self.builder.insert(Op::ArrayConcatStack);
+                for (pat, typ) in sections.iter().rev().zip(exprs.iter().rev()) {
+                    self.store_pat(pat, typ.clone(), is_const)?;
+                }
+                Ok(())
+            }
+            Pat::Ident(ident) => self.store_new(ident, typ, is_const, pat.span.clone()),
+        }
     }
 
     fn store(&mut self, ident: &'static str) {

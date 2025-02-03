@@ -36,6 +36,7 @@ pub enum Op {
     InsertMap,
     CreateArray,
     ArrayPush,
+    ArrayConcatStack,
     LoadBool(bool),
     LoadChar(char),
     LoadInt(i64),
