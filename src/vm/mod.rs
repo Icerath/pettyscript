@@ -404,6 +404,8 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
         use MethodBuiltin as M;
 
         let value = match method {
+            M::IntAbs => Value::Int(self.pop_int().abs()),
+
             M::CharIsDigit => Value::Bool(self.pop_char().is_ascii_digit()),
             M::CharIsAlphabetic => Value::Bool(self.pop_char().is_alphabetic()),
 

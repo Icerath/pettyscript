@@ -940,6 +940,10 @@ impl Codegen<'_> {
                 "is_alphabetic" => (CharIsAlphabetic, FnSig { ret: Type::Bool, args: [].into() }),
                 _ => panic!("type char does not contain method: {method}"),
             },
+            Type::Int => match method {
+                "abs" => (IntAbs, FnSig { ret: Type::Int, args: [].into() }),
+                _ => panic!("type int does not contain method: `{method}`"),
+            },
             Type::Map { key, value } => match method {
                 "insert" => (MapInsert, FnSig {
                     ret: Type::Null,

@@ -12,6 +12,8 @@ pub enum Builtin {
 
 #[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MethodBuiltin {
+    IntAbs,
+
     StrTrim,
     StrStartsWith,
     StrIsDigit,
