@@ -856,6 +856,7 @@ impl Codegen<'_> {
             (Type::Str, Type::Str) => true,
             (Type::Bool, Type::Bool) => true,
             (Type::Tuple(lhs), Type::Tuple(rhs)) => self.can_cmp_tuples(lhs, rhs),
+            (Type::Array(lhs), Type::Array(rhs)) => self.can_cmp(lhs, rhs),
             _ => false,
         }
     }
