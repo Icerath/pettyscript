@@ -112,11 +112,11 @@ pub struct Block {
 pub enum Expr {
     Index { expr: Box<Expr>, index: Box<Expr> },
     FieldAccess { expr: Box<Expr>, field: Spanned<Ident> },
-    MethodCall { expr: Box<Expr>, method: Spanned<Ident>, args: Box<[Expr]> },
+    MethodCall { expr: Box<Expr>, method: Spanned<Ident>, args: Box<[Spanned<Expr>]> },
     Literal(Spanned<Literal>),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
-    FnCall { function: Box<Expr>, args: Box<[Expr]> },
+    FnCall { function: Box<Expr>, args: Box<[Spanned<Expr>]> },
     InitStruct { ident: Ident, fields: Box<[StructInitField]> },
     Array(Box<[Expr]>),
 }
@@ -136,7 +136,7 @@ pub enum Literal {
     FString(FString),
     Ident(Ident),
     Map(Box<[[Expr; 2]]>),
-    Tuple(Box<[Expr]>),
+    Tuple(Box<[Spanned<Expr>]>),
 }
 
 #[derive(Debug)]
@@ -278,14 +278,17 @@ impl<'a> Parser<'a> {
         Ok(root)
     }
 
-    fn parse_separated_exprs(
+    fn parse_separated<T>(
         &mut self,
         sep: TokenKind,
         terminator: TokenKind,
-    ) -> Result<Vec<Expr>> {
+    ) -> Result<Box<[Spanned<T>]>>
+    where
+        T: Parse,
+    {
         let mut args = vec![];
         while self.peek()?.kind() != terminator {
-            let expr = self.parse_root_expr()?;
+            let expr = T::parse(self)?;
             args.push(expr);
             if self.peek()?.kind() == terminator {
                 break;
@@ -293,7 +296,7 @@ impl<'a> Parser<'a> {
             self.expect_token(sep)?;
         }
         self.skip();
-        Ok(args)
+        Ok(args.into())
     }
 
     fn parse_leaf_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
@@ -303,8 +306,8 @@ impl<'a> Parser<'a> {
             match self.peek()? {
                 Token::LParen => {
                     self.skip();
-                    let args = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RParen)?;
-                    expr = Expr::FnCall { function: Box::new(expr), args: args.into() };
+                    let args = self.parse_separated(TokenKind::Comma, TokenKind::RParen)?;
+                    expr = Expr::FnCall { function: Box::new(expr), args };
                 }
                 Token::Dot => 'block: {
                     self.skip();
@@ -314,9 +317,8 @@ impl<'a> Parser<'a> {
                         break 'block;
                     }
                     self.skip();
-                    let args = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RParen)?;
-                    expr =
-                        Expr::MethodCall { expr: Box::new(expr), method: field, args: args.into() }
+                    let args = self.parse_separated(TokenKind::Comma, TokenKind::RParen)?;
+                    expr = Expr::MethodCall { expr: Box::new(expr), method: field, args }
                 }
                 Token::LBracket => {
                     self.skip();
@@ -452,8 +454,8 @@ impl<'a> Parser<'a> {
 
     fn parse_tuple_literal(&mut self) -> Result<Literal> {
         self.expect_token(Token::LBracket)?;
-        let exprs = self.parse_separated_exprs(TokenKind::Comma, TokenKind::RBracket)?;
-        Ok(Literal::Tuple(exprs.into()))
+        let exprs = self.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
+        Ok(Literal::Tuple(exprs))
     }
 
     fn parse_fstring(&mut self, str: &str) -> Result<FString> {
@@ -562,19 +564,6 @@ impl<'a> Parser<'a> {
         let expr = self.parse_root_expr()?;
         self.expect_semicolon()?;
         Ok(Assign { root, segments: segments.into(), expr })
-    }
-
-    fn parse_separated_idents(&mut self, terminator: TokenKind) -> Result<Box<[Spanned<Ident>]>> {
-        let mut params = vec![];
-        while self.peek()?.kind() != terminator {
-            let ident = Ident::parse(self)?;
-            params.push(ident);
-            if self.peek()?.kind() == terminator {
-                break;
-            }
-            self.expect_token(Token::Comma)?;
-        }
-        Ok(params.into())
     }
 
     fn parse_separated_ident_types(&mut self, terminator: TokenKind) -> Result<Params> {
@@ -826,8 +815,7 @@ impl Parse for Enum {
         stream.expect_token(Token::Enum)?;
         let ident = Ident::parse(stream)?;
         stream.expect_token(Token::LBrace)?;
-        let variants = stream.parse_separated_idents(TokenKind::RBrace)?;
-        stream.expect_token(Token::RBrace)?;
+        let variants = stream.parse_separated(TokenKind::Comma, TokenKind::RBrace)?;
         Ok(Enum { ident, variants })
     }
 }
@@ -912,19 +900,16 @@ impl Parse for Pat {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         match stream.bump()? {
             Token::LBracket => {
-                let mut arr = vec![];
-                while stream.peek()? != Token::RBracket {
-                    arr.push(Pat::parse(stream)?);
-                    if stream.peek()? == Token::RBracket {
-                        stream.skip();
-                        break;
-                    }
-                    stream.expect_token(Token::Comma)?;
-                }
-                Ok(Self::Array(arr.into()))
+                Ok(Self::Array(stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?))
             }
             Token::Ident(ident) => Ok(Self::Ident(ident)),
             got => Err(stream.expect_failed(got.kind(), &[TokenKind::Ident, TokenKind::LBracket])),
         }
+    }
+}
+
+impl Parse for Expr {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.parse_expr(0, true)
     }
 }

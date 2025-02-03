@@ -835,7 +835,12 @@ impl Codegen<'_> {
         })
     }
 
-    fn method_call(&mut self, expr: &Expr, method: &'static str, args: &[Expr]) -> Result<Type> {
+    fn method_call(
+        &mut self,
+        expr: &Expr,
+        method: &'static str,
+        args: &[Spanned<Expr>],
+    ) -> Result<Type> {
         let typ = self.expr(expr)?;
         let (op, method) = self.load_method(typ, method);
         assert_eq!(args.len(), method.args.len(), "{method:?}");
