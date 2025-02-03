@@ -77,6 +77,15 @@ impl Type {
             (Self::Map { key: lk, value: lv }, Self::Map { key: rk, value: rv }) => {
                 Self::Map { key: Rc::new(lk.try_combine(rk)?), value: Rc::new(lv.try_combine(rv)?) }
             }
+            (Self::Tuple(lhs), Self::Tuple(rhs)) => {
+                assert_eq!(lhs.len(), rhs.len());
+                Self::Tuple(
+                    lhs.iter()
+                        .zip(&**rhs)
+                        .map(|(lhs, rhs)| lhs.try_combine(rhs))
+                        .collect::<Option<_>>()?,
+                )
+            }
             (Self::Unknown, typ) | (typ, Self::Unknown) => typ.clone(),
             _ => return None,
         })
@@ -164,6 +173,7 @@ impl Codegen<'_> {
         scope.named_types.insert("char", Type::Char);
         scope.named_types.insert("null", Type::Null);
         scope.named_types.insert("array", Type::Array(Rc::new(Type::Unknown)));
+        scope.named_types.insert("tuple", Type::Tuple(Rc::new([])));
         scope.named_types.insert("map", Type::Map {
             key: Rc::new(Type::Unknown),
             value: Rc::new(Type::Unknown),
@@ -537,6 +547,13 @@ impl Codegen<'_> {
                     value: Rc::new(self.load_explicit_type(&explicit_typ.generics[1])?),
                 }
             }
+            Type::Tuple(_) => Type::Tuple(
+                explicit_typ
+                    .generics
+                    .iter()
+                    .map(|generic| self.load_explicit_type(generic))
+                    .collect::<Option<_>>()?,
+            ),
             other => {
                 assert_eq!(explicit_typ.generics.len(), 0, "{other:?}");
                 other

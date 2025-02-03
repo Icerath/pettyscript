@@ -5,7 +5,7 @@
 assert(#[1, 2] == #[1, 2]);
 assert(f"{#[1, 2]}" == "[1, 2]");
 
-let [[a, b], c] = #[#[1, '2'], "Go!"];
+let [[a, b], c]: tuple[tuple[_, char], _] = #[#[1, '2'], "Go!"];
 assert(a == 1);
 assert(b == '2');
 assert(c == "Go!");
