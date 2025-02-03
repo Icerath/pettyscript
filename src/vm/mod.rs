@@ -8,6 +8,7 @@ use std::{
     fmt::Write as _,
     hint::{assert_unchecked, unreachable_unchecked},
     io::{self, Write},
+    ops::Deref,
     rc::Rc,
 };
 
@@ -46,6 +47,14 @@ pub enum Callable {
 pub enum PettyStr {
     Literal(&'static str),
     String(Rc<Box<str>>),
+}
+
+impl Deref for PettyStr {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
 }
 
 impl PartialEq for PettyStr {
@@ -264,7 +273,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                         Callable::Builtin(builtin) => match builtin {
                             Builtin::ParseInt => {
                                 let str = self.pop_str();
-                                Value::Int(str.as_str().parse::<i64>().unwrap())
+                                Value::Int(str.parse::<i64>().unwrap())
                             }
                             Builtin::Assert => {
                                 let bool = self.pop_bool();
@@ -273,7 +282,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                             }
                             Builtin::Println => {
                                 let str = self.pop_str();
-                                self.stdout.write_all(str.as_str().as_bytes())?;
+                                self.stdout.write_all(str.as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
                                 break 'fn_call;
                             }
@@ -364,17 +373,14 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let rhs = self.pop_stack();
                     let lhs = self.pop_stack();
                     let value = match lhs {
-                        Value::String(str) => {
-                            let str = str.as_str();
-                            match rhs {
-                                Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
-                                Value::RangeInclusive(_) => todo!(),
-                                Value::Range([start, end]) => Value::String(PettyStr::String(
-                                    Rc::new(str[start as usize..end as usize].into()),
-                                )),
-                                _ => panic!("{rhs:?}"),
-                            }
-                        }
+                        Value::String(str) => match rhs {
+                            Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
+                            Value::RangeInclusive(_) => todo!(),
+                            Value::Range([start, end]) => Value::String(PettyStr::String(Rc::new(
+                                str[start as usize..end as usize].into(),
+                            ))),
+                            _ => panic!("{rhs:?}"),
+                        },
                         Value::Array(arr) => {
                             let Value::Int(rhs) = rhs else { unreachable_unchecked() };
                             arr.borrow()[rhs as usize].clone()
@@ -432,35 +438,22 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 
             M::StrIsAlphabetic => {
                 let str = self.pop_str();
-                Value::Bool(str.as_str().chars().all(|c| c.is_ascii_alphabetic()))
+                Value::Bool(str.chars().all(|c| c.is_ascii_alphabetic()))
             }
-            M::StrIsDigit => {
-                let str = self.pop_str();
-                Value::Bool(str.as_str().chars().all(|c| c.is_ascii_digit()))
-            }
-            M::StrTrim => {
-                let str = self.pop_str();
-                Value::String(PettyStr::String(Rc::new(str.as_str().trim().into())))
-            }
+            M::StrIsDigit => Value::Bool(self.pop_str().chars().all(|c| c.is_ascii_digit())),
+            M::StrTrim => Value::String(PettyStr::String(Rc::new(self.pop_str().trim().into()))),
             M::StrStartsWith => {
                 let pat = self.pop_str();
                 let str = self.pop_str();
-
-                let pat = pat.as_str();
-                let str = str.as_str();
-
-                Value::Bool(str.starts_with(pat))
+                Value::Bool(str.starts_with(pat.as_str()))
             }
-            M::StrLines => {
-                let str = self.pop_str();
-                Value::Array(Rc::new(
-                    str.as_str()
-                        .lines()
-                        .map(|s| Value::String(PettyStr::String(Rc::new(s.into()))))
-                        .collect::<Vec<_>>()
-                        .into(),
-                ))
-            }
+            M::StrLines => Value::Array(Rc::new(
+                self.pop_str()
+                    .lines()
+                    .map(|s| Value::String(PettyStr::String(Rc::new(s.into()))))
+                    .collect::<Vec<_>>()
+                    .into(),
+            )),
 
             M::ArrayPop => self.pop_arr().borrow_mut().pop().unwrap(),
             M::ArrayPush => {
@@ -498,7 +491,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
     unsafe fn load_builtin_field(&mut self, field: BuiltinField) {
         use BuiltinField as B;
         let val = match field {
-            B::StrLen => Value::Int(self.pop_str().as_str().len() as i64),
+            B::StrLen => Value::Int(self.pop_str().len() as i64),
             B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
         };
         self.stack.push(val);
