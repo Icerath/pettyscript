@@ -150,6 +150,7 @@ struct Codegen<'src> {
 
 fn builtin_type(builtin: Builtin) -> Type {
     Type::Function(Rc::new(match builtin {
+        Builtin::ParseInt => FnSig { ret: Type::Int, args: [Type::Str].into() },
         Builtin::Assert => FnSig { ret: Type::Bool, args: [Type::Bool].into() },
         Builtin::Exit => FnSig { ret: Type::Null, args: [Type::Int].into() }, // FIXME: Return never type.
         Builtin::Println => FnSig { ret: Type::Null, args: [Type::Str].into() },

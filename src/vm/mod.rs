@@ -240,6 +240,10 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let Value::Callable(callable) = self.pop_stack() else { panic!() };
                     let value = match callable {
                         Callable::Builtin(builtin) => match builtin {
+                            Builtin::ParseInt => {
+                                let str = self.pop_str();
+                                Value::Int(str.as_str(self.consts).parse::<i64>().unwrap())
+                            }
                             Builtin::Assert => {
                                 let bool = self.pop_bool();
                                 assert!(bool, "RUNTIME ASSERTION FAILED");

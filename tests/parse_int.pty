@@ -1,0 +1,1 @@
+assert(parse_int("20") == 20);

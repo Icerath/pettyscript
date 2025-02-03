@@ -7,6 +7,7 @@ pub enum Builtin {
     ReadFile,
     Exit,
     Assert,
+    ParseInt,
 }
 
 #[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,6 +61,7 @@ impl TryFrom<u16> for BuiltinField {
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {
+            Self::ParseInt => "parse_int",
             Self::Assert => "assert",
             Self::Println => "println",
             Self::ReadFile => "read_file",
