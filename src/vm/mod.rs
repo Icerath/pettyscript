@@ -17,24 +17,24 @@ use crate::{
     bytecode::{Op, StrIdent, VERSION},
 };
 
-pub type PettyMap = BTreeMap<Value, Value>;
+pub type PettyMap<'src> = BTreeMap<Value<'src>, Value<'src>>;
 
 // TODO: Remove Rc<Refcell> with indexes
 // TODO: Replace BTreeMap with HashMap
 // TODO: Avoid extra indirection/allocation for Struct.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Value {
+pub enum Value<'src> {
     Bool(bool),
     EnumVariant { name: StrIdent },
     Char(char),
     Int(i64),
     Callable(Callable),
-    String(PettyStr),
-    Array(Rc<RefCell<Vec<Value>>>),
-    Map(Rc<RefCell<PettyMap>>),
+    String(PettyStr<'src>),
+    Array(Rc<RefCell<Vec<Value<'src>>>>),
+    Map(Rc<RefCell<PettyMap<'src>>>),
     Range([i64; 2]),
     RangeInclusive([i64; 2]),
-    Struct { fields: Rc<RefCell<Box<[Value]>>> },
+    Struct { fields: Rc<RefCell<Box<[Value<'src>]>>> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,12 +44,12 @@ pub enum Callable {
 }
 
 #[derive(Debug, Clone)]
-pub enum PettyStr {
-    Literal(&'static str),
+pub enum PettyStr<'src> {
+    Literal(&'src str),
     String(Rc<Box<str>>),
 }
 
-impl Deref for PettyStr {
+impl Deref for PettyStr<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -57,27 +57,27 @@ impl Deref for PettyStr {
     }
 }
 
-impl PartialEq for PettyStr {
+impl PartialEq for PettyStr<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.as_str() == other.as_str()
     }
 }
 
-impl Eq for PettyStr {}
+impl Eq for PettyStr<'_> {}
 
-impl PartialOrd for PettyStr {
+impl PartialOrd for PettyStr<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.as_str().cmp(other.as_str()))
     }
 }
 
-impl Ord for PettyStr {
+impl Ord for PettyStr<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_str().cmp(other.as_str())
     }
 }
 
-impl PettyStr {
+impl PettyStr<'_> {
     fn as_str(&self) -> &str {
         match *self {
             Self::Literal(str) => str,
@@ -99,13 +99,13 @@ pub unsafe fn execute_bytecode_with(bytecode: &[u8], stdout: &mut dyn Write) -> 
     unsafe { VirtualMachine::new(bytecode, stdout).execute() }
 }
 
-struct VirtualMachine<'a, 'io> {
-    consts: &'static str,
-    instructions: &'a [u8],
+struct VirtualMachine<'src, 'io> {
+    consts: &'src str,
+    instructions: &'src [u8],
     head: usize,
-    stack: Vec<Value>,
+    stack: Vec<Value<'src>>,
     call_stack: Vec<usize>,
-    variable_stacks: Vec<Box<[Value]>>,
+    variable_stacks: Vec<Box<[Value<'src>]>>,
     stdout: &'io mut dyn Write,
 }
 
@@ -120,32 +120,32 @@ macro_rules! impl_pop_helper {
     };
 }
 
-impl<'a, 'io> VirtualMachine<'a, 'io> {
+impl<'src, 'io> VirtualMachine<'src, 'io> {
     impl_pop_helper! { pop_int, Int, i64 }
 
     impl_pop_helper! { pop_bool, Bool, bool }
 
     impl_pop_helper! { pop_char, Char, char }
 
-    impl_pop_helper! { pop_str, String, PettyStr }
+    impl_pop_helper! { pop_str, String, PettyStr<'src> }
 
-    impl_pop_helper! { pop_arr, Array, Rc<RefCell<Vec<Value>>> }
+    impl_pop_helper! { pop_arr, Array, Rc<RefCell<Vec<Value<'src>>>> }
 
-    impl_pop_helper! { pop_map, Map, Rc<RefCell<PettyMap>> }
+    impl_pop_helper! { pop_map, Map, Rc<RefCell<PettyMap<'src>>> }
 
-    unsafe fn pop_stack(&mut self) -> Value {
+    unsafe fn pop_stack(&mut self) -> Value<'src> {
         Self::partial_pop_stack(&mut self.stack)
     }
 
-    unsafe fn partial_pop_stack(stack: &mut Vec<Value>) -> Value {
+    unsafe fn partial_pop_stack(stack: &mut Vec<Value<'src>>) -> Value<'src> {
         stack.pop().unwrap_unchecked()
     }
 
-    unsafe fn last_stack(&self) -> &Value {
+    unsafe fn last_stack(&self) -> &Value<'src> {
         self.stack.last().unwrap_unchecked()
     }
 
-    fn new(bytecode: &'a [u8], stdout: &'io mut dyn Write) -> Self {
+    fn new(bytecode: &'src [u8], stdout: &'io mut dyn Write) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
         assert_eq!(version, VERSION);
@@ -153,7 +153,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 
         let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
         reader.bytes = &reader.bytes[reader.head..];
-        let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap().to_string().leak();
+        let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
         let instructions = &reader.bytes[len_consts..];
 
         let stack = vec![];
@@ -164,7 +164,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
             .into_iter()
             .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Bool(false)))
             .collect();
-        let variable_stacks: Vec<Box<[Value]>> = vec![global_scope];
+        let variable_stacks: Vec<Box<[Value<'src>]>> = vec![global_scope];
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
@@ -499,9 +499,9 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 }
 
 #[derive(Clone, Copy)]
-struct DisplayValue<'a, 'b> {
-    consts: &'a str,
-    value: &'b Value,
+struct DisplayValue<'src, 'b> {
+    consts: &'src str,
+    value: &'b Value<'src>,
 }
 
 impl fmt::Debug for DisplayValue<'_, '_> {
