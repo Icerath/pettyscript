@@ -14,10 +14,8 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
     for dir_entry in std::fs::read_dir("tests").unwrap() {
         let entry = dir_entry.unwrap();
         let src = Path::new("..").join(entry.path()).display().to_string();
-        let test_name = Ident::new(
-            &("test_".to_string() + &entry.path().file_stem().unwrap().to_str().unwrap()),
-            Span::call_site(),
-        );
+        let test_name =
+            Ident::new(&entry.path().file_stem().unwrap().to_str().unwrap(), Span::call_site());
         tests.extend(quote! {
             #[test]
             fn #test_name () {

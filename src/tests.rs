@@ -94,7 +94,7 @@ test_fails!(zst_map_type, "let map: map[int, null] = #{};");
 test_fails!(test_illegal_arrays, "let array = []; array.push(1);");
 
 #[test]
-fn test_for_loop() {
+fn for_loop() {
     test_expr!(r#"for i in 0..=5 { println(f"{i}"); }"#, "0\n1\n2\n3\n4\n5");
     test_expr!(r#"for i in 0..=5 { if i == 0 { continue; } println(f"{i}"); }"#, "1\n2\n3\n4\n5");
     test_expr!(r#"for i in 0..=5 { if i == 4 { break; } println(f"{i}"); }"#, "0\n1\n2\n3");
@@ -105,7 +105,7 @@ fn test_for_loop() {
 }
 
 #[test]
-fn test_structs() {
+fn structs() {
     test_expr!("struct Point {x:int,y:int} Point { x: 0, y: 0 }", "");
     test_expr!(
         r#"struct Lexer {str:str} let lexer = Lexer { str: "abc" }; lexer.str = lexer.str[0..2]; println(f"{lexer.str}")"#,
@@ -128,7 +128,7 @@ fn test_structs() {
 }
 
 #[test]
-fn test_while_loops() {
+fn while_loops() {
     test_expr!(
         r#"let i: int = 0; while true { if i == 4 { break; } println(f"{i}"); i = i + 1; }"#,
         "0\n1\n2\n3"
@@ -136,7 +136,7 @@ fn test_while_loops() {
 }
 
 #[test]
-fn test_if_stmt() {
+fn if_stmt() {
     test_expr!(r#"if false && true {} else if true && false {} else { println("Hi"); }"#, "Hi");
     test_expr!(r#"if true { println("a"); } else if false {} else {}"#, "a");
     test_expr!(r#"if 5 < 1 { println(f"{true}"); } else { println(f"{false}"); } "#, "false");
