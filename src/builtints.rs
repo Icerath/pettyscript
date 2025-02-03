@@ -18,6 +18,7 @@ pub enum MethodBuiltin {
     StrStartsWith,
     StrIsDigit,
     StrIsAlphabetic,
+    StrLines,
 
     CharIsDigit,
     CharIsAlphabetic,

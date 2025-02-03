@@ -933,6 +933,9 @@ impl Codegen<'_> {
                 }
                 "is_digit" => (StrIsDigit, FnSig { ret: Type::Bool, args: [].into() }),
                 "is_alphabetic" => (StrIsAlphabetic, FnSig { ret: Type::Bool, args: [].into() }),
+                "lines" => {
+                    (StrLines, FnSig { ret: Type::Array(Rc::new(Type::Str)), args: [].into() })
+                }
                 _ => panic!("type str does not contain method: {method}"),
             },
             Type::Char => match method {

@@ -430,6 +430,16 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 
                 Value::Bool(str.starts_with(pat))
             }
+            M::StrLines => {
+                let str = self.pop_str();
+                Value::Array(Rc::new(
+                    str.as_str(self.consts)
+                        .lines()
+                        .map(|s| Value::String(PettyStr::String(Rc::new(s.into()))))
+                        .collect::<Vec<_>>()
+                        .into(),
+                ))
+            }
 
             M::ArrayPop => self.pop_arr().borrow_mut().pop().unwrap(),
             M::ArrayPush => {
