@@ -1,6 +1,6 @@
 let a: map[str, int] = #{};
 a.insert("Bob", 32); a.insert("Alice", 34);
-assert(f"{a}" == "{Bob: 32, Alice: 34}");
+assert(f"{a}" == "{Alice: 34, Bob: 32}");
 
 let b: map[str, int] = #{};
 b.insert("Bob", 32);

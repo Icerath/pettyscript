@@ -23,7 +23,7 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
                 let ast = parse(&src).unwrap();
                 let ast = Ast { src: src, body: &ast };
                 let code = codegen::codegen(ast).unwrap();
-                exec_vm(&code);
+                unsafe { vm::execute_bytecode(&code) };
             }
         });
     }

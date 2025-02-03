@@ -42,16 +42,36 @@ pub enum Callable {
     Function { label: u32, stack_size: u16 },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 pub enum PettyStr {
-    Literal { ptr: u32, len: u32 },
+    Literal(&'static str),
     String(Rc<Box<str>>),
 }
 
+impl PartialEq for PettyStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for PettyStr {}
+
+impl PartialOrd for PettyStr {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.as_str().cmp(other.as_str()))
+    }
+}
+
+impl Ord for PettyStr {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_str().cmp(other.as_str())
+    }
+}
+
 impl PettyStr {
-    fn as_str<'a>(&'a self, consts: &'a str) -> &'a str {
+    fn as_str(&self) -> &str {
         match *self {
-            Self::Literal { ptr, len } => &consts[ptr as usize..ptr as usize + len as usize],
+            Self::Literal(str) => str,
             Self::String(ref str) => str,
         }
     }
@@ -71,7 +91,7 @@ pub unsafe fn execute_bytecode_with(bytecode: &[u8], stdout: &mut dyn Write) -> 
 }
 
 struct VirtualMachine<'a, 'io> {
-    consts: &'a str,
+    consts: &'static str,
     instructions: &'a [u8],
     head: usize,
     stack: Vec<Value>,
@@ -124,7 +144,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 
         let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
         reader.bytes = &reader.bytes[reader.head..];
-        let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
+        let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap().to_string().leak();
         let instructions = &reader.bytes[len_consts..];
 
         let stack = vec![];
@@ -195,7 +215,9 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                 Op::LoadIntSmall(int) => self.stack.push(Value::Int(int as i64)),
                 Op::LoadInt(int) => self.stack.push(Value::Int(int)),
                 Op::LoadString { ptr, len } => {
-                    self.stack.push(Value::String(PettyStr::Literal { ptr, len }))
+                    self.stack.push(Value::String(PettyStr::Literal(
+                        &self.consts[ptr as usize..ptr as usize + len as usize],
+                    )));
                 }
                 Op::Range => {
                     let end = self.pop_int();
@@ -242,7 +264,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                         Callable::Builtin(builtin) => match builtin {
                             Builtin::ParseInt => {
                                 let str = self.pop_str();
-                                Value::Int(str.as_str(self.consts).parse::<i64>().unwrap())
+                                Value::Int(str.as_str().parse::<i64>().unwrap())
                             }
                             Builtin::Assert => {
                                 let bool = self.pop_bool();
@@ -251,14 +273,13 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                             }
                             Builtin::Println => {
                                 let str = self.pop_str();
-                                self.stdout.write_all(str.as_str(self.consts).as_bytes())?;
+                                self.stdout.write_all(str.as_str().as_bytes())?;
                                 self.stdout.write_all(b"\n")?;
                                 break 'fn_call;
                             }
                             Builtin::ReadFile => {
                                 let str = self.pop_str();
-                                let string =
-                                    std::fs::read_to_string(str.as_str(self.consts)).unwrap();
+                                let string = std::fs::read_to_string(str.as_str()).unwrap();
                                 Value::String(PettyStr::String(Rc::new(string.into())))
                             }
                             Builtin::Exit => {
@@ -344,7 +365,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
                     let lhs = self.pop_stack();
                     let value = match lhs {
                         Value::String(str) => {
-                            let str = str.as_str(self.consts);
+                            let str = str.as_str();
                             match rhs {
                                 Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
                                 Value::RangeInclusive(_) => todo!(),
@@ -390,7 +411,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
             Value::Char(lhs) => glue!(Char, lhs),
             Value::String(lhs) => {
                 let Value::String(rhs) = rhs else { unreachable_unchecked() };
-                lhs.as_str(self.consts).cmp(rhs.as_str(self.consts))
+                lhs.as_str().cmp(rhs.as_str())
             }
             Value::Array(lhs) => {
                 let Value::Array(rhs) = rhs else { unreachable_unchecked() };
@@ -411,29 +432,29 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
 
             M::StrIsAlphabetic => {
                 let str = self.pop_str();
-                Value::Bool(str.as_str(self.consts).chars().all(|c| c.is_ascii_alphabetic()))
+                Value::Bool(str.as_str().chars().all(|c| c.is_ascii_alphabetic()))
             }
             M::StrIsDigit => {
                 let str = self.pop_str();
-                Value::Bool(str.as_str(self.consts).chars().all(|c| c.is_ascii_digit()))
+                Value::Bool(str.as_str().chars().all(|c| c.is_ascii_digit()))
             }
             M::StrTrim => {
                 let str = self.pop_str();
-                Value::String(PettyStr::String(Rc::new(str.as_str(self.consts).trim().into())))
+                Value::String(PettyStr::String(Rc::new(str.as_str().trim().into())))
             }
             M::StrStartsWith => {
                 let pat = self.pop_str();
                 let str = self.pop_str();
 
-                let pat = pat.as_str(self.consts);
-                let str = str.as_str(self.consts);
+                let pat = pat.as_str();
+                let str = str.as_str();
 
                 Value::Bool(str.starts_with(pat))
             }
             M::StrLines => {
                 let str = self.pop_str();
                 Value::Array(Rc::new(
-                    str.as_str(self.consts)
+                    str.as_str()
                         .lines()
                         .map(|s| Value::String(PettyStr::String(Rc::new(s.into()))))
                         .collect::<Vec<_>>()
@@ -477,7 +498,7 @@ impl<'a, 'io> VirtualMachine<'a, 'io> {
     unsafe fn load_builtin_field(&mut self, field: BuiltinField) {
         use BuiltinField as B;
         let val = match field {
-            B::StrLen => Value::Int(self.pop_str().as_str(self.consts).len() as i64),
+            B::StrLen => Value::Int(self.pop_str().as_str().len() as i64),
             B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
         };
         self.stack.push(val);
@@ -533,7 +554,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::RangeInclusive([start, end]) => {
                 write!(f, "{}..={}", start, end)
             }
-            Value::String(str) => write!(f, "{}", &str.as_str(self.consts)),
+            Value::String(str) => write!(f, "{}", &str.as_str()),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();
                 for value in &*values.borrow() {
