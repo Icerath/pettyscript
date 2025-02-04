@@ -14,6 +14,7 @@ use crate::{
 pub enum Item {
     Function(Function),
     Loop(Block),
+    ForLoop(ForLoop),
     IfChain(IfChain),
     Expr(Expr),
     Block(Block),
@@ -39,6 +40,13 @@ pub struct Block {
 
 impl Block {
     const EMPTY: Self = Self { items: vec![] };
+}
+
+#[derive(Debug)]
+pub struct ForLoop {
+    ident: Ident,
+    iter: Expr,
+    body: Block,
 }
 
 #[derive(Debug)]
@@ -140,6 +148,7 @@ impl Lowering<'_> {
     fn stmt(&mut self, stmt: &Stmt, out: &mut Vec<Item>) -> Result<()> {
         match stmt {
             Stmt::WhileLoop(while_loop) => self.while_loop(while_loop, out)?,
+            Stmt::ForLoop(for_loop) => self.for_loop(for_loop, out)?,
             Stmt::Let(var_decl) => self.var_decl(var_decl, false, out)?,
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
@@ -161,6 +170,30 @@ impl Lowering<'_> {
         new_body.append(&mut self.block(&while_loop.body.stmts)?.items);
         out.push(Item::Loop(Block { items: new_body }));
         Ok(())
+    }
+
+    fn for_loop(&mut self, for_loop: &ast::ForLoop, out: &mut Vec<Item>) -> Result<()> {
+        let iter = self.expr(&for_loop.iter)?;
+        // TODO: Don't fully substitute this type.
+        let Ty::Con(iter_typ) = iter.ty.sub(&self.subs) else { panic!() };
+        let iter_item_ty = TyVar::uniq();
+        let item_ty = self.iter_item_ty(&iter_typ);
+        unify(&Ty::Var(iter_item_ty), &item_ty, &mut self.subs);
+
+        let iter_ident = self.insert_scope(&for_loop.ident, iter_item_ty);
+        let body = self.block(&for_loop.body.stmts)?;
+
+        // TODO: Handle for loop sugar here instead of later.
+        out.push(Item::ForLoop(ForLoop { ident: iter_ident, iter, body }));
+        Ok(())
+    }
+
+    fn iter_item_ty(&mut self, iter: &TyCon) -> Ty {
+        // FIXME: .............
+        match iter.name {
+            "range" => Ty::int(),
+            _ => panic!("{iter:?}"),
+        }
     }
 
     fn var_decl(
@@ -323,7 +356,20 @@ impl Lowering<'_> {
         let left = self.expr(left)?;
         let right = self.expr(right)?;
         unify(&left.ty, &right.ty, &mut self.subs);
-        Ok(Expr::uniq(ExprKind::Binary { exprs: Box::new([left, right]), op }))
+        let ty = self.binary_op_out(op, &left.ty);
+
+        Ok(Expr { ty, kind: ExprKind::Binary { exprs: Box::new([left, right]), op } })
+    }
+
+    fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
+        match op {
+            BinOp::Add => ty.clone(),
+            BinOp::Range => {
+                unify(ty, &Ty::int(), &mut self.subs);
+                Ty::range()
+            }
+            _ => todo!("{op:?}"),
+        }
     }
 
     fn array(&mut self, aexprs: &[ast::Expr]) -> Result<Expr> {
@@ -368,6 +414,8 @@ impl Ty {
     impl_ty_const!(char);
 
     impl_ty_const!(null);
+
+    impl_ty_const!(range);
 
     pub fn array(of: TyVar) -> Ty {
         Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
