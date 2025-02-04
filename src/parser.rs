@@ -145,7 +145,7 @@ pub struct FString {
     pub remaining: Ident,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BinOp {
     Add,
     Sub,
@@ -189,7 +189,7 @@ impl TryFrom<TokenKind> for BinOp {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnaryOp {
     Not,
     Neg,
@@ -511,34 +511,26 @@ impl<'a> Parser<'a> {
     fn parse_var_decl(&mut self) -> Result<Spanned<VarDecl>> {
         let start = self.lexer.span().start;
         let pat = Pat::parse(self)?;
+        let mut typ = None;
         if self.peek()? == Token::Colon {
             self.skip();
-            let typ = ExplicitType::parse(self)?;
-            let expr = match self.bump()? {
-                Token::Semicolon => {
-                    return Ok(Spanned {
-                        inner: VarDecl { pat, typ: Some(typ), expr: None },
-                        span: start..self.lexer.span().end,
-                    });
-                }
-                Token::Eq => self.parse_root_expr()?,
-                got => {
-                    return Err(
-                        self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq])
-                    );
-                }
-            };
-            self.expect_semicolon()?;
-            return Ok(Spanned {
-                inner: VarDecl { pat, typ: Some(typ), expr: Some(expr) },
-                span: start..self.lexer.span().end,
-            });
+            typ = Some(ExplicitType::parse(self)?);
         }
-        self.expect_any(&[TokenKind::Eq, TokenKind::Colon])?;
-        let expr = self.parse_root_expr()?;
+        let expr = match self.bump()? {
+            Token::Semicolon => {
+                return Ok(Spanned {
+                    inner: VarDecl { pat, typ, expr: None },
+                    span: start..self.lexer.span().end,
+                });
+            }
+            Token::Eq => self.parse_root_expr()?,
+            got => {
+                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]));
+            }
+        };
         self.expect_semicolon()?;
         Ok(Spanned {
-            inner: VarDecl { pat, typ: None, expr: Some(expr) },
+            inner: VarDecl { pat, typ, expr: Some(expr) },
             span: start..self.lexer.span().end,
         })
     }

@@ -3,11 +3,13 @@ mod bytecode;
 mod codegen;
 mod disassemble;
 mod errors;
+mod hir;
 mod intern;
 mod lexer;
 mod parser;
 #[cfg(test)]
 mod tests;
+mod typck;
 mod vm;
 
 use std::path::PathBuf;
@@ -28,9 +30,16 @@ struct Args {
 
 fn main() -> miette::Result<()> {
     let args = Args::parse();
-    let content = std::fs::read_to_string(args.path).unwrap();
-    let ast = parse(&content)?;
-    let ast = Ast { src: &content, body: &ast };
+    let src = std::fs::read_to_string(args.path).unwrap();
+    let ast = parse(&src)?;
+    let mut hir = hir::Lowering::new(&src);
+    let block = hir.block(&ast).unwrap();
+    println!("{block:?}");
+    println!("{:?}", &hir.subs);
+
+    return Ok(());
+
+    let ast = Ast { src: &src, body: &ast };
     let bytecode = codegen::codegen(ast)?;
     if let Some(path) = args.output_bytecode {
         std::fs::write(path, &bytecode).unwrap();
