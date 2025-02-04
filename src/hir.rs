@@ -81,6 +81,7 @@ pub enum ExprKind {
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Index { expr: Box<Expr>, index: Box<Expr> },
     Array(Vec<Expr>),
+    Map(Vec<[Expr; 2]>),
     Ident(Ident),
     Bool(bool),
     Char(char),
@@ -126,6 +127,7 @@ impl<'src> Lowering<'src> {
         named_types.insert("str", Ty::str());
         named_types.insert("null", Ty::null());
         named_types.insert("array", Ty::array(TyVar::ILLEGAL));
+        named_types.insert("map", Ty::map(TyVar::ILLEGAL, TyVar::ILLEGAL));
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
@@ -135,9 +137,14 @@ impl<'src> Lowering<'src> {
         scope.insert("println", println_var);
 
         let assert_var = TyVar::uniq();
-        let assert = Ty::func([Ty::bool()], Ty::null());
+        let assert = Ty::func([Ty::bool()], Ty::bool());
         unify(&Ty::Var(assert_var), &assert, &mut subs);
         scope.insert("assert", assert_var);
+
+        let parse_int_var = TyVar::uniq();
+        let parse_int = Ty::func([Ty::str()], Ty::int());
+        unify(&Ty::Var(parse_int_var), &parse_int, &mut subs);
+        scope.insert("parse_int", parse_int_var);
 
         Self { src, subs, scopes: vec![scope], named_types }
     }
@@ -343,7 +350,11 @@ impl Lowering<'_> {
         if expl_ty.is_inferred() {
             return Ok(Ty::Var(TyVar::uniq()));
         }
-        let ty = self.named_types.get(&**expl_ty.ident).unwrap().clone();
+        let ty = self
+            .named_types
+            .get(&**expl_ty.ident)
+            .unwrap_or_else(|| panic!("{:?}", expl_ty))
+            .clone();
         let Ty::Con(tycon) = ty else { panic!() };
         Ok(Ty::Con(TyCon {
             name: tycon.name,
@@ -380,7 +391,8 @@ impl Lowering<'_> {
                 let ident = self.load_var(ident).expect(ident);
                 Expr { ty: Ty::Var(ident.ty), kind: ExprKind::Ident(ident) }
             }
-            _ => todo!(),
+            ast::Literal::Map(map) => self.map(map)?,
+            _ => todo!("{literal:?}"),
         })
     }
 
@@ -421,7 +433,7 @@ impl Lowering<'_> {
     fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
         match op {
             BinOp::Add | BinOp::Mod => ty.clone(),
-            BinOp::Eq => Ty::bool(),
+            BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::bool(),
             BinOp::Range => {
                 unify(ty, &Ty::int(), &mut self.subs);
                 Ty::range()
@@ -429,6 +441,10 @@ impl Lowering<'_> {
             BinOp::RangeInclusive => {
                 unify(ty, &Ty::int(), &mut self.subs);
                 Ty::range_inclusive()
+            }
+            BinOp::And | BinOp::Or => {
+                unify(ty, &Ty::bool(), &mut self.subs);
+                Ty::bool()
             }
             _ => todo!("{op:?}"),
         }
@@ -445,6 +461,24 @@ impl Lowering<'_> {
             exprs.push(expr);
         }
         Ok(Expr { kind: ExprKind::Array(exprs), ty })
+    }
+
+    fn map(&mut self, init: &[[ast::Expr; 2]]) -> Result<Expr> {
+        let mut entries = Vec::with_capacity(init.len());
+        let key_ty = TyVar::uniq();
+        let value_ty = TyVar::uniq();
+
+        for [key, value] in init {
+            let key = self.expr(key)?;
+            let value = self.expr(value)?;
+
+            unify(&key.ty, &Ty::Var(key_ty), &mut self.subs);
+            unify(&value.ty, &Ty::Var(value_ty), &mut self.subs);
+
+            entries.push([key, value]);
+        }
+        let ty = Ty::map(key_ty, value_ty);
+        Ok(Expr { ty, kind: ExprKind::Map(entries) })
     }
 
     fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {
@@ -476,9 +510,13 @@ impl Lowering<'_> {
         match tycon.name {
             "array" => match field {
                 "len" => Ty::int(),
-                _ => todo!(),
+                _ => todo!("{field:?}"),
             },
-            _ => todo!(),
+            "str" => match field {
+                "len" => Ty::int(),
+                _ => todo!("{field:?}"),
+            },
+            _ => todo!("type `{}` does not contain field: `{field}`", tycon.name),
         }
     }
 
@@ -507,13 +545,33 @@ impl Lowering<'_> {
     fn method_params(&mut self, ty: &Ty, method: &'static str) -> Rc<[Ty]> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.name {
+            "int" => match method {
+                "abs" => Rc::new([Ty::int()]),
+                _ => todo!("`{method}`"),
+            },
+            "str" => match method {
+                "trim" => Rc::new([Ty::str()]),
+                "starts_with" => Rc::new([Ty::str(), Ty::bool()]),
+                "is_digit" => Rc::new([Ty::bool()]),
+                "is_alphabetic" => Rc::new([Ty::bool()]),
+                _ => todo!("`{method}`"),
+            },
             "array" => match method {
                 "push" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
                 "pop" => Rc::new([tycon.generics[0].clone()]),
                 "sort" => Rc::new([ty.clone()]),
-                _ => todo!(),
+                _ => todo!("`{method}`"),
             },
-            _ => todo!(),
+            "map" => match method {
+                "insert" => {
+                    Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone(), Ty::null()])
+                }
+                "get" => Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone()]),
+                "remove" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
+                _ => todo!("`{method}`"),
+            },
+
+            _ => panic!("type `{}` does not contain method `{method}`", tycon.name),
         }
     }
 
@@ -532,7 +590,10 @@ impl Lowering<'_> {
 
         match (ty.name, index.name) {
             ("array", "int") => ty.generics[0].clone(),
-            _ => todo!(),
+            ("array", "range") => Ty::Con(ty),
+            ("str", "int") => Ty::char(),
+            ("str", "range") => Ty::str(),
+            _ => todo!("{ty:?}"),
         }
     }
 }
@@ -560,6 +621,10 @@ impl Ty {
 
     pub fn array(of: TyVar) -> Ty {
         Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
+    }
+
+    pub fn map(key: TyVar, val: TyVar) -> Ty {
+        Ty::Con(TyCon { name: "map", generics: Rc::new([Ty::Var(key), Ty::Var(val)]) })
     }
 
     pub fn func(args: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
