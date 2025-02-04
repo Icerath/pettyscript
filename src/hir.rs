@@ -192,6 +192,7 @@ impl Lowering<'_> {
         // FIXME: .............
         match iter.name {
             "range" => Ty::int(),
+            "range_inclusive" => Ty::int(),
             _ => panic!("{iter:?}"),
         }
     }
@@ -368,6 +369,10 @@ impl Lowering<'_> {
                 unify(ty, &Ty::int(), &mut self.subs);
                 Ty::range()
             }
+            BinOp::RangeInclusive => {
+                unify(ty, &Ty::int(), &mut self.subs);
+                Ty::range_inclusive()
+            }
             _ => todo!("{op:?}"),
         }
     }
@@ -416,6 +421,8 @@ impl Ty {
     impl_ty_const!(null);
 
     impl_ty_const!(range);
+
+    impl_ty_const!(range_inclusive);
 
     pub fn array(of: TyVar) -> Ty {
         Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
