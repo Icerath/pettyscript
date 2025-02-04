@@ -1,0 +1,6 @@
+fn main() -> int {
+    return 1;
+}
+
+let y = main;
+let z = main();

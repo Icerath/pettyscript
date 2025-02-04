@@ -86,7 +86,7 @@ impl TyVar {
 }
 
 impl Ty {
-    fn sub(&self, subs: &Substitutions) -> Ty {
+    pub fn sub(&self, subs: &Substitutions) -> Ty {
         match self {
             Self::Con(TyCon { name, generics }) => {
                 Ty::Con(TyCon { name, generics: generics.iter().map(|ty| ty.sub(subs)).collect() })
