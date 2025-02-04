@@ -334,26 +334,7 @@ impl Lowering<'_> {
             ast::Expr::Unary { op, expr } => self.unary(*op, expr),
             ast::Expr::Binary { op, exprs } => self.binary(*op, &exprs[0], &exprs[1]),
             ast::Expr::Array(exprs) => self.array(exprs),
-            ast::Expr::FnCall { function, args } => {
-                // FIXME: Not entirely sure how to avoid substituting the type here.
-
-                let expr = self.expr(function)?;
-                let fn_ty = expr.ty.sub(&self.subs);
-                let Ty::Con(TyCon { name, generics }) = fn_ty else { panic!() };
-                assert_eq!(name, "func");
-                assert_eq!(args.len() + 1, generics.len());
-                let mut new_args = vec![];
-                for (arg, param) in args.iter().zip(&*generics) {
-                    let arg = self.expr(arg)?;
-                    unify(&arg.ty, param, &mut self.subs);
-                    new_args.push(arg);
-                }
-                let ret = generics.last().unwrap().clone();
-                Ok(Expr {
-                    ty: ret,
-                    kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args },
-                })
-            }
+            ast::Expr::FnCall { function, args } => self.fn_call(function, args),
             _ => todo!(),
         }
     }
@@ -435,6 +416,24 @@ impl Lowering<'_> {
             exprs.push(expr);
         }
         Ok(Expr { kind: ExprKind::Array(exprs), ty })
+    }
+
+    fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {
+        // FIXME: Not entirely sure how to avoid substituting the type here.
+
+        let expr = self.expr(func)?;
+        let fn_ty = expr.ty.sub(&self.subs);
+        let Ty::Con(TyCon { name, generics }) = fn_ty else { panic!() };
+        assert_eq!(name, "func");
+        assert_eq!(args.len() + 1, generics.len());
+        let mut new_args = vec![];
+        for (arg, param) in args.iter().zip(&*generics) {
+            let arg = self.expr(arg)?;
+            unify(&arg.ty, param, &mut self.subs);
+            new_args.push(arg);
+        }
+        let ret = generics.last().unwrap().clone();
+        Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args } })
     }
 }
 
