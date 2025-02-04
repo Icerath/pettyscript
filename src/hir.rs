@@ -81,6 +81,7 @@ pub enum ExprKind {
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Index { expr: Box<Expr>, index: Box<Expr> },
     Array(Vec<Expr>),
+    Tuple(Vec<Expr>),
     Map(Vec<[Expr; 2]>),
     Ident(Ident),
     Bool(bool),
@@ -128,6 +129,7 @@ impl<'src> Lowering<'src> {
         named_types.insert("null", Ty::null());
         named_types.insert("array", Ty::array(TyVar::ILLEGAL));
         named_types.insert("map", Ty::map(TyVar::ILLEGAL, TyVar::ILLEGAL));
+        named_types.insert("tuple", Ty::tuple(Rc::new([])));
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
@@ -392,7 +394,7 @@ impl Lowering<'_> {
                 Expr { ty: Ty::Var(ident.ty), kind: ExprKind::Ident(ident) }
             }
             ast::Literal::Map(map) => self.map(map)?,
-            _ => todo!("{literal:?}"),
+            ast::Literal::Tuple(tuple) => self.tuple(tuple)?,
         })
     }
 
@@ -461,6 +463,18 @@ impl Lowering<'_> {
             exprs.push(expr);
         }
         Ok(Expr { kind: ExprKind::Array(exprs), ty })
+    }
+
+    fn tuple(&mut self, aexprs: &[Spanned<ast::Expr>]) -> Result<Expr> {
+        let mut generics = Vec::with_capacity(aexprs.len());
+        let mut exprs = Vec::with_capacity(aexprs.len());
+
+        for aexpr in aexprs {
+            let expr = self.expr(aexpr)?;
+            generics.push(expr.ty.clone());
+            exprs.push(expr);
+        }
+        Ok(Expr { kind: ExprKind::Tuple(exprs), ty: Ty::tuple(generics.into()) })
     }
 
     fn map(&mut self, init: &[[ast::Expr; 2]]) -> Result<Expr> {
@@ -630,5 +644,9 @@ impl Ty {
     pub fn func(args: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
         let args = args.into_iter().chain([ret]).collect();
         Ty::Con(TyCon { name: "func", generics: args })
+    }
+
+    pub fn tuple(generics: Rc<[Ty]>) -> Ty {
+        Ty::Con(TyCon { name: "tuple", generics })
     }
 }
