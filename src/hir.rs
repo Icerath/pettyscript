@@ -122,14 +122,12 @@ impl<'src> Lowering<'src> {
         unify(&Ty::Var(ret_var), &Ty::null(), &mut subs);
 
         let mut named_types = FxHashMap::default();
-        named_types.insert("int", Ty::int());
-        named_types.insert("char", Ty::char());
-        named_types.insert("bool", Ty::bool());
-        named_types.insert("str", Ty::str());
-        named_types.insert("null", Ty::null());
-        named_types.insert("array", Ty::array(TyVar::ILLEGAL));
-        named_types.insert("map", Ty::map(TyVar::ILLEGAL, TyVar::ILLEGAL));
-        named_types.insert("tuple", Ty::tuple(Rc::new([])));
+
+        let generics = Rc::new([]);
+        let builtin_names = ["int", "char", "bool", "str", "null", "array", "map", "tuple"];
+        for name in builtin_names {
+            named_types.insert(name, Ty::Con(TyCon { name, generics: generics.clone() }));
+        }
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
