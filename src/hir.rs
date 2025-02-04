@@ -399,30 +399,19 @@ impl Expr {
 }
 
 macro_rules! impl_ty_const {
-    ($name: ident) => {
-        pub fn $name() -> Ty {
+    ($($name: ident),+) => {
+        $(pub fn $name() -> Ty {
             thread_local! {
                 static CACHE: TyCon = TyCon { name: stringify!($name), generics: Rc::new([]) };
             }
             CACHE.with(|ty| Ty::Con(ty.clone()))
-        }
+        })+
+
     };
 }
 
 impl Ty {
-    impl_ty_const!(str);
-
-    impl_ty_const!(int);
-
-    impl_ty_const!(bool);
-
-    impl_ty_const!(char);
-
-    impl_ty_const!(null);
-
-    impl_ty_const!(range);
-
-    impl_ty_const!(range_inclusive);
+    impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
 
     pub fn array(of: TyVar) -> Ty {
         Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
