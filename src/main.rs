@@ -35,7 +35,13 @@ fn main() -> miette::Result<()> {
     let mut hir = hir::Lowering::new(&src);
     let block = hir.block(&ast).unwrap();
     println!("{block:?}");
-    println!("{:?}", &hir.subs);
+
+    let mut keys = hir.subs.keys().collect::<Vec<_>>();
+    keys.sort_unstable();
+    for tyvar in keys {
+        let x = typck::Ty::Var(*tyvar).sub(&hir.subs);
+        println!("{:?} -> {x:?}", tyvar.0);
+    }
 
     return Ok(());
 

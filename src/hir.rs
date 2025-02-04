@@ -44,7 +44,7 @@ impl Block {
 
 #[derive(Debug)]
 pub struct ForLoop {
-    ident: Ident,
+    ident: Option<Ident>,
     iter: Expr,
     body: Block,
 }
@@ -121,6 +121,7 @@ impl<'src> Lowering<'src> {
         named_types.insert("char", Ty::char());
         named_types.insert("bool", Ty::bool());
         named_types.insert("str", Ty::str());
+        named_types.insert("null", Ty::null());
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
@@ -134,16 +135,21 @@ impl<'src> Lowering<'src> {
 }
 
 impl FnScope {
-    fn insert(&mut self, name: &'static str, ty: TyVar) -> Ident {
+    /// Returns none if name is ignored ("_")
+    fn insert(&mut self, name: &'static str, ty: TyVar) -> Option<Ident> {
+        if name == "_" {
+            return None;
+        }
         let ident = Ident { ty, local: self.variables.len() };
         let prev = self.variables.insert(name, ident);
-        assert!(prev.is_none());
-        ident
+        assert!(prev.is_none(), "{name}: {ident:?}");
+        Some(ident)
     }
 }
 
 impl Lowering<'_> {
-    pub fn insert_scope(&mut self, name: &'static str, ty: TyVar) -> Ident {
+    /// Returns none if name is ignored  ("_")
+    pub fn insert_scope(&mut self, name: &'static str, ty: TyVar) -> Option<Ident> {
         self.scope().insert(name, ty)
     }
 }
@@ -270,7 +276,7 @@ impl Lowering<'_> {
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
         let fn_var = TyVar::uniq();
-        let ident = self.insert_scope(&func.ident, fn_var);
+        let ident = self.insert_scope(&func.ident, fn_var).unwrap();
 
         let ret_var = TyVar::uniq();
         self.scopes.push(FnScope { ret_var, variables: FxHashMap::default() });
