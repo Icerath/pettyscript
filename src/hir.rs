@@ -273,11 +273,9 @@ impl Lowering<'_> {
             unify(&ty, &Ty::Var(var), &mut self.subs);
         }
 
-        if let Some(expr) = &var_decl.expr {
-            let expr = self.expr(expr)?;
-            unify(&expr.ty, &Ty::Var(var), &mut self.subs);
-            out.push(Item::Assign(Assign { ident, expr }))
-        }
+        let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
+        unify(&expr.ty, &Ty::Var(var), &mut self.subs);
+        out.push(Item::Assign(Assign { ident, expr }));
         self.insert_scope(ident, var);
         Ok(())
     }
