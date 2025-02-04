@@ -149,6 +149,7 @@ impl Lowering<'_> {
         match stmt {
             Stmt::WhileLoop(while_loop) => self.while_loop(while_loop, out)?,
             Stmt::ForLoop(for_loop) => self.for_loop(for_loop, out)?,
+            Stmt::IfChain(if_chain) => self.if_chain(if_chain, out)?,
             Stmt::Let(var_decl) => self.var_decl(var_decl, false, out)?,
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
@@ -185,6 +186,31 @@ impl Lowering<'_> {
 
         // TODO: Handle for loop sugar here instead of later.
         out.push(Item::ForLoop(ForLoop { ident: iter_ident, iter, body }));
+        Ok(())
+    }
+
+    fn if_chain(&mut self, if_chain: &ast::IfChain, out: &mut Vec<Item>) -> Result<()> {
+        let mut chain = vec![];
+
+        let condition = self.expr(&if_chain.first.condition)?;
+        unify(&condition.ty, &Ty::bool(), &mut self.subs);
+        let block = self.block(&if_chain.first.body.stmts)?;
+        chain.push((condition, block));
+
+        for if_stmt in [&if_chain.first].into_iter().chain(&if_chain.r#else_ifs) {
+            let condition = self.expr(&if_stmt.condition)?;
+            unify(&condition.ty, &Ty::bool(), &mut self.subs);
+            let block = self.block(&if_stmt.body.stmts)?;
+            chain.push((condition, block));
+        }
+
+        let end = if let Some(r#else) = &if_chain.r#else {
+            self.block(&r#else.stmts)?
+        } else {
+            Block::EMPTY
+        };
+
+        out.push(Item::IfChain(IfChain { chain, end }));
         Ok(())
     }
 
@@ -364,7 +390,8 @@ impl Lowering<'_> {
 
     fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
         match op {
-            BinOp::Add => ty.clone(),
+            BinOp::Add | BinOp::Mod => ty.clone(),
+            BinOp::Eq => Ty::bool(),
             BinOp::Range => {
                 unify(ty, &Ty::int(), &mut self.subs);
                 Ty::range()
