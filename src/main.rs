@@ -38,7 +38,7 @@ fn main() -> miette::Result<()> {
 
     let mut keys = hir.subs.keys().collect::<Vec<_>>();
     keys.sort_unstable();
-    for tyvar in hir.subs.keys() {
+    for tyvar in keys {
         let x = typck::Ty::Var(*tyvar).sub(&hir.subs);
         println!("{:?} -> {x:?}", tyvar.0);
     }

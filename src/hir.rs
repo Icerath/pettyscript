@@ -78,6 +78,7 @@ pub enum ExprKind {
     Binary { exprs: Box<[Expr; 2]>, op: BinOp },
     FnCall { expr: Box<Expr>, args: Vec<Expr> },
     FieldAccess { expr: Box<Expr>, field: &'static str },
+    MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Array(Vec<Expr>),
     Ident(Ident),
     Bool(bool),
@@ -361,6 +362,7 @@ impl Lowering<'_> {
             ast::Expr::Array(exprs) => self.array(exprs),
             ast::Expr::FnCall { function, args } => self.fn_call(function, args),
             ast::Expr::FieldAccess { expr, field } => self.field_access(expr, field),
+            ast::Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
             _ => todo!("{expr:?}"),
         }
     }
@@ -451,7 +453,7 @@ impl Lowering<'_> {
         let Ty::Con(TyCon { name, generics }) = fn_ty else { panic!() };
         assert_eq!(name, "func");
         assert_eq!(args.len() + 1, generics.len());
-        let mut new_args = vec![];
+        let mut new_args = Vec::with_capacity(args.len());
         for (arg, param) in args.iter().zip(&*generics) {
             let arg = self.expr(arg)?;
             unify(&arg.ty, param, &mut self.subs);
@@ -472,6 +474,41 @@ impl Lowering<'_> {
         match tycon.name {
             "array" => match field {
                 "len" => Ty::int(),
+                _ => todo!(),
+            },
+            _ => todo!(),
+        }
+    }
+
+    fn method_call(
+        &mut self,
+        expr: &ast::Expr,
+        method: &'static str,
+        args: &[Spanned<ast::Expr>],
+    ) -> Result<Expr> {
+        let expr = self.expr(expr)?;
+        let params = self.method_params(&expr.ty, method);
+        assert_eq!(args.len() + 1, params.len());
+        let mut new_args = Vec::with_capacity(args.len());
+        for (arg, param) in args.iter().zip(&*params) {
+            let arg = self.expr(arg)?;
+            unify(&arg.ty, param, &mut self.subs);
+            new_args.push(arg);
+        }
+        let ret = params.last().unwrap().clone();
+        Ok(Expr {
+            ty: ret,
+            kind: ExprKind::MethodCall { expr: Box::new(expr), method, args: new_args },
+        })
+    }
+
+    fn method_params(&mut self, ty: &Ty, method: &'static str) -> Rc<[Ty]> {
+        let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
+        match tycon.name {
+            "array" => match method {
+                "push" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
+                "pop" => Rc::new([tycon.generics[0].clone()]),
+                "sort" => Rc::new([ty.clone()]),
                 _ => todo!(),
             },
             _ => todo!(),
