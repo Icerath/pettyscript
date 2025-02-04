@@ -139,16 +139,7 @@ impl Lowering<'_> {
 
     fn stmt(&mut self, stmt: &Stmt, out: &mut Vec<Item>) -> Result<()> {
         match stmt {
-            Stmt::WhileLoop(ast::WhileLoop { expr, body }) => {
-                let branch_expr = self.expr(expr)?;
-                let exit_condition = Item::IfChain(IfChain {
-                    chain: vec![(branch_expr, Block { items: vec![Item::Break] })],
-                    end: Block::EMPTY,
-                });
-                let mut new_body = vec![exit_condition];
-                new_body.append(&mut self.block(&body.stmts)?.items);
-                out.push(Item::Loop(Block { items: new_body }));
-            }
+            Stmt::WhileLoop(while_loop) => self.while_loop(while_loop, out)?,
             Stmt::Let(var_decl) => self.var_decl(var_decl, false, out)?,
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
@@ -157,6 +148,18 @@ impl Lowering<'_> {
             Stmt::Expr(expr) => out.push(Item::Expr(self.expr(expr)?)),
             _ => todo!("{stmt:?}"),
         }
+        Ok(())
+    }
+
+    fn while_loop(&mut self, while_loop: &ast::WhileLoop, out: &mut Vec<Item>) -> Result<()> {
+        let branch_expr = self.expr(&while_loop.expr)?;
+        let exit_condition = Item::IfChain(IfChain {
+            chain: vec![(branch_expr, Block { items: vec![Item::Break] })],
+            end: Block::EMPTY,
+        });
+        let mut new_body = vec![exit_condition];
+        new_body.append(&mut self.block(&while_loop.body.stmts)?.items);
+        out.push(Item::Loop(Block { items: new_body }));
         Ok(())
     }
 
