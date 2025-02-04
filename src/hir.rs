@@ -115,24 +115,36 @@ impl<'src> Lowering<'src> {
         let mut subs = Substitutions::new();
         let ret_var = TyVar::uniq();
         unify(&Ty::Var(ret_var), &Ty::null(), &mut subs);
-        let scopes = vec![FnScope { ret_var, variables: FxHashMap::default() }];
+
         let mut named_types = FxHashMap::default();
         named_types.insert("int", Ty::int());
         named_types.insert("char", Ty::char());
         named_types.insert("bool", Ty::bool());
         named_types.insert("str", Ty::str());
 
-        Self { src, subs, scopes, named_types }
+        let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
+
+        let println_var = TyVar::uniq();
+        let println = Ty::func([Ty::str()], Ty::null());
+        unify(&Ty::Var(println_var), &println, &mut subs);
+        scope.insert("println", println_var);
+
+        Self { src, subs, scopes: vec![scope], named_types }
+    }
+}
+
+impl FnScope {
+    fn insert(&mut self, name: &'static str, ty: TyVar) -> Ident {
+        let ident = Ident { ty, local: self.variables.len() };
+        let prev = self.variables.insert(name, ident);
+        assert!(prev.is_none());
+        ident
     }
 }
 
 impl Lowering<'_> {
     pub fn insert_scope(&mut self, name: &'static str, ty: TyVar) -> Ident {
-        let scope = self.scope();
-        let ident = Ident { ty, local: scope.variables.len() };
-        let prev = scope.variables.insert(name, ident);
-        assert!(prev.is_none());
-        ident
+        self.scope().insert(name, ty)
     }
 }
 
@@ -354,8 +366,8 @@ impl Lowering<'_> {
             ast::Literal::String(str) => Expr { ty: Ty::str(), kind: ExprKind::Str(str) },
             ast::Literal::FString(fstring) => self.fstr(fstring)?,
             ast::Literal::Ident(ident) => {
-                let ident = self.scope().variables.get(ident).unwrap();
-                Expr { ty: Ty::Var(ident.ty), kind: ExprKind::Ident(*ident) }
+                let ident = self.load_var(ident).expect(ident);
+                Expr { ty: Ty::Var(ident.ty), kind: ExprKind::Ident(ident) }
             }
             _ => todo!(),
         })
@@ -372,6 +384,13 @@ impl Lowering<'_> {
 
     fn scope(&mut self) -> &mut FnScope {
         self.scopes.last_mut().unwrap()
+    }
+
+    fn load_var(&mut self, name: &'static str) -> Option<Ident> {
+        match self.scopes.last().unwrap().variables.get(name) {
+            Some(ident) => Some(*ident),
+            None => self.scopes.first().unwrap().variables.get(name).copied(),
+        }
     }
 
     fn unary(&mut self, op: UnaryOp, aexpr: &ast::Expr) -> Result<Expr> {
@@ -442,5 +461,10 @@ impl Ty {
 
     pub fn array(of: TyVar) -> Ty {
         Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
+    }
+
+    pub fn func(args: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
+        let args = args.into_iter().chain([ret]).collect();
+        Ty::Con(TyCon { name: "func", generics: args })
     }
 }
