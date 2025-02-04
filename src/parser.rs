@@ -53,7 +53,6 @@ pub struct ExplicitType {
 }
 
 impl ExplicitType {
-    #[expect(unused, reason = "TODO: Inferred types")]
     pub fn is_inferred(&self) -> bool {
         *self.ident == "_"
     }

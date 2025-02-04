@@ -77,6 +77,7 @@ pub enum ExprKind {
     Unary { expr: Box<Expr>, op: UnaryOp },
     Binary { exprs: Box<[Expr; 2]>, op: BinOp },
     FnCall { expr: Box<Expr>, args: Vec<Expr> },
+    FieldAccess { expr: Box<Expr>, field: &'static str },
     Array(Vec<Expr>),
     Ident(Ident),
     Bool(bool),
@@ -122,6 +123,7 @@ impl<'src> Lowering<'src> {
         named_types.insert("bool", Ty::bool());
         named_types.insert("str", Ty::str());
         named_types.insert("null", Ty::null());
+        named_types.insert("array", Ty::array(TyVar::ILLEGAL));
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
@@ -129,6 +131,11 @@ impl<'src> Lowering<'src> {
         let println = Ty::func([Ty::str()], Ty::null());
         unify(&Ty::Var(println_var), &println, &mut subs);
         scope.insert("println", println_var);
+
+        let assert_var = TyVar::uniq();
+        let assert = Ty::func([Ty::bool()], Ty::null());
+        unify(&Ty::Var(assert_var), &assert, &mut subs);
+        scope.insert("assert", assert_var);
 
         Self { src, subs, scopes: vec![scope], named_types }
     }
@@ -331,7 +338,19 @@ impl Lowering<'_> {
     }
 
     fn load_explicit_type(&self, expl_ty: &Spanned<ExplicitType>) -> Result<Ty> {
-        Ok(self.named_types.get(&**expl_ty.ident).unwrap().clone())
+        if expl_ty.is_inferred() {
+            return Ok(Ty::Var(TyVar::uniq()));
+        }
+        let ty = self.named_types.get(&**expl_ty.ident).unwrap().clone();
+        let Ty::Con(tycon) = ty else { panic!() };
+        Ok(Ty::Con(TyCon {
+            name: tycon.name,
+            generics: expl_ty
+                .generics
+                .iter()
+                .map(|g| self.load_explicit_type(g))
+                .collect::<Result<_>>()?,
+        }))
     }
 
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
@@ -341,7 +360,8 @@ impl Lowering<'_> {
             ast::Expr::Binary { op, exprs } => self.binary(*op, &exprs[0], &exprs[1]),
             ast::Expr::Array(exprs) => self.array(exprs),
             ast::Expr::FnCall { function, args } => self.fn_call(function, args),
-            _ => todo!(),
+            ast::Expr::FieldAccess { expr, field } => self.field_access(expr, field),
+            _ => todo!("{expr:?}"),
         }
     }
 
@@ -413,7 +433,6 @@ impl Lowering<'_> {
     fn array(&mut self, aexprs: &[ast::Expr]) -> Result<Expr> {
         let var = TyVar::uniq();
         let ty = Ty::array(var);
-        self.subs.insert(TyVar::uniq(), ty.clone());
 
         let mut exprs = vec![];
         for aexpr in aexprs {
@@ -440,6 +459,23 @@ impl Lowering<'_> {
         }
         let ret = generics.last().unwrap().clone();
         Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args } })
+    }
+
+    fn field_access(&mut self, expr: &ast::Expr, field: &'static str) -> Result<Expr> {
+        let expr = self.expr(expr)?;
+        let field_ty = self.field_ty(&expr.ty, field);
+        Ok(Expr { ty: field_ty, kind: ExprKind::FieldAccess { expr: Box::new(expr), field } })
+    }
+
+    fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
+        let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
+        match tycon.name {
+            "array" => match field {
+                "len" => Ty::int(),
+                _ => todo!(),
+            },
+            _ => todo!(),
+        }
     }
 }
 

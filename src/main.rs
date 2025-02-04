@@ -38,13 +38,14 @@ fn main() -> miette::Result<()> {
 
     let mut keys = hir.subs.keys().collect::<Vec<_>>();
     keys.sort_unstable();
-    for tyvar in keys {
+    for tyvar in hir.subs.keys() {
         let x = typck::Ty::Var(*tyvar).sub(&hir.subs);
         println!("{:?} -> {x:?}", tyvar.0);
     }
 
     return Ok(());
 
+    #[expect(unreachable_code)]
     let ast = Ast { src: &src, body: &ast };
     let bytecode = codegen::codegen(ast)?;
     if let Some(path) = args.output_bytecode {

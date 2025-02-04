@@ -1,7 +1,4 @@
-fn main() -> int {
-    for i in 0..10 {}
-    return 1;
-}
-
-let y = main;
-let z = main();
+let empty_arr: array[int] = [];
+assert(empty_arr.len == 0);
+let arr = [1];
+assert(arr.len == 1);

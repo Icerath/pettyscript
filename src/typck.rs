@@ -63,6 +63,8 @@ fn insert(ty: &Ty, v: TyVar, subs: &mut Substitutions) {
 }
 
 impl TyVar {
+    pub const ILLEGAL: Self = Self(usize::MAX);
+
     pub fn uniq() -> Self {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         Self(COUNTER.fetch_add(1, Ordering::Relaxed))
