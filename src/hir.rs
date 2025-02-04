@@ -79,6 +79,7 @@ pub enum ExprKind {
     FnCall { expr: Box<Expr>, args: Vec<Expr> },
     FieldAccess { expr: Box<Expr>, field: &'static str },
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
+    Index { expr: Box<Expr>, index: Box<Expr> },
     Array(Vec<Expr>),
     Ident(Ident),
     Bool(bool),
@@ -363,6 +364,7 @@ impl Lowering<'_> {
             ast::Expr::FnCall { function, args } => self.fn_call(function, args),
             ast::Expr::FieldAccess { expr, field } => self.field_access(expr, field),
             ast::Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
+            ast::Expr::Index { expr, index } => self.index(expr, index),
             _ => todo!("{expr:?}"),
         }
     }
@@ -511,6 +513,25 @@ impl Lowering<'_> {
                 "sort" => Rc::new([ty.clone()]),
                 _ => todo!(),
             },
+            _ => todo!(),
+        }
+    }
+
+    fn index(&mut self, expr: &ast::Expr, index: &ast::Expr) -> Result<Expr> {
+        let expr = self.expr(expr)?;
+        let index = self.expr(index)?;
+
+        let ty = self.index_ty(&expr.ty, &index.ty);
+        Ok(Expr { ty, kind: ExprKind::Index { expr: Box::new(expr), index: Box::new(index) } })
+    }
+
+    fn index_ty(&mut self, ty: &Ty, index: &Ty) -> Ty {
+        let Ty::Con(index) = index.sub(&self.subs) else { panic!() };
+        let Ty::Con(ty) = ty.sub(&self.subs) else { panic!() };
+        assert!(index.generics.is_empty());
+
+        match (ty.name, index.name) {
+            ("array", "int") => ty.generics[0].clone(),
             _ => todo!(),
         }
     }
