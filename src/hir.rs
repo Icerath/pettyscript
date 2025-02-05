@@ -1,13 +1,19 @@
 #![expect(dead_code)]
 
-use std::rc::Rc;
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
 
 use miette::Result;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    parser::{self as ast, BinOp, ExplicitType, Pat, Spanned, Stmt, UnaryOp, VarDecl},
-    typck::{Substitutions, Ty, TyCon, TyVar, unify},
+    parser::{
+        self as ast, AssignSegment, BinOp, ExplicitType, Pat, Spanned, Stmt, StructInitField,
+        UnaryOp, VarDecl,
+    },
+    typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
 
 #[derive(Debug)]
@@ -80,6 +86,7 @@ pub enum ExprKind {
     FieldAccess { expr: Box<Expr>, field: &'static str },
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Index { expr: Box<Expr>, index: Box<Expr> },
+    StructInit { ident: &'static str, fields: Vec<(&'static str, Expr)> },
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Map(Vec<[Expr; 2]>),
@@ -105,6 +112,7 @@ pub struct Fstr {
 
 pub struct Lowering<'src> {
     pub named_types: FxHashMap<&'static str, Ty>,
+    pub structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
     pub subs: Substitutions,
     scopes: Vec<FnScope>,
     src: &'src str,
@@ -126,7 +134,10 @@ impl<'src> Lowering<'src> {
         let generics = Rc::new([]);
         let builtin_names = ["int", "char", "bool", "str", "null", "array", "map", "tuple"];
         for name in builtin_names {
-            named_types.insert(name, Ty::Con(TyCon { name, generics: generics.clone() }));
+            named_types.insert(
+                name,
+                Ty::Con(TyCon { kind: TyKind::Named(name), generics: generics.clone() }),
+            );
         }
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
@@ -146,7 +157,7 @@ impl<'src> Lowering<'src> {
         unify(&Ty::Var(parse_int_var), &parse_int, &mut subs);
         scope.insert("parse_int", parse_int_var);
 
-        Self { src, subs, scopes: vec![scope], named_types }
+        Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
 }
 
@@ -187,6 +198,7 @@ impl Lowering<'_> {
             Stmt::Let(var_decl) => self.var_decl(var_decl, false, out)?,
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
+            Stmt::Struct(struct_) => self.struct_(struct_, out)?,
             Stmt::Function(func) => self.function(func, out)?,
             Stmt::Return(ret) => self.ret(ret, out)?,
             Stmt::Expr(expr) => out.push(Item::Expr(self.expr(expr)?)),
@@ -250,9 +262,9 @@ impl Lowering<'_> {
 
     fn iter_item_ty(&mut self, iter: &TyCon) -> Ty {
         // FIXME: .............
-        match iter.name {
-            "range" => Ty::int(),
-            "range_inclusive" => Ty::int(),
+        match iter.kind {
+            TyKind::Named("range") => Ty::int(),
+            TyKind::Named("range_inclusive") => Ty::int(),
             _ => panic!("{iter:?}"),
         }
     }
@@ -281,10 +293,36 @@ impl Lowering<'_> {
     }
 
     fn assign(&mut self, assign: &ast::Assign, out: &mut Vec<Item>) -> Result<()> {
-        let ident = *self.scope().variables.get(&**assign.root).unwrap();
+        let mut var = Ty::Var(self.load_var(&assign.root).unwrap().ty);
+        for segment in &assign.segments {
+            match segment {
+                AssignSegment::Index(_) => panic!(),
+                AssignSegment::Field(field) => {
+                    var = self.field_ty(&var, field);
+                }
+            }
+        }
         let expr = self.expr(&assign.expr)?;
-        unify(&Ty::Var(ident.ty), &expr.ty, &mut self.subs);
+        unify(&var, &expr.ty, &mut self.subs);
+        // TODO: Assignment should pass all segments
         out.push(Item::Assign(Assign { ident: &assign.root, expr }));
+        Ok(())
+    }
+
+    fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
+        let mut fields = BTreeMap::new();
+        for (field, expl_ty) in &struct_.fields {
+            let ty = self.load_explicit_type(expl_ty)?;
+            fields.insert(**field, ty);
+        }
+        let fields = Rc::new(fields);
+        let ty = Ty::Con(TyCon {
+            kind: TyKind::Struct { name: &struct_.ident, fields },
+            generics: Rc::new([]),
+        });
+        let prev = self.named_types.insert(&struct_.ident, ty);
+        assert!(prev.is_none());
+        _ = out;
         Ok(())
     }
 
@@ -313,7 +351,7 @@ impl Lowering<'_> {
         }
 
         // TODO: Is this the right way to explain a function type?
-        let fn_ty = Ty::Con(TyCon { name: "func", generics: params.into() });
+        let fn_ty = Ty::Con(TyCon { kind: TyKind::Named("func"), generics: params.into() });
         unify(&Ty::Var(fn_var), &fn_ty, &mut self.subs);
 
         let body = self.block(&func.body.stmts)?;
@@ -355,7 +393,7 @@ impl Lowering<'_> {
             .clone();
         let Ty::Con(tycon) = ty else { panic!() };
         Ok(Ty::Con(TyCon {
-            name: tycon.name,
+            kind: tycon.kind,
             generics: expl_ty
                 .generics
                 .iter()
@@ -374,7 +412,7 @@ impl Lowering<'_> {
             ast::Expr::FieldAccess { expr, field } => self.field_access(expr, field),
             ast::Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
             ast::Expr::Index { expr, index } => self.index(expr, index),
-            _ => todo!("{expr:?}"),
+            ast::Expr::InitStruct { ident, fields } => self.init_struct(ident, fields),
         }
     }
 
@@ -496,7 +534,8 @@ impl Lowering<'_> {
 
         let expr = self.expr(func)?;
         let fn_ty = expr.ty.sub(&self.subs);
-        let Ty::Con(TyCon { name, generics }) = fn_ty else { panic!() };
+        let Ty::Con(TyCon { kind, generics }) = fn_ty else { panic!() };
+        let TyKind::Named(name) = kind else { panic!() };
         assert_eq!(name, "func");
         assert_eq!(args.len() + 1, generics.len());
         let mut new_args = Vec::with_capacity(args.len());
@@ -517,16 +556,17 @@ impl Lowering<'_> {
 
     fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
-        match tycon.name {
-            "array" => match field {
+        match tycon.kind {
+            TyKind::Struct { name, fields } => fields.get(field).unwrap().clone(),
+            TyKind::Named("array") => match field {
                 "len" => Ty::int(),
                 _ => todo!("{field:?}"),
             },
-            "str" => match field {
+            TyKind::Named("str") => match field {
                 "len" => Ty::int(),
                 _ => todo!("{field:?}"),
             },
-            _ => todo!("type `{}` does not contain field: `{field}`", tycon.name),
+            _ => todo!("type `{:?}` does not contain field: `{field}`", tycon.kind),
         }
     }
 
@@ -554,7 +594,11 @@ impl Lowering<'_> {
 
     fn method_params(&mut self, ty: &Ty, method: &'static str) -> Rc<[Ty]> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
-        match tycon.name {
+        let name = match tycon.kind {
+            TyKind::Named(name) => name,
+            _ => panic!(),
+        };
+        match name {
             "int" => match method {
                 "abs" => Rc::new([Ty::int()]),
                 _ => todo!("`{method}`"),
@@ -581,7 +625,7 @@ impl Lowering<'_> {
                 _ => todo!("`{method}`"),
             },
 
-            _ => panic!("type `{}` does not contain method `{method}`", tycon.name),
+            _ => panic!("type `{:?}` does not contain method `{method}`", tycon),
         }
     }
 
@@ -597,14 +641,35 @@ impl Lowering<'_> {
         let Ty::Con(index) = index.sub(&self.subs) else { panic!() };
         let Ty::Con(ty) = ty.sub(&self.subs) else { panic!() };
         assert!(index.generics.is_empty());
+        let TyKind::Named(ty_name) = ty.kind else { panic!() };
+        let TyKind::Named(index_name) = index.kind else { panic!() };
 
-        match (ty.name, index.name) {
+        match (ty_name, index_name) {
             ("array", "int") => ty.generics[0].clone(),
             ("array", "range") => Ty::Con(ty),
             ("str", "int") => Ty::char(),
             ("str", "range") => Ty::str(),
             _ => todo!("{ty:?}"),
         }
+    }
+
+    fn init_struct(
+        &mut self,
+        ident: &'static str,
+        init_fields: &[StructInitField],
+    ) -> Result<Expr> {
+        let Ty::Con(tycon) = self.named_types.get(ident).unwrap().clone() else { panic!() };
+        let TyKind::Struct { name, fields } = tycon.kind else { panic!() };
+        let mut new_fields = vec![];
+        for init in init_fields {
+            let init_expr = self.expr(init.expr.as_ref().unwrap())?;
+            let ty = fields.get(*init.ident).unwrap();
+            unify(ty, &init_expr.ty, &mut self.subs);
+            new_fields.push((*init.ident, init_expr));
+        }
+        let ty =
+            Ty::Con(TyCon { kind: TyKind::Struct { name: ident, fields }, generics: Rc::new([]) });
+        Ok(Expr { ty, kind: ExprKind::StructInit { ident, fields: new_fields } })
     }
 }
 
@@ -618,7 +683,7 @@ macro_rules! impl_ty_const {
     ($($name: ident),+) => {
         $(pub fn $name() -> Ty {
             thread_local! {
-                static CACHE: TyCon = TyCon { name: stringify!($name), generics: Rc::new([]) };
+                static CACHE: TyCon = TyCon { kind: TyKind::Named(stringify!($name)), generics: Rc::new([]) };
             }
             CACHE.with(|ty| Ty::Con(ty.clone()))
         })+
@@ -630,19 +695,22 @@ impl Ty {
     impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
 
     pub fn array(of: TyVar) -> Ty {
-        Ty::Con(TyCon { name: "array", generics: Rc::new([Ty::Var(of)]) })
+        Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([Ty::Var(of)]) })
     }
 
     pub fn map(key: TyVar, val: TyVar) -> Ty {
-        Ty::Con(TyCon { name: "map", generics: Rc::new([Ty::Var(key), Ty::Var(val)]) })
+        Ty::Con(TyCon {
+            kind: TyKind::Named("map"),
+            generics: Rc::new([Ty::Var(key), Ty::Var(val)]),
+        })
     }
 
     pub fn func(args: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
         let args = args.into_iter().chain([ret]).collect();
-        Ty::Con(TyCon { name: "func", generics: args })
+        Ty::Con(TyCon { kind: TyKind::Named("func"), generics: args })
     }
 
     pub fn tuple(generics: Rc<[Ty]>) -> Ty {
-        Ty::Con(TyCon { name: "tuple", generics })
+        Ty::Con(TyCon { kind: TyKind::Named("tuple"), generics })
     }
 }

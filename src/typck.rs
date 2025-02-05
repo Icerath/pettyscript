@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt,
     iter::zip,
     rc::Rc,
@@ -23,8 +23,14 @@ impl fmt::Debug for Ty {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TyCon {
-    pub name: &'static str,
+    pub kind: TyKind,
     pub generics: Rc<[Ty]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TyKind {
+    Named(&'static str),
+    Struct { name: &'static str, fields: Rc<BTreeMap<&'static str, Ty>> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -36,10 +42,11 @@ pub type Substitutions = HashMap<TyVar, Ty>;
 pub fn unify(left: &Ty, right: &Ty, subs: &mut Substitutions) {
     match (&left, &right) {
         (
-            Ty::Con(TyCon { name: name1, generics: gen1 }),
-            Ty::Con(TyCon { name: name2, generics: gen2 }),
+            Ty::Con(TyCon { kind: kind1, generics: gen1 }),
+            Ty::Con(TyCon { kind: kind2, generics: gen2 }),
         ) => {
-            assert_eq!(name1, name2);
+            // TODO: Unify kinds
+            assert_eq!(kind1, kind2);
             assert_eq!(gen1.len(), gen2.len());
 
             for (l, r) in zip(gen1.iter(), gen2.iter()) {
@@ -88,9 +95,10 @@ impl TyVar {
 impl Ty {
     pub fn sub(&self, subs: &Substitutions) -> Ty {
         match self {
-            Self::Con(TyCon { name, generics }) => {
-                Ty::Con(TyCon { name, generics: generics.iter().map(|ty| ty.sub(subs)).collect() })
-            }
+            Self::Con(TyCon { kind, generics }) => Ty::Con(TyCon {
+                kind: kind.clone(),
+                generics: generics.iter().map(|ty| ty.sub(subs)).collect(),
+            }),
             Self::Var(v @ TyVar(_)) => {
                 if let Some(t) = subs.get(v) {
                     t.sub(subs)
@@ -113,7 +121,7 @@ mod tests {
     macro_rules! tycon {
         ($name:expr,$($generic:expr)*) => {
             Ty::Con(TyCon {
-                name: $name,
+                kind: TyKind::Named($name),
                 generics: vec![$($generic),*].into(),
             })
         };

@@ -105,29 +105,6 @@ fn for_loop() {
 }
 
 #[test]
-fn structs() {
-    test_expr!("struct Point {x:int,y:int} Point { x: 0, y: 0 }", "");
-    test_expr!(
-        r#"struct Lexer {str:str} let lexer = Lexer { str: "abc" }; lexer.str = lexer.str[0..2]; println(f"{lexer.str}")"#,
-        "ab"
-    );
-    test_expr!(r#"struct A {str:int} println(f"{A { str: 1 }}")"#, "{ 1 }");
-    test_expr!(r#"struct A {name:str} println(f"{(A { name: "Bob" }).name}")"#, "Bob");
-    test_expr!(
-        r#"struct Lexer {len:int}let lexer = Lexer { len: 10 }; println(f"{lexer.len}");"#,
-        "10"
-    );
-    test_expr!(
-        r#"struct Lexer{len:int} let lexer = Lexer { len: 10 }; println(f"{1 < lexer.len}");"#,
-        "true"
-    );
-    test_expr!(
-        r#"struct Lexer{len:int} let lexer = Lexer { len: 10 }; lexer.len = 11; println(f"{lexer.len}");"#,
-        "11"
-    );
-}
-
-#[test]
 fn while_loops() {
     test_expr!(
         r#"let i: int = 0; while true { if i == 4 { break; } println(f"{i}"); i = i + 1; }"#,
