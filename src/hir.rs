@@ -687,9 +687,18 @@ impl Lowering<'_> {
         let TyKind::Struct { fields, .. } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {
-            let init_expr = self.expr(init.expr.as_ref().unwrap())?;
             let ty = fields.get(*init.ident).unwrap();
-            unify(ty, &init_expr.ty, &mut self.subs);
+            let init_expr = match init.expr.as_ref() {
+                Some(expr) => {
+                    let expr = self.expr(expr)?;
+                    unify(ty, &expr.ty, &mut self.subs);
+                    expr
+                }
+                None => Expr {
+                    ty: ty.clone(),
+                    kind: ExprKind::Ident(self.load_var(&init.ident).unwrap()),
+                },
+            };
             new_fields.push((*init.ident, init_expr));
         }
         let ty =
