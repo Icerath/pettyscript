@@ -236,7 +236,7 @@ impl Codegen<'_> {
                 self.scopes.last_mut().unwrap().named_types.insert(*r#struct.ident, typ);
             }
             Stmt::Enum(Enum { ident, variants }) => {
-                // Each enum it of a different type
+                // Each enum is of a different type
                 static COUNTER: AtomicU32 = AtomicU32::new(0);
                 let id = COUNTER.fetch_add(1, Ordering::Relaxed);
                 let typ = Type::Enum {
