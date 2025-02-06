@@ -61,8 +61,8 @@ pub struct ForLoop {
 
 #[derive(Debug)]
 pub struct IfChain {
-    chain: Vec<(Expr, Block)>,
-    end: Block,
+    pub chain: Vec<(Expr, Block)>,
+    pub end: Block,
 }
 
 #[derive(Debug)]

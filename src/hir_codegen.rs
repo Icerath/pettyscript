@@ -39,6 +39,7 @@ impl Codegen {
     fn item(&mut self, item: &Item) -> Result<()> {
         match item {
             Item::Function(func) => self.function(func),
+            Item::IfChain(if_chain) => self.if_chain(if_chain),
             Item::ForLoop(for_loop) => self.for_loop(for_loop),
             Item::Expr(expr) => {
                 self.expr(expr)?;
@@ -81,6 +82,22 @@ impl Codegen {
         Ok(())
     }
 
+    fn if_chain(&mut self, if_chain: &IfChain) -> Result<()> {
+        let end_label = self.builder.create_label();
+        let mut next = self.builder.create_label();
+        for (condition, block) in &if_chain.chain {
+            self.builder.insert_label(next);
+            next = self.builder.create_label();
+            self.expr(condition)?;
+            self.builder.insert(Instr::CJump(next));
+            self.block(block)?;
+        }
+        self.builder.insert_label(next);
+        self.block(&if_chain.end)?;
+        self.builder.insert_label(end_label);
+        Ok(())
+    }
+
     fn for_loop(&mut self, for_loop: &ForLoop) -> Result<()> {
         let start_label = self.builder.create_label();
         let end_label = self.builder.create_label();
@@ -94,7 +111,7 @@ impl Codegen {
         let Ty::Con(ty) = for_loop.iter.ty.sub(&self.subs) else { panic!() };
         let iter_op = match ty.kind {
             TyKind::Named("range") => Instr::IterRange,
-            TyKind::Named("range_inclusive") => Instr::IterRange,
+            TyKind::Named("range_inclusive") => Instr::IterRangeInclusive,
             typ => panic!("{typ:?}"),
         };
         self.builder.insert(iter_op);
@@ -120,7 +137,12 @@ impl Codegen {
         match &expr.kind {
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
+            ExprKind::Bool(bool) => self.builder.insert(Instr::LoadBool(*bool)),
             ExprKind::Int(int) => self.builder.insert(Instr::LoadInt(*int)),
+            ExprKind::Str(str) => {
+                let [ptr, len] = self.builder.insert_string(str);
+                self.builder.insert(Instr::LoadString { ptr, len });
+            }
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
             ExprKind::Ident(ident) => self.load(ident.offset),
             kind => todo!("{kind:?}"),
@@ -148,6 +170,8 @@ impl Codegen {
 
         match op {
             BinOp::Add => self.builder.insert(Instr::AddInt),
+            BinOp::Mod => self.builder.insert(Instr::Mod),
+            BinOp::Eq => self.builder.insert(Instr::Eq),
             BinOp::Range => self.builder.insert(Instr::Range),
             BinOp::RangeInclusive => self.builder.insert(Instr::RangeInclusive),
             _ => todo!("{op:?}"),
