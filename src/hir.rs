@@ -149,6 +149,7 @@ impl<'src> Lowering<'src> {
         scope.insert("assert", Ty::func([Ty::bool()], Ty::bool()));
         scope.insert("exit", Ty::func([Ty::int()], Ty::null()));
         scope.insert("parse_int", Ty::func([Ty::str()], Ty::int()));
+        scope.insert("read_file", Ty::func([Ty::str()], Ty::str()));
 
         Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
