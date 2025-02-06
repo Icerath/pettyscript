@@ -570,8 +570,8 @@ impl Lowering<'_> {
     fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.kind {
-            TyKind::Struct { name, fields } => fields.get(field).unwrap().clone(),
-            TyKind::Enum { name, variants } => {
+            TyKind::Struct { name: _, fields } => fields.get(field).unwrap().clone(),
+            TyKind::Enum { name: _, variants } => {
                 Ty::Con(TyCon::from(TyKind::Variant { id: variants[field] }))
             }
             TyKind::Named("array") => match field {
@@ -675,7 +675,7 @@ impl Lowering<'_> {
         init_fields: &[StructInitField],
     ) -> Result<Expr> {
         let Ty::Con(tycon) = self.named_types.get(ident).unwrap().clone() else { panic!() };
-        let TyKind::Struct { name, fields } = tycon.kind else { panic!() };
+        let TyKind::Struct { name: _, fields } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {
             let init_expr = self.expr(init.expr.as_ref().unwrap())?;
