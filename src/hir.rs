@@ -36,6 +36,7 @@ pub struct Function {
     pub name: &'static str,
     pub ident: Ident,
     pub params: Vec<Ident>,
+    pub stack_size: usize,
     pub ret: TyVar,
     pub body: Block,
 }
@@ -75,8 +76,8 @@ pub struct Return {
 
 #[derive(Debug)]
 pub struct Expr {
-    ty: Ty,
-    kind: ExprKind,
+    pub ty: Ty,
+    pub kind: ExprKind,
 }
 
 #[derive(Debug)]
@@ -362,21 +363,24 @@ impl Lowering<'_> {
             unify(&Ty::Var(ret_var), &Ty::null(), &mut self.subs);
         }
 
+        let body = self.block(&func.body.stmts)?;
+        let last_scope = self.scopes.pop().unwrap();
+        let stack_size = last_scope.variables.len();
+
         let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
             params: params.iter().map(|ident| ident.ty.clone()).collect(),
             ret: Rc::new(Ty::Var(ret_var)),
         }));
         unify(&Ty::Var(fn_var), &fn_ty, &mut self.subs);
 
-        let body = self.block(&func.body.stmts)?;
         out.push(Item::Function(Function {
             name: &func.ident,
             ident,
+            stack_size,
             params: fn_params,
             ret: ret_var,
             body,
         }));
-        self.scopes.pop().unwrap();
         Ok(())
     }
 
