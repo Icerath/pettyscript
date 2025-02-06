@@ -98,9 +98,9 @@ pub enum ExprKind {
     Fstr(Fstr),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Ident {
-    ty: TyVar,
+    ty: Ty,
     local: usize,
 }
 
@@ -142,24 +142,16 @@ impl<'src> Lowering<'src> {
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
-        let null_var = TyVar::uniq();
-        unify(&Ty::Var(null_var), &Ty::null(), &mut subs);
-        scope.insert("null", null_var);
+        scope.insert("null", Ty::null());
 
-        let println_var = TyVar::uniq();
         let println = Ty::func([Ty::str()], Ty::null());
-        unify(&Ty::Var(println_var), &println, &mut subs);
-        scope.insert("println", println_var);
+        scope.insert("println", println);
 
-        let assert_var = TyVar::uniq();
         let assert = Ty::func([Ty::bool()], Ty::bool());
-        unify(&Ty::Var(assert_var), &assert, &mut subs);
-        scope.insert("assert", assert_var);
+        scope.insert("assert", assert);
 
-        let parse_int_var = TyVar::uniq();
         let parse_int = Ty::func([Ty::str()], Ty::int());
-        unify(&Ty::Var(parse_int_var), &parse_int, &mut subs);
-        scope.insert("parse_int", parse_int_var);
+        scope.insert("parse_int", parse_int);
 
         Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
@@ -167,12 +159,12 @@ impl<'src> Lowering<'src> {
 
 impl FnScope {
     /// Returns none if name is ignored ("_")
-    fn insert(&mut self, name: &'static str, ty: TyVar) -> Option<Ident> {
+    fn insert(&mut self, name: &'static str, ty: Ty) -> Option<Ident> {
         if name == "_" {
             return None;
         }
         let ident = Ident { ty, local: self.variables.len() };
-        let prev = self.variables.insert(name, ident);
+        let prev = self.variables.insert(name, ident.clone());
         assert!(prev.is_none(), "{name}: {ident:?}");
         Some(ident)
     }
@@ -180,7 +172,7 @@ impl FnScope {
 
 impl Lowering<'_> {
     /// Returns none if name is ignored  ("_")
-    pub fn insert_scope(&mut self, name: &'static str, ty: TyVar) -> Option<Ident> {
+    pub fn insert_scope(&mut self, name: &'static str, ty: Ty) -> Option<Ident> {
         self.scope().insert(name, ty)
     }
 }
@@ -228,11 +220,9 @@ impl Lowering<'_> {
         let iter = self.expr(&for_loop.iter)?;
         // TODO: Don't fully substitute this type.
         let Ty::Con(iter_typ) = iter.ty.sub(&self.subs) else { panic!() };
-        let iter_item_ty = TyVar::uniq();
         let item_ty = self.iter_item_ty(&iter_typ);
-        unify(&Ty::Var(iter_item_ty), &item_ty, &mut self.subs);
 
-        let iter_ident = self.insert_scope(&for_loop.ident, iter_item_ty);
+        let iter_ident = self.insert_scope(&for_loop.ident, item_ty);
         let body = self.block(&for_loop.body.stmts)?;
 
         // TODO: Handle for loop sugar here instead of later.
@@ -283,22 +273,22 @@ impl Lowering<'_> {
         let _ = is_const;
         let Pat::Ident(ident) = &*var_decl.pat else { todo!() };
         assert!(!self.scope().variables.contains_key(ident));
-        let var = TyVar::uniq();
 
+        let mut ty = None;
         if let Some(expl_ty) = &var_decl.typ {
-            let ty = self.load_explicit_type(expl_ty)?;
-            unify(&ty, &Ty::Var(var), &mut self.subs);
+            ty = Some(self.load_explicit_type(expl_ty)?);
         }
+        let ty = ty.unwrap_or_else(|| Ty::Var(TyVar::uniq()));
 
         let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
-        unify(&expr.ty, &Ty::Var(var), &mut self.subs);
+        unify(&expr.ty, &ty, &mut self.subs);
         out.push(Item::Assign(Assign { ident, expr }));
-        self.insert_scope(ident, var);
+        self.insert_scope(ident, ty);
         Ok(())
     }
 
     fn assign(&mut self, assign: &ast::Assign, out: &mut Vec<Item>) -> Result<()> {
-        let mut var = Ty::Var(self.load_var(&assign.root).unwrap().ty);
+        let mut var = self.load_var(&assign.root).unwrap().ty;
         for segment in &assign.segments {
             match segment {
                 AssignSegment::Index(_) => panic!(),
@@ -341,9 +331,7 @@ impl Lowering<'_> {
             kind: TyKind::Enum { name: &enum_.ident, variants },
             generics: Rc::new([]),
         });
-        let var = TyVar::uniq();
-        unify(&Ty::Var(var), &ty, &mut self.subs);
-        let _ = self.insert_scope(&enum_.ident, var);
+        let _ = self.insert_scope(&enum_.ident, ty.clone());
 
         let prev = self.named_types.insert(&enum_.ident, ty);
         assert!(prev.is_none());
@@ -353,7 +341,7 @@ impl Lowering<'_> {
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
         let fn_var = TyVar::uniq();
-        let ident = self.insert_scope(&func.ident, fn_var).unwrap();
+        let ident = self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap();
 
         let ret_var = TyVar::uniq();
         self.scopes.push(FnScope { ret_var, variables: FxHashMap::default() });
@@ -363,7 +351,7 @@ impl Lowering<'_> {
             let var = TyVar::uniq();
             params.push(Ty::Var(var));
             unify(&Ty::Var(var), &ty, &mut self.subs);
-            self.insert_scope(ident, var);
+            self.insert_scope(ident, Ty::Var(var));
         }
         let fn_params = params.clone();
         params.push(Ty::Var(ret_var));
@@ -450,7 +438,7 @@ impl Lowering<'_> {
             ast::Literal::FString(fstring) => self.fstr(fstring)?,
             ast::Literal::Ident(ident) => {
                 let ident = self.load_var(ident).expect(ident);
-                Expr { ty: Ty::Var(ident.ty), kind: ExprKind::Ident(ident) }
+                Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) }
             }
             ast::Literal::Map(map) => self.map(map)?,
             ast::Literal::Tuple(tuple) => self.tuple(tuple)?,
@@ -472,8 +460,8 @@ impl Lowering<'_> {
 
     fn load_var(&mut self, name: &'static str) -> Option<Ident> {
         match self.scopes.last().unwrap().variables.get(name) {
-            Some(ident) => Some(*ident),
-            None => self.scopes.first().unwrap().variables.get(name).copied(),
+            Some(ident) => Some(ident.clone()),
+            None => self.scopes.first().unwrap().variables.get(name).cloned(),
         }
     }
 
