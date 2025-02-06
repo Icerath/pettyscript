@@ -118,6 +118,7 @@ pub struct Lowering<'src> {
     src: &'src str,
 }
 
+#[derive(Debug)]
 pub struct FnScope {
     ret_var: TyVar,
     variables: FxHashMap<&'static str, Ident>,
@@ -198,6 +199,8 @@ impl Lowering<'_> {
             Stmt::Enum(enum_) => self.enum_(enum_, out)?,
             Stmt::Function(func) => self.function(func, out)?,
             Stmt::Return(ret) => self.ret(ret, out)?,
+            Stmt::Continue => out.push(Item::Continue),
+            Stmt::Break => out.push(Item::Break),
             Stmt::Expr(expr) => out.push(Item::Expr(self.expr(expr)?)),
             _ => todo!("{stmt:?}"),
         }
@@ -233,11 +236,6 @@ impl Lowering<'_> {
     fn if_chain(&mut self, if_chain: &ast::IfChain, out: &mut Vec<Item>) -> Result<()> {
         let mut chain = vec![];
 
-        let condition = self.expr(&if_chain.first.condition)?;
-        unify(&condition.ty, &Ty::bool(), &mut self.subs);
-        let block = self.block(&if_chain.first.body.stmts)?;
-        chain.push((condition, block));
-
         for if_stmt in [&if_chain.first].into_iter().chain(&if_chain.r#else_ifs) {
             let condition = self.expr(&if_stmt.condition)?;
             unify(&condition.ty, &Ty::bool(), &mut self.subs);
@@ -272,7 +270,7 @@ impl Lowering<'_> {
     ) -> Result<()> {
         let _ = is_const;
         let Pat::Ident(ident) = &*var_decl.pat else { todo!() };
-        assert!(!self.scope().variables.contains_key(ident));
+        assert!(!self.scope().variables.contains_key(ident), "{ident:?} - {:?}", self.scope());
 
         let mut ty = None;
         if let Some(expl_ty) = &var_decl.typ {
