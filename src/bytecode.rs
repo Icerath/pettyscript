@@ -78,11 +78,9 @@ macro_rules! impl_int {
 
             unsafe fn bc_read_unchecked(bytes: &mut &[u8]) -> Self {
                 let size = size_of::<Self>();
-                unsafe {
-                    let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap_unchecked());
-                    *bytes = bytes.get_unchecked(size..);
-                    out
-                }
+                let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap());
+                unsafe { *bytes = bytes.get_unchecked(size..) };
+                out
             }
         }
         impl BcWrite for $int {
