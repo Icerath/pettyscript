@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::{Builtin, BuiltinField, MethodBuiltin},
-    bytecode::{BytecodeBuilder, Op, StrIdent},
+    bytecode::{BytecodeBuilder, Instr, StrIdent},
     errors,
     parser::*,
 };
@@ -24,8 +24,8 @@ pub fn codegen(ast: Ast) -> Result<Vec<u8>> {
     }
 
     if let Some(var) = codegen.scopes.last().unwrap().variables.get("main") {
-        codegen.builder.insert(Op::Load(var.offset));
-        codegen.builder.insert(Op::FnCall);
+        codegen.builder.insert(Instr::Load(var.offset));
+        codegen.builder.insert(Instr::FnCall);
     }
     let last_scope = codegen.scopes.pop().unwrap();
     codegen.builder.set_global_stack_size(last_scope.variables.len() as u32);
@@ -206,10 +206,10 @@ impl Codegen<'_> {
             return Ok(());
         }
         if ident == "_" {
-            self.builder.insert(Op::Pop);
+            self.builder.insert(Instr::Pop);
         } else {
             let offset = self.write_ident_offset(ident, typ, is_const);
-            self.builder.insert(Op::Store(offset));
+            self.builder.insert(Instr::Store(offset));
         }
         Ok(())
     }
@@ -266,8 +266,8 @@ impl Codegen<'_> {
 
                 let offset = self.write_ident_offset(ident, typ.clone(), true);
                 let set_stack_size = self.builder.create_function();
-                self.builder.insert(Op::Store(offset));
-                self.builder.insert(Op::Jump(function_end));
+                self.builder.insert(Instr::Store(offset));
+                self.builder.insert(Instr::Jump(function_end));
                 self.builder.insert_label(function_start);
 
                 self.scopes.push(FunctionScope::new(ret.clone()));
@@ -285,10 +285,10 @@ impl Codegen<'_> {
                 self.scopes.pop().unwrap();
 
                 if ret == Type::Null {
-                    self.builder.insert(Op::Ret);
+                    self.builder.insert(Instr::Ret);
                 } else {
                     // FIXME: Instead produce a compile error when this is possible
-                    self.builder.insert(Op::Abort);
+                    self.builder.insert(Instr::Abort);
                 }
 
                 self.builder.insert_label(function_end);
@@ -325,12 +325,12 @@ impl Codegen<'_> {
                             let (_, expected) = self.load_field(segment_type, field);
                             assert_eq!(typ, expected);
                             if !typ.is_zst() {
-                                self.builder.insert(Op::StoreField(fields[**field].0));
+                                self.builder.insert(Instr::StoreField(fields[**field].0));
                             }
                         }
                         AssignSegment::Index(_) => todo!(),
                     }
-                    self.builder.insert(Op::Pop);
+                    self.builder.insert(Instr::Pop);
                 }
             }
             Stmt::WhileLoop(WhileLoop { expr, body }) => {
@@ -345,9 +345,9 @@ impl Codegen<'_> {
                     Type::Bool => {}
                     other => panic!("Cannot use type: {other:?} in while loop"),
                 }
-                self.builder.insert(Op::CJump(end_label));
+                self.builder.insert(Instr::CJump(end_label));
                 self.gen_block(&body.stmts)?;
-                self.builder.insert(Op::Jump(start_label));
+                self.builder.insert(Instr::Jump(start_label));
                 self.builder.insert_label(end_label);
 
                 self.continue_label = prev_continue;
@@ -368,12 +368,12 @@ impl Codegen<'_> {
 
                 self.builder.insert_label(start_label);
                 let iter_op = match iter {
-                    Type::Range => Op::IterRange,
-                    Type::RangeInclusive => Op::IterRangeInclusive,
+                    Type::Range => Instr::IterRange,
+                    Type::RangeInclusive => Instr::IterRangeInclusive,
                     typ => panic!("{typ:?}"),
                 };
                 self.builder.insert(iter_op);
-                self.builder.insert(Op::CJump(end_label));
+                self.builder.insert(Instr::CJump(end_label));
 
                 self.store_new(ident, ident_typ, false, 0..0)?;
 
@@ -381,7 +381,7 @@ impl Codegen<'_> {
                     self.r#gen(stmt)?;
                 }
 
-                self.builder.insert(Op::Jump(start_label));
+                self.builder.insert(Instr::Jump(start_label));
                 self.builder.insert_label(end_label);
 
                 self.continue_label = prev_continue;
@@ -397,10 +397,10 @@ impl Codegen<'_> {
 
                 let final_end_label = if not_lone_if { self.builder.create_label() } else { 0 };
                 let mut next_label = self.builder.create_label();
-                self.builder.insert(Op::CJump(next_label));
+                self.builder.insert(Instr::CJump(next_label));
                 self.gen_block(&first.body.stmts)?;
                 if not_lone_if {
-                    self.builder.insert(Op::Jump(final_end_label));
+                    self.builder.insert(Instr::Jump(final_end_label));
                 }
                 for elseif in else_ifs {
                     self.builder.insert_label(next_label);
@@ -410,10 +410,10 @@ impl Codegen<'_> {
                         other => panic!("Cannot use type {other:?} in if stmts"),
                     }
                     next_label = self.builder.create_label();
-                    self.builder.insert(Op::CJump(next_label));
+                    self.builder.insert(Instr::CJump(next_label));
                     self.gen_block(&elseif.body.stmts)?;
                     if not_lone_if {
-                        self.builder.insert(Op::Jump(final_end_label));
+                        self.builder.insert(Instr::Jump(final_end_label));
                     }
                 }
                 self.builder.insert_label(next_label);
@@ -427,11 +427,11 @@ impl Codegen<'_> {
             Stmt::Expr(expr) => {
                 let typ = self.expr(expr)?;
                 if !typ.is_zst() {
-                    self.builder.insert(Op::Pop);
+                    self.builder.insert(Instr::Pop);
                 }
             }
-            Stmt::Continue => self.builder.insert(Op::Jump(self.continue_label.unwrap())),
-            Stmt::Break => self.builder.insert(Op::Jump(self.break_label.unwrap())),
+            Stmt::Continue => self.builder.insert(Instr::Jump(self.continue_label.unwrap())),
+            Stmt::Break => self.builder.insert(Instr::Jump(self.break_label.unwrap())),
             Stmt::Return(expr) => {
                 let typ = if let Some(expr) = &expr.0 { self.expr(expr)? } else { Type::Null };
                 let scope = self.scopes.last().unwrap();
@@ -440,7 +440,7 @@ impl Codegen<'_> {
                     "Tried to return {typ:?} from function returning: {:?}",
                     scope.ret
                 );
-                self.builder.insert(Op::Ret);
+                self.builder.insert(Instr::Ret);
             }
             Stmt::Block(block) => {
                 for stmt in &block.stmts {
@@ -462,8 +462,8 @@ impl Codegen<'_> {
                 let expected = expected.clone().unwrap();
                 let op = match expected {
                     Type::Null => break 'block Type::Null,
-                    Type::Int => Op::LoadIntSmall(0),
-                    Type::Str => Op::LoadString { ptr: 0, len: 0 },
+                    Type::Int => Instr::LoadIntSmall(0),
+                    Type::Str => Instr::LoadString { ptr: 0, len: 0 },
                     _ => todo!("{expected:?}"),
                 };
                 self.builder.insert(op);
@@ -482,7 +482,7 @@ impl Codegen<'_> {
             Pat::Array(sections) => {
                 let Type::Tuple(exprs) = typ else { panic!("{typ:?}") };
                 assert_eq!(exprs.len(), sections.len());
-                self.builder.insert(Op::ArrayConcatStack);
+                self.builder.insert(Instr::ArrayConcatStack);
                 for (pat, typ) in sections.iter().rev().zip(exprs.iter().rev()) {
                     self.store_pat(pat, typ.clone(), is_const)?;
                 }
@@ -497,7 +497,7 @@ impl Codegen<'_> {
             Some(var) => {
                 assert!(!var.is_const);
                 if !var.typ.is_zst() {
-                    self.builder.insert(Op::Store(var.offset));
+                    self.builder.insert(Instr::Store(var.offset));
                 }
             }
             None => panic!(),
@@ -568,7 +568,7 @@ impl Codegen<'_> {
                 match &var.typ {
                     Type::Enum { .. } => {}
                     typ if typ.is_zst() => {}
-                    _ => self.builder.insert(Op::Load(var.offset)),
+                    _ => self.builder.insert(Instr::Load(var.offset)),
                 }
                 var.typ.clone()
             }
@@ -581,7 +581,7 @@ impl Codegen<'_> {
                 match &var.typ {
                     Type::Enum { .. } => {}
                     typ if typ.is_zst() => {}
-                    _ => self.builder.insert(Op::LoadGlobal(var.offset)),
+                    _ => self.builder.insert(Instr::LoadGlobal(var.offset)),
                 }
                 var.typ.clone()
             }
@@ -594,16 +594,16 @@ impl Codegen<'_> {
                 let span = literal.span.clone();
                 match &**literal {
                     Literal::Tuple(tuple) => {
-                        self.builder.insert(Op::CreateArray);
+                        self.builder.insert(Instr::CreateArray);
                         let mut arg_types = vec![];
                         for expr in tuple {
                             arg_types.push(self.expr(expr)?);
-                            self.builder.insert(Op::ArrayPush);
+                            self.builder.insert(Instr::ArrayPush);
                         }
                         Type::Tuple(arg_types.into())
                     }
                     Literal::Map(map) => {
-                        self.builder.insert(Op::CreateMap);
+                        self.builder.insert(Instr::CreateMap);
                         if map.is_empty() {
                             break 'block Type::Map {
                                 key: Rc::new(Type::Unknown),
@@ -614,35 +614,35 @@ impl Codegen<'_> {
                         let [key, val] = entries.next().unwrap();
                         let key_typ = self.expr(key)?;
                         let val_typ = self.expr(val)?;
-                        self.builder.insert(Op::InsertMap);
+                        self.builder.insert(Instr::InsertMap);
 
                         for [key, val] in entries {
                             assert_eq!(self.expr(key)?, key_typ);
                             assert_eq!(self.expr(val)?, val_typ);
-                            self.builder.insert(Op::InsertMap);
+                            self.builder.insert(Instr::InsertMap);
                         }
 
                         Type::Map { key: Rc::new(key_typ), value: Rc::new(val_typ) }
                     }
                     Literal::Bool(bool) => {
-                        self.builder.insert(Op::LoadBool(*bool));
+                        self.builder.insert(Instr::LoadBool(*bool));
                         Type::Bool
                     }
                     Literal::Char(char) => {
-                        self.builder.insert(Op::LoadChar(*char));
+                        self.builder.insert(Instr::LoadChar(*char));
                         Type::Char
                     }
                     Literal::Int(int) => {
                         let op = match (*int).try_into() {
-                            Ok(small) => Op::LoadIntSmall(small),
-                            Err(_) => Op::LoadInt(*int),
+                            Ok(small) => Instr::LoadIntSmall(small),
+                            Err(_) => Instr::LoadInt(*int),
                         };
                         self.builder.insert(op);
                         Type::Int
                     }
                     Literal::String(string) => {
                         let [ptr, len] = self.builder.insert_string(string);
-                        self.builder.insert(Op::LoadString { ptr, len });
+                        self.builder.insert(Instr::LoadString { ptr, len });
                         Type::Str
                     }
                     Literal::FString(fstring) => {
@@ -650,24 +650,24 @@ impl Codegen<'_> {
                         for (str, expr) in &fstring.segments {
                             let [ptr, len] = self.builder.insert_string(str);
                             if len != 0 {
-                                self.builder.insert(Op::LoadString { ptr, len });
+                                self.builder.insert(Instr::LoadString { ptr, len });
                                 num_segments += 1;
                             }
                             let typ = self.expr(expr)?;
 
                             if typ == Type::Null {
                                 let [ptr, len] = self.builder.insert_string("null");
-                                self.builder.insert(Op::LoadString { ptr, len });
+                                self.builder.insert(Instr::LoadString { ptr, len });
                             } else if typ.is_zst() {
                                 todo!()
                             }
                         }
                         let [ptr, len] = self.builder.insert_string(fstring.remaining);
                         if len != 0 {
-                            self.builder.insert(Op::LoadString { ptr, len });
+                            self.builder.insert(Instr::LoadString { ptr, len });
                             num_segments += 1;
                         }
-                        self.builder.insert(Op::BuildFstr { num_segments });
+                        self.builder.insert(Instr::BuildFstr { num_segments });
                         Type::Str
                     }
                     Literal::Ident(ident) => self.load(Spanned { inner: ident, span })?,
@@ -679,9 +679,9 @@ impl Codegen<'_> {
                         let end_label = self.builder.create_label();
                         let lhs = self.expr(&exprs[0])?;
                         assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
-                        self.builder.insert(Op::Dup);
-                        self.builder.insert(Op::CJump(end_label));
-                        self.builder.insert(Op::Pop);
+                        self.builder.insert(Instr::Dup);
+                        self.builder.insert(Instr::CJump(end_label));
+                        self.builder.insert(Instr::Pop);
                         let rhs = self.expr(&exprs[1])?;
                         assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
@@ -691,10 +691,10 @@ impl Codegen<'_> {
                         let end_label = self.builder.create_label();
                         let lhs = self.expr(&exprs[0])?;
                         assert_eq!(lhs, Type::Bool, "Cannot use or operator on type {lhs:?}");
-                        self.builder.insert(Op::Dup);
-                        self.builder.insert(Op::Not);
-                        self.builder.insert(Op::CJump(end_label));
-                        self.builder.insert(Op::Pop);
+                        self.builder.insert(Instr::Dup);
+                        self.builder.insert(Instr::Not);
+                        self.builder.insert(Instr::CJump(end_label));
+                        self.builder.insert(Instr::Pop);
                         let rhs = self.expr(&exprs[1])?;
                         assert_eq!(rhs, Type::Bool, "Cannot use or operator on type {rhs:?}");
                         self.builder.insert_label(end_label);
@@ -706,42 +706,42 @@ impl Codegen<'_> {
                 let rhs = self.expr(&exprs[1])?;
 
                 let op = match op {
-                    BinOp::Range => Op::Range,
-                    BinOp::RangeInclusive => Op::RangeInclusive,
-                    BinOp::Mod => Op::Mod,
+                    BinOp::Range => Instr::Range,
+                    BinOp::RangeInclusive => Instr::RangeInclusive,
+                    BinOp::Mod => Instr::Mod,
                     BinOp::Add => {
                         assert_eq!(lhs, Type::Int);
                         assert_eq!(rhs, Type::Int);
-                        self.builder.insert(Op::AddInt);
+                        self.builder.insert(Instr::AddInt);
                         break 'block Type::Int;
                     }
                     BinOp::Eq => {
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq);
+                        self.builder.insert(Instr::Eq);
                         break 'block Type::Bool;
                     }
                     BinOp::Greater => {
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Greater);
+                        self.builder.insert(Instr::Greater);
                         break 'block Type::Bool;
                     }
                     BinOp::Less => {
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Less);
+                        self.builder.insert(Instr::Less);
                         break 'block Type::Bool;
                     }
                     BinOp::Neq => {
                         assert!(self.can_cmp(&lhs, &rhs), "{lhs:?} - {rhs:?}");
-                        self.builder.insert(Op::Eq);
-                        self.builder.insert(Op::Not);
+                        self.builder.insert(Instr::Eq);
+                        self.builder.insert(Instr::Not);
                         break 'block Type::Bool;
                     }
                     _ => todo!("{op:?}"),
                 };
                 let typ = match (lhs, rhs, op) {
-                    (Type::Int, Type::Int, Op::Range) => Type::Range,
-                    (Type::Int, Type::Int, Op::RangeInclusive) => Type::RangeInclusive,
-                    (_, _, Op::Range | Op::RangeInclusive) => panic!(),
+                    (Type::Int, Type::Int, Instr::Range) => Type::Range,
+                    (Type::Int, Type::Int, Instr::RangeInclusive) => Type::RangeInclusive,
+                    (_, _, Instr::Range | Instr::RangeInclusive) => panic!(),
                     // FIXME: This catchall might have false positives
                     (lhs, rhs, _) if lhs == rhs => lhs,
                     (lhs, rhs, op) => panic!("{op:?}: {lhs:?} - {rhs:?}"),
@@ -765,7 +765,7 @@ impl Codegen<'_> {
                     }
                     other => panic!("Cannot call {other:?}"),
                 };
-                self.builder.insert(Op::FnCall);
+                self.builder.insert(Instr::FnCall);
                 ret_type
             }
             Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args)?,
@@ -778,14 +778,14 @@ impl Codegen<'_> {
             Expr::Index { expr, index } => {
                 let container_typ = self.expr(expr)?;
                 let index_typ = self.expr(index)?;
-                self.builder.insert(Op::Index);
+                self.builder.insert(Instr::Index);
                 self.index_type(container_typ, index_typ)
             }
             Expr::InitStruct { ident, fields } => {
                 let struct_type = self.load_name_type(ident).unwrap();
                 let Type::Struct { name: _, fields: type_fields } = &struct_type else { panic!() };
                 // TODO: Reduce struct size for zst fields.
-                self.builder.insert(Op::CreateStruct { size: type_fields.len() as u32 });
+                self.builder.insert(Instr::CreateStruct { size: type_fields.len() as u32 });
                 for StructInitField { ident, expr } in fields {
                     assert!(type_fields.contains_key(**ident));
                     let typ = match expr {
@@ -794,13 +794,13 @@ impl Codegen<'_> {
                     };
                     assert_eq!(type_fields.get(**ident).unwrap().1, typ);
                     if !typ.is_zst() {
-                        self.builder.insert(Op::StoreField(type_fields[**ident].0));
+                        self.builder.insert(Instr::StoreField(type_fields[**ident].0));
                     }
                 }
                 struct_type
             }
             Expr::Array(array) => 'block: {
-                self.builder.insert(Op::CreateArray);
+                self.builder.insert(Instr::CreateArray);
 
                 if array.is_empty() {
                     break 'block Type::Array(Rc::new(Type::Unknown));
@@ -810,11 +810,11 @@ impl Codegen<'_> {
                 if typ.is_zst() {
                     panic!("ZSTs are not supported in arrays");
                 }
-                self.builder.insert(Op::ArrayPush);
+                self.builder.insert(Instr::ArrayPush);
                 for expr in array_iter {
                     let next_typ = self.expr(expr)?;
                     assert_eq!(next_typ, typ);
-                    self.builder.insert(Op::ArrayPush);
+                    self.builder.insert(Instr::ArrayPush);
                 }
                 Type::Array(Rc::new(typ))
             }
@@ -827,8 +827,8 @@ impl Codegen<'_> {
                     panic!("Cannot use - operator on {typ:?}");
                 }
                 match op {
-                    UnaryOp::Not => self.builder.insert(Op::Not),
-                    UnaryOp::Neg => self.builder.insert(Op::Neg),
+                    UnaryOp::Not => self.builder.insert(Instr::Not),
+                    UnaryOp::Neg => self.builder.insert(Instr::Neg),
                 }
                 typ
             }
@@ -849,7 +849,7 @@ impl Codegen<'_> {
             assert_eq!(param_typ, arg_typ);
         }
         match op {
-            LoadMethod::Builtin(builtin) => self.builder.insert(Op::CallBuiltinMethod(builtin)),
+            LoadMethod::Builtin(builtin) => self.builder.insert(Instr::CallBuiltinMethod(builtin)),
         }
         Ok(method.ret)
     }
@@ -887,9 +887,9 @@ impl Codegen<'_> {
 
     fn insert_load_field(&mut self, load_field: LoadField) {
         match load_field {
-            LoadField::Builtin(builtin) => self.builder.insert(Op::LoadBuiltinField(builtin)),
-            LoadField::StructField(field) => self.builder.insert(Op::LoadField(field)),
-            LoadField::EnumVariant(variant) => self.builder.insert(Op::LoadVariant(variant)),
+            LoadField::Builtin(builtin) => self.builder.insert(Instr::LoadBuiltinField(builtin)),
+            LoadField::StructField(field) => self.builder.insert(Instr::LoadField(field)),
+            LoadField::EnumVariant(variant) => self.builder.insert(Instr::LoadVariant(variant)),
             LoadField::ZstField => {}
         }
     }

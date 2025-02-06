@@ -41,7 +41,7 @@ pub fn bc_write_derive(input: TokenStream) -> TokenStream {
         let variant_ident = variant.ident;
 
         let branch = match variant.fields {
-            Fields::Unit => quote! { Op::#variant_ident => {} },
+            Fields::Unit => quote! { Instr::#variant_ident => {} },
             Fields::Named(fields) => {
                 let mut body = quote! {};
                 let mut branch = quote! {};
@@ -51,7 +51,7 @@ pub fn bc_write_derive(input: TokenStream) -> TokenStream {
                     branch.extend(quote! { #ident , });
                     body.extend(quote! { #ident.bc_write(&mut buf); });
                 }
-                quote! { Op::#variant_ident  { #branch } => { #body } }
+                quote! { Instr::#variant_ident  { #branch } => { #body } }
             }
             Fields::Unnamed(fields) => {
                 let mut body = quote! {};
@@ -62,7 +62,7 @@ pub fn bc_write_derive(input: TokenStream) -> TokenStream {
                     branch.extend(quote! { #ident , });
                     body.extend(quote! { #ident.bc_write(&mut buf); });
                 }
-                quote! { Op::#variant_ident ( #branch ) => { # body } }
+                quote! { Instr::#variant_ident ( #branch ) => { # body } }
             }
         };
         match_stmt.extend(branch);

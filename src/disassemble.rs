@@ -1,5 +1,5 @@
 use crate::{
-    bytecode::{Op, VERSION},
+    bytecode::{Instr, VERSION},
     vm::BytecodeReader,
 };
 
@@ -23,52 +23,52 @@ pub fn disassemble(bytecode: &[u8]) {
 
     while reader.head < reader.bytes.len() {
         let offset = reader.head;
-        let op = Op::bc_read(&reader.bytes[reader.head..]);
+        let op = Instr::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         print!("{offset}: ");
         match op {
-            Op::Abort => println!("ABORT"),
-            Op::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
-            Op::AddInt => println!("ADD_INT"),
-            Op::Neg => println!("NEG"),
-            Op::CreateMap => println!("CREATE_MAP"),
-            Op::InsertMap => println!("INSERT_MAP"),
-            Op::CreateArray => println!("CREATE_ARRAY"),
-            Op::ArrayPush => println!("ARRAY_PUSH"),
-            Op::ArrayConcatStack => println!("ARRAY_CONCAT_STACK"),
-            Op::Dup => println!("DUP"),
-            Op::Eq => println!("EQ"),
-            Op::Less => println!("LESS"),
-            Op::Greater => println!("GREATER"),
-            Op::Index => println!("INDEX"),
-            Op::Jump(label) => println!("JUMP {label}"),
-            Op::CJump(label) => println!("CJUMP {label}"),
-            Op::CreateFunction { stack_size } => println!("CREATE_FUNCTION {stack_size}"),
-            Op::CreateStruct { size } => println!("EMPTY_STRUCT {size}"),
-            Op::FnCall => println!("FN_CALL"),
-            Op::IterRange => println!("ITER_RANGE"),
-            Op::IterRangeInclusive => println!("ITER_RANGE_INCLUSIVE"),
-            Op::Load(ident) => println!("LOAD {ident}"),
-            Op::Store(ident) => println!("STORE {ident}"),
-            Op::LoadChar(char) => println!("LOAD_CHAR {char:?}"),
-            Op::LoadBool(bool) => println!("LOAD_BOOL: {bool}"),
-            Op::Pop => println!("POP"),
-            Op::LoadField(field) => println!("LOAD_FIELD {field}"),
-            Op::LoadBuiltinField(field) => println!("LOAD_BUILTIN_FIELD {}", field as u8),
-            Op::CallBuiltinMethod(method) => println!("CALL_BUILTIN_METHOD: {}", method as u8),
-            Op::StoreField(field) => println!("STORE_FIELD {}", field),
-            Op::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
-            Op::LoadIntSmall(int) => println!("LOAD_INT_SMALL {int}"),
-            Op::LoadInt(int) => println!("LOAD_INT {int}"),
-            Op::LoadString { ptr, len } => {
+            Instr::Abort => println!("ABORT"),
+            Instr::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
+            Instr::AddInt => println!("ADD_INT"),
+            Instr::Neg => println!("NEG"),
+            Instr::CreateMap => println!("CREATE_MAP"),
+            Instr::InsertMap => println!("INSERT_MAP"),
+            Instr::CreateArray => println!("CREATE_ARRAY"),
+            Instr::ArrayPush => println!("ARRAY_PUSH"),
+            Instr::ArrayConcatStack => println!("ARRAY_CONCAT_STACK"),
+            Instr::Dup => println!("DUP"),
+            Instr::Eq => println!("EQ"),
+            Instr::Less => println!("LESS"),
+            Instr::Greater => println!("GREATER"),
+            Instr::Index => println!("INDEX"),
+            Instr::Jump(label) => println!("JUMP {label}"),
+            Instr::CJump(label) => println!("CJUMP {label}"),
+            Instr::CreateFunction { stack_size } => println!("CREATE_FUNCTION {stack_size}"),
+            Instr::CreateStruct { size } => println!("EMPTY_STRUCT {size}"),
+            Instr::FnCall => println!("FN_CALL"),
+            Instr::IterRange => println!("ITER_RANGE"),
+            Instr::IterRangeInclusive => println!("ITER_RANGE_INCLUSIVE"),
+            Instr::Load(ident) => println!("LOAD {ident}"),
+            Instr::Store(ident) => println!("STORE {ident}"),
+            Instr::LoadChar(char) => println!("LOAD_CHAR {char:?}"),
+            Instr::LoadBool(bool) => println!("LOAD_BOOL: {bool}"),
+            Instr::Pop => println!("POP"),
+            Instr::LoadField(field) => println!("LOAD_FIELD {field}"),
+            Instr::LoadBuiltinField(field) => println!("LOAD_BUILTIN_FIELD {}", field as u8),
+            Instr::CallBuiltinMethod(method) => println!("CALL_BUILTIN_METHOD: {}", method as u8),
+            Instr::StoreField(field) => println!("STORE_FIELD {}", field),
+            Instr::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
+            Instr::LoadIntSmall(int) => println!("LOAD_INT_SMALL {int}"),
+            Instr::LoadInt(int) => println!("LOAD_INT {int}"),
+            Instr::LoadString { ptr, len } => {
                 println!("LOAD_STR {:?}", load_str!(ptr, len))
             }
-            Op::Mod => println!("MODULO"),
-            Op::Not => println!("NOT"),
-            Op::Range => println!("RANGE"),
-            Op::RangeInclusive => println!("RANGE_INCLUSIVE"),
-            Op::Ret => println!("RET"),
-            Op::LoadVariant(ident) => {
+            Instr::Mod => println!("MODULO"),
+            Instr::Not => println!("NOT"),
+            Instr::Range => println!("RANGE"),
+            Instr::RangeInclusive => println!("RANGE_INCLUSIVE"),
+            Instr::Ret => println!("RET"),
+            Instr::LoadVariant(ident) => {
                 println!("LOAD_VARIANT {}", load_str!(ident.ptr, ident.len))
             }
         };

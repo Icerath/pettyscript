@@ -14,7 +14,7 @@ pub struct StrIdent {
 #[derive(BcRead, BcWrite, EnumKind, NumVariants, Clone, Copy, Debug, PartialEq)]
 #[enum_kind(OpCode)]
 #[repr(u8)]
-pub enum Op {
+pub enum Instr {
     Abort,
     BuildFstr { num_segments: u16 },
     AddInt,
@@ -181,7 +181,7 @@ impl BytecodeBuilder {
 
     pub fn create_function(&mut self) -> usize {
         let out = self.instruction_data.len() + 1;
-        self.insert(Op::CreateFunction { stack_size: 0 });
+        self.insert(Instr::CreateFunction { stack_size: 0 });
         out
     }
 
@@ -189,13 +189,13 @@ impl BytecodeBuilder {
         self.instruction_data[label..label + 2].copy_from_slice(&value.to_le_bytes());
     }
 
-    pub fn insert(&mut self, instruction: Op) {
-        const { assert!(size_of::<Op>() == 16) };
+    pub fn insert(&mut self, instruction: Instr) {
+        const { assert!(size_of::<Instr>() == 16) };
         const { assert!(size_of::<OpCode>() == 1) };
 
         self.instruction_data.push(OpCode::from(instruction) as u8);
         match instruction {
-            Op::CJump(_) | Op::Jump(_) => self.jumps.push(self.instruction_data.len()),
+            Instr::CJump(_) | Instr::Jump(_) => self.jumps.push(self.instruction_data.len()),
             _ => {}
         }
         instruction.bc_write(&mut self.instruction_data);
@@ -238,7 +238,7 @@ impl TryFrom<u8> for OpCode {
     type Error = ();
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value as usize >= Op::VARIANT_COUNT {
+        if value as usize >= Instr::VARIANT_COUNT {
             return Err(());
         }
         Ok(unsafe { std::mem::transmute::<u8, Self>(value) })

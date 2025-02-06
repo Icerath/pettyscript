@@ -14,7 +14,7 @@ use std::{
 
 use crate::{
     builtints::{Builtin, BuiltinField, MethodBuiltin},
-    bytecode::{Op, StrIdent, VERSION},
+    bytecode::{Instr, StrIdent, VERSION},
 };
 
 pub type PettyMap<'src> = BTreeMap<Value<'src>, Value<'src>>;
@@ -170,11 +170,11 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
 
     unsafe fn execute(&mut self) -> io::Result<()> {
         while self.head < self.instructions.len() {
-            let op = Op::bc_read_unchecked(&self.instructions[self.head..]);
+            let op = Instr::bc_read_unchecked(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
-                Op::Abort => panic!("ABORTING"),
-                Op::BuildFstr { num_segments } => {
+                Instr::Abort => panic!("ABORTING"),
+                Instr::BuildFstr { num_segments } => {
                     let mut builder = String::new();
                     for _ in 0..num_segments {
                         let value = self.pop_stack();
@@ -185,60 +185,60 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     }
                     self.stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
                 }
-                Op::CreateMap => self.stack.push(Value::Map(Rc::default())),
-                Op::InsertMap => {
+                Instr::CreateMap => self.stack.push(Value::Map(Rc::default())),
+                Instr::InsertMap => {
                     let value = self.pop_stack();
                     let key = self.pop_stack();
                     let Value::Map(map) = self.stack.last_mut().unwrap() else { panic!() };
                     map.borrow_mut().insert(key, value);
                 }
-                Op::CreateArray => self.stack.push(Value::Array(Rc::default())),
-                Op::ArrayPush => {
+                Instr::CreateArray => self.stack.push(Value::Array(Rc::default())),
+                Instr::ArrayPush => {
                     let value = self.pop_stack();
                     let arr = self.stack.last_mut().unwrap();
                     let Value::Array(arr) = arr else { panic!() };
                     arr.borrow_mut().push(value);
                 }
-                Op::ArrayConcatStack => {
+                Instr::ArrayConcatStack => {
                     let arr = self.pop_arr();
                     self.stack.extend_from_slice(&arr.borrow());
                 }
-                Op::LoadGlobal(offset) => {
+                Instr::LoadGlobal(offset) => {
                     unsafe { assert_unchecked(!self.variable_stacks.is_empty()) };
                     let stack = &self.variable_stacks[0];
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
                     self.stack.push(stack[offset as usize].clone());
                 }
-                Op::Load(offset) => {
+                Instr::Load(offset) => {
                     let stack = self.variable_stacks.last().unwrap_unchecked();
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
                     self.stack.push(stack[offset as usize].clone())
                 }
-                Op::Store(offset) => {
+                Instr::Store(offset) => {
                     let offset = offset as usize;
                     let variable_stack = self.variable_stacks.last_mut().unwrap_unchecked();
                     unsafe { assert_unchecked(offset < variable_stack.len()) };
                     variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
-                Op::LoadChar(char) => self.stack.push(Value::Char(char)),
-                Op::LoadIntSmall(int) => self.stack.push(Value::Int(int as i64)),
-                Op::LoadInt(int) => self.stack.push(Value::Int(int)),
-                Op::LoadString { ptr, len } => {
+                Instr::LoadChar(char) => self.stack.push(Value::Char(char)),
+                Instr::LoadIntSmall(int) => self.stack.push(Value::Int(int as i64)),
+                Instr::LoadInt(int) => self.stack.push(Value::Int(int)),
+                Instr::LoadString { ptr, len } => {
                     self.stack.push(Value::String(PettyStr::Literal(
                         &self.consts[ptr as usize..ptr as usize + len as usize],
                     )));
                 }
-                Op::Range => {
+                Instr::Range => {
                     let end = self.pop_int();
                     let start = self.pop_int();
                     self.stack.push(Value::Range([start, end]));
                 }
-                Op::RangeInclusive => {
+                Instr::RangeInclusive => {
                     let end = self.pop_int();
                     let start = self.pop_int();
                     self.stack.push(Value::RangeInclusive([start, end]));
                 }
-                Op::IterRange => {
+                Instr::IterRange => {
                     let Value::Range([start, end]) = self.pop_stack() else {
                         unreachable_unchecked()
                     };
@@ -250,7 +250,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                         self.stack.push(Value::Bool(false));
                     }
                 }
-                Op::IterRangeInclusive => {
+                Instr::IterRangeInclusive => {
                     let Value::RangeInclusive([start, end]) = self.pop_stack() else {
                         unreachable_unchecked()
                     };
@@ -262,12 +262,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                         self.stack.push(Value::Bool(false));
                     }
                 }
-                Op::CJump(label) => {
+                Instr::CJump(label) => {
                     if !self.pop_bool() {
                         self.head = label as usize;
                     }
                 }
-                Op::FnCall => 'fn_call: {
+                Instr::FnCall => 'fn_call: {
                     let Value::Callable(callable) = self.pop_stack() else { panic!() };
                     let value = match callable {
                         Callable::Builtin(builtin) => match builtin {
@@ -307,59 +307,59 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     };
                     self.stack.push(value);
                 }
-                Op::Pop => _ = self.pop_stack(),
-                Op::Dup => self.stack.push(self.last_stack().clone()),
-                Op::Jump(label) => self.head = label as usize,
-                Op::Mod => {
+                Instr::Pop => _ = self.pop_stack(),
+                Instr::Dup => self.stack.push(self.last_stack().clone()),
+                Instr::Jump(label) => self.head = label as usize,
+                Instr::Mod => {
                     let rhs = self.pop_int();
                     let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs % rhs));
                 }
-                Op::Greater => {
+                Instr::Greater => {
                     let is_greater = self.cmp() == Ordering::Greater;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Less => {
+                Instr::Less => {
                     let is_greater = self.cmp() == Ordering::Less;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::Eq => {
+                Instr::Eq => {
                     let is_greater = self.cmp() == Ordering::Equal;
                     self.stack.push(Value::Bool(is_greater))
                 }
-                Op::AddInt => {
+                Instr::AddInt => {
                     let Value::Int(lhs) = self.pop_stack() else { unreachable_unchecked() };
                     let Value::Int(rhs) = self.pop_stack() else { unreachable_unchecked() };
                     self.stack.push(Value::Int(lhs + rhs));
                 }
-                Op::LoadBool(bool) => self.stack.push(Value::Bool(bool)),
-                Op::CreateFunction { stack_size } => {
+                Instr::LoadBool(bool) => self.stack.push(Value::Bool(bool)),
+                Instr::CreateFunction { stack_size } => {
                     self.stack.push(Value::Callable(Callable::Function {
                         label: self.head as u32 + 5 + 5,
                         stack_size,
                     }))
                 }
-                Op::Ret => {
+                Instr::Ret => {
                     self.head = self.call_stack.pop().unwrap();
                     self.variable_stacks.pop().unwrap();
                 }
-                Op::StoreField(field) => {
+                Instr::StoreField(field) => {
                     let value = self.pop_stack();
                     let Value::Struct { fields } = self.stack.last_mut().unwrap() else {
                         unreachable_unchecked()
                     };
                     fields.borrow_mut()[field as usize] = value;
                 }
-                Op::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
-                Op::CreateStruct { size } => {
+                Instr::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
+                Instr::CreateStruct { size } => {
                     let fields: Box<[Value]> =
                         std::iter::repeat_with(|| Value::Bool(false)).take(size as usize).collect();
                     let fields = Rc::new(RefCell::new(fields));
                     self.stack.push(Value::Struct { fields })
                 }
-                Op::CallBuiltinMethod(method) => self.call_builtin_method(method),
-                Op::LoadBuiltinField(field) => self.load_builtin_field(field),
-                Op::LoadField(field) => {
+                Instr::CallBuiltinMethod(method) => self.call_builtin_method(method),
+                Instr::LoadBuiltinField(field) => self.load_builtin_field(field),
+                Instr::LoadField(field) => {
                     let Value::Struct { fields } = self.pop_stack() else {
                         unreachable_unchecked()
                     };
@@ -369,7 +369,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     };
                     self.stack.push(value);
                 }
-                Op::Index => {
+                Instr::Index => {
                     let rhs = self.pop_stack();
                     let lhs = self.pop_stack();
                     let value = match lhs {
@@ -389,11 +389,11 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     };
                     self.stack.push(value);
                 }
-                Op::Not => {
+                Instr::Not => {
                     let bool = self.pop_bool();
                     self.stack.push(Value::Bool(!bool));
                 }
-                Op::Neg => {
+                Instr::Neg => {
                     let int = self.pop_int();
                     self.stack.push(Value::Int(-int));
                 }
