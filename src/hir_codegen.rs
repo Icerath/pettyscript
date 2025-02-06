@@ -4,7 +4,7 @@ use crate::{
     bytecode::{BytecodeBuilder, Instr},
     hir::*,
     parser::BinOp,
-    typck::{Substitutions, Ty},
+    typck::{Substitutions, Ty, TyKind},
 };
 
 pub fn codegen(block: &Block, subs: Substitutions) -> Result<Vec<u8>> {
@@ -24,6 +24,8 @@ struct Codegen {
     subs: Substitutions,
     builder: BytecodeBuilder,
     main_fn: Option<Offset>,
+    continue_label: Option<u32>,
+    break_label: Option<u32>,
 }
 
 impl Codegen {
@@ -37,6 +39,7 @@ impl Codegen {
     fn item(&mut self, item: &Item) -> Result<()> {
         match item {
             Item::Function(func) => self.function(func),
+            Item::ForLoop(for_loop) => self.for_loop(for_loop),
             Item::Expr(expr) => {
                 self.expr(expr)?;
                 if self.ty(&expr.ty) != Ty::null() {
@@ -78,6 +81,41 @@ impl Codegen {
         Ok(())
     }
 
+    fn for_loop(&mut self, for_loop: &ForLoop) -> Result<()> {
+        let start_label = self.builder.create_label();
+        let end_label = self.builder.create_label();
+
+        let prev_continue = self.continue_label.replace(start_label);
+        let prev_break = self.break_label.replace(end_label);
+
+        self.expr(&for_loop.iter)?;
+
+        self.builder.insert_label(start_label);
+        let Ty::Con(ty) = for_loop.iter.ty.sub(&self.subs) else { panic!() };
+        let iter_op = match ty.kind {
+            TyKind::Named("range") => Instr::IterRange,
+            TyKind::Named("range_inclusive") => Instr::IterRange,
+            typ => panic!("{typ:?}"),
+        };
+        self.builder.insert(iter_op);
+        self.builder.insert(Instr::CJump(end_label));
+
+        if let Some(ident) = &for_loop.ident {
+            self.store(ident.offset);
+        } else {
+            self.builder.insert(Instr::Pop);
+        }
+
+        self.block(&for_loop.body)?;
+
+        self.builder.insert(Instr::Jump(start_label));
+        self.builder.insert_label(end_label);
+
+        self.continue_label = prev_continue;
+        self.break_label = prev_break;
+        Ok(())
+    }
+
     fn expr(&mut self, expr: &Expr) -> Result<()> {
         match &expr.kind {
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
@@ -110,6 +148,8 @@ impl Codegen {
 
         match op {
             BinOp::Add => self.builder.insert(Instr::AddInt),
+            BinOp::Range => self.builder.insert(Instr::Range),
+            BinOp::RangeInclusive => self.builder.insert(Instr::RangeInclusive),
             _ => todo!("{op:?}"),
         }
         Ok(())

@@ -54,9 +54,9 @@ impl Block {
 
 #[derive(Debug)]
 pub struct ForLoop {
-    ident: Option<Ident>,
-    iter: Expr,
-    body: Block,
+    pub ident: Option<Ident>,
+    pub iter: Expr,
+    pub body: Block,
 }
 
 #[derive(Debug)]
