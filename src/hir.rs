@@ -33,16 +33,16 @@ pub enum Item {
 
 #[derive(Debug)]
 pub struct Function {
-    name: &'static str,
-    ident: Ident,
-    params: Vec<Ty>,
-    ret: TyVar,
-    body: Block,
+    pub name: &'static str,
+    pub ident: Ident,
+    pub params: Vec<Ident>,
+    pub ret: TyVar,
+    pub body: Block,
 }
 
 #[derive(Debug)]
 pub struct Block {
-    items: Vec<Item>,
+    pub items: Vec<Item>,
 }
 
 impl Block {
@@ -101,8 +101,8 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone)]
 pub struct Ident {
-    ty: Ty,
-    local: usize,
+    pub ty: Ty,
+    pub local: usize,
 }
 
 #[derive(Debug)]
@@ -349,12 +349,11 @@ impl Lowering<'_> {
         for (ident, expl_typ) in &func.params {
             let ty = self.load_explicit_type(expl_typ)?;
             let var = TyVar::uniq();
-            params.push(Ty::Var(var));
             unify(&Ty::Var(var), &ty, &mut self.subs);
-            self.insert_scope(ident, Ty::Var(var));
+            let ident = self.insert_scope(ident, Ty::Var(var)).unwrap();
+            params.push(ident);
         }
         let fn_params = params.clone();
-        params.push(Ty::Var(ret_var));
 
         if let Some(ret_ty) = &func.ret_type {
             let ret_ty = self.load_explicit_type(ret_ty)?;
@@ -363,8 +362,10 @@ impl Lowering<'_> {
             unify(&Ty::Var(ret_var), &Ty::null(), &mut self.subs);
         }
 
-        // TODO: Is this the right way to explain a function type?
-        let fn_ty = Ty::Con(TyCon { kind: TyKind::Named("func"), generics: params.into() });
+        let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
+            params: params.iter().map(|ident| ident.ty.clone()).collect(),
+            ret: Rc::new(Ty::Var(ret_var)),
+        }));
         unify(&Ty::Var(fn_var), &fn_ty, &mut self.subs);
 
         let body = self.block(&func.body.stmts)?;
@@ -547,18 +548,19 @@ impl Lowering<'_> {
 
         let expr = self.expr(func)?;
         let fn_ty = expr.ty.sub(&self.subs);
-        let Ty::Con(TyCon { kind, generics }) = fn_ty else { panic!() };
-        let TyKind::Named(name) = kind else { panic!() };
-        assert_eq!(name, "func");
-        assert_eq!(args.len() + 1, generics.len());
+        let Ty::Con(TyCon { kind, .. }) = fn_ty else { panic!() };
+        let TyKind::Function { params, ret } = kind else { panic!("{kind:?}") };
+        assert_eq!(args.len(), params.len());
         let mut new_args = Vec::with_capacity(args.len());
-        for (arg, param) in args.iter().zip(&*generics) {
+        for (arg, param) in args.iter().zip(&*params) {
             let arg = self.expr(arg)?;
             unify(&arg.ty, param, &mut self.subs);
             new_args.push(arg);
         }
-        let ret = generics.last().unwrap().clone();
-        Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args } })
+        Ok(Expr {
+            ty: (*ret).clone(),
+            kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args },
+        })
     }
 
     fn field_access(&mut self, expr: &ast::Expr, field: &'static str) -> Result<Expr> {
@@ -739,9 +741,11 @@ impl Ty {
         })
     }
 
-    pub fn func(args: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
-        let args = args.into_iter().chain([ret]).collect();
-        Ty::Con(TyCon { kind: TyKind::Named("func"), generics: args })
+    pub fn func(params: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
+        Ty::Con(TyCon::from(TyKind::Function {
+            params: params.into_iter().collect(),
+            ret: Rc::new(ret),
+        }))
     }
 
     pub fn tuple(generics: Rc<[Ty]>) -> Ty {

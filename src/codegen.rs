@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{
     rc::Rc,
     sync::atomic::{AtomicU32, Ordering},

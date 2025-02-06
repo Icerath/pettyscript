@@ -38,6 +38,7 @@ pub enum TyKind {
     Named(&'static str),
     Struct { name: &'static str, fields: Rc<BTreeMap<&'static str, Ty>> },
     Enum { id: u32, name: &'static str, variants: Rc<BTreeMap<&'static str, u32>> },
+    Function { params: Rc<[Ty]>, ret: Rc<Ty> },
     Variant { id: u32 },
 }
 

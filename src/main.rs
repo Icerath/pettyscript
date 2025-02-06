@@ -4,6 +4,7 @@ mod codegen;
 mod disassemble;
 mod errors;
 mod hir;
+// mod hir_codegen;
 mod intern;
 mod lexer;
 mod parser;
