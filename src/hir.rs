@@ -145,18 +145,10 @@ impl<'src> Lowering<'src> {
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
         scope.insert("null", Ty::null());
-
-        let println = Ty::func([Ty::str()], Ty::null());
-        scope.insert("println", println);
-
-        let assert = Ty::func([Ty::bool()], Ty::bool());
-        scope.insert("assert", assert);
-
-        let exit = Ty::func([Ty::int()], Ty::null());
-        scope.insert("exit", exit);
-
-        let parse_int = Ty::func([Ty::str()], Ty::int());
-        scope.insert("parse_int", parse_int);
+        scope.insert("println", Ty::func([Ty::str()], Ty::null()));
+        scope.insert("assert", Ty::func([Ty::bool()], Ty::bool()));
+        scope.insert("exit", Ty::func([Ty::int()], Ty::null()));
+        scope.insert("parse_int", Ty::func([Ty::str()], Ty::int()));
 
         Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
