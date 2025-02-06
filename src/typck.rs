@@ -37,7 +37,7 @@ impl From<TyKind> for TyCon {
 pub enum TyKind {
     Named(&'static str),
     Struct { name: &'static str, fields: Rc<BTreeMap<&'static str, Ty>> },
-    Enum { name: &'static str, variants: Rc<BTreeMap<&'static str, u32>> },
+    Enum { id: u32, name: &'static str, variants: Rc<BTreeMap<&'static str, u32>> },
     Variant { id: u32 },
 }
 

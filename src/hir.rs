@@ -3,6 +3,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     rc::Rc,
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 use miette::Result;
@@ -320,13 +321,16 @@ impl Lowering<'_> {
     }
 
     fn enum_(&mut self, enum_: &ast::Enum, out: &mut Vec<Item>) -> Result<()> {
+        static ENUM_ID: AtomicU32 = AtomicU32::new(0);
+        let enum_id = ENUM_ID.fetch_add(1, Ordering::Relaxed);
+
         let mut variants = BTreeMap::<&str, _>::new();
         for (offset, field) in enum_.variants.iter().enumerate() {
             variants.insert(field, offset as u32);
         }
         let variants = Rc::new(variants);
         let ty = Ty::Con(TyCon {
-            kind: TyKind::Enum { name: &enum_.ident, variants },
+            kind: TyKind::Enum { id: enum_id, name: &enum_.ident, variants },
             generics: Rc::new([]),
         });
         let _ = self.insert_scope(&enum_.ident, ty.clone());
@@ -568,9 +572,13 @@ impl Lowering<'_> {
     fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.kind {
-            TyKind::Struct { name: _, fields } => fields.get(field).unwrap().clone(),
-            TyKind::Enum { name: _, variants } => {
-                Ty::Con(TyCon::from(TyKind::Variant { id: variants[field] }))
+            TyKind::Struct { fields, .. } => fields.get(field).unwrap().clone(),
+            TyKind::Enum { variants, id, .. } => {
+                assert!(
+                    variants.contains_key(field),
+                    "type `{ty:?}` does not contain field: {field:?}"
+                );
+                Ty::Con(TyCon::from(TyKind::Variant { id }))
             }
             TyKind::Named("array") => match field {
                 "len" => Ty::int(),
@@ -673,7 +681,7 @@ impl Lowering<'_> {
         init_fields: &[StructInitField],
     ) -> Result<Expr> {
         let Ty::Con(tycon) = self.named_types.get(ident).unwrap().clone() else { panic!() };
-        let TyKind::Struct { name: _, fields } = tycon.kind else { panic!() };
+        let TyKind::Struct { fields, .. } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {
             let init_expr = self.expr(init.expr.as_ref().unwrap())?;
