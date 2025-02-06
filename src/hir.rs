@@ -105,7 +105,13 @@ pub enum ExprKind {
 #[derive(Debug, Clone)]
 pub struct Ident {
     pub ty: Ty,
-    pub local: usize,
+    pub offset: Offset,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Offset {
+    Local(u32),
+    Global(u32),
 }
 
 #[derive(Debug)]
@@ -156,10 +162,10 @@ impl<'src> Lowering<'src> {
                 Builtin::ParseInt => Ty::func([Ty::str()], Ty::int()),
                 Builtin::ReadFile => Ty::func([Ty::str()], Ty::str()),
             };
-            scope.insert(name, ty);
+            scope.insert(name, ty, true);
         }
 
-        scope.insert("null", Ty::null());
+        scope.insert("null", Ty::null(), true);
 
         Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
@@ -167,11 +173,13 @@ impl<'src> Lowering<'src> {
 
 impl FnScope {
     /// Returns none if name is ignored ("_")
-    fn insert(&mut self, name: &'static str, ty: Ty) -> Option<Ident> {
+    fn insert(&mut self, name: &'static str, ty: Ty, is_global: bool) -> Option<Ident> {
         if name == "_" {
             return None;
         }
-        let ident = Ident { ty, local: self.variables.len() };
+        let offset = self.variables.len() as u32;
+        let offset = if is_global { Offset::Global(offset) } else { Offset::Local(offset) };
+        let ident = Ident { ty, offset };
         let prev = self.variables.insert(name, ident.clone());
         assert!(prev.is_none(), "{name}: {ident:?}");
         Some(ident)
@@ -181,7 +189,11 @@ impl FnScope {
 impl Lowering<'_> {
     /// Returns none if name is ignored  ("_")
     pub fn insert_scope(&mut self, name: &'static str, ty: Ty) -> Option<Ident> {
-        self.scope().insert(name, ty)
+        if self.scopes.len() == 1 {
+            self.scope().insert(name, ty, true)
+        } else {
+            self.scope().insert(name, ty, false)
+        }
     }
 }
 

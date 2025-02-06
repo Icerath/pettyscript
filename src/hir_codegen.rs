@@ -12,8 +12,8 @@ pub fn codegen(block: &Block, subs: Substitutions) -> Result<Vec<u8>> {
     codegen.block(block)?;
     // TODO: Actually count this.
     codegen.builder.set_global_stack_size(64);
-    if let Some(global_offset) = codegen.main_fn {
-        codegen.builder.insert(Instr::Load(global_offset));
+    if let Some(offset) = codegen.main_fn {
+        codegen.load(offset);
         codegen.builder.insert(Instr::FnCall);
     }
     Ok(codegen.builder.finish())
@@ -23,7 +23,7 @@ pub fn codegen(block: &Block, subs: Substitutions) -> Result<Vec<u8>> {
 struct Codegen {
     subs: Substitutions,
     builder: BytecodeBuilder,
-    main_fn: Option<u32>,
+    main_fn: Option<Offset>,
 }
 
 impl Codegen {
@@ -53,10 +53,10 @@ impl Codegen {
         let function_end = self.builder.create_label();
 
         if func.name == "main" {
-            self.main_fn = Some(func.ident.local as u32);
+            self.main_fn = Some(func.ident.offset);
         }
         self.builder.insert(Instr::CreateFunction { stack_size: func.stack_size as u16 });
-        self.builder.insert(Instr::Store(func.ident.local as u32));
+        self.store(func.ident.offset);
         self.builder.insert(Instr::Jump(function_end));
         self.builder.insert_label(function_start);
 
@@ -84,7 +84,7 @@ impl Codegen {
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
             ExprKind::Int(int) => self.builder.insert(Instr::LoadInt(*int)),
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
-            ExprKind::Ident(ident) => self.builder.insert(Instr::Load(ident.local as u32)),
+            ExprKind::Ident(ident) => self.load(ident.offset),
             kind => todo!("{kind:?}"),
         }
         Ok(())
@@ -140,6 +140,21 @@ impl Codegen {
         }
         self.builder.insert(Instr::BuildFstr { num_segments });
         Ok(())
+    }
+
+    fn load(&mut self, offset: Offset) {
+        match offset {
+            Offset::Local(offset) => self.builder.insert(Instr::Load(offset)),
+            Offset::Global(offset) => self.builder.insert(Instr::LoadGlobal(offset)),
+        }
+    }
+
+    fn store(&mut self, offset: Offset) {
+        match offset {
+            Offset::Local(offset) => self.builder.insert(Instr::Store(offset)),
+            // ???
+            Offset::Global(offset) => self.builder.insert(Instr::Store(offset)),
+        }
     }
 
     fn ty(&self, ty: &Ty) -> Ty {
