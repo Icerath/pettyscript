@@ -10,6 +10,7 @@ use miette::Result;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    builtints::Builtin,
     parser::{
         self as ast, AssignSegment, BinOp, ExplicitType, Pat, Spanned, Stmt, StructInitField,
         UnaryOp, VarDecl,
@@ -37,6 +38,7 @@ pub struct Function {
     pub ident: Ident,
     pub params: Vec<Ident>,
     pub stack_size: usize,
+    pub ty: Ty,
     pub ret: TyVar,
     pub body: Block,
 }
@@ -145,12 +147,19 @@ impl<'src> Lowering<'src> {
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
+        for builtin in Builtin::ALL {
+            let name = builtin.name();
+            let ty = match builtin {
+                Builtin::Println => Ty::func([Ty::str()], Ty::null()),
+                Builtin::Assert => Ty::func([Ty::bool()], Ty::bool()),
+                Builtin::Exit => Ty::func([Ty::int()], Ty::null()),
+                Builtin::ParseInt => Ty::func([Ty::str()], Ty::int()),
+                Builtin::ReadFile => Ty::func([Ty::str()], Ty::str()),
+            };
+            scope.insert(name, ty);
+        }
+
         scope.insert("null", Ty::null());
-        scope.insert("println", Ty::func([Ty::str()], Ty::null()));
-        scope.insert("assert", Ty::func([Ty::bool()], Ty::bool()));
-        scope.insert("exit", Ty::func([Ty::int()], Ty::null()));
-        scope.insert("parse_int", Ty::func([Ty::str()], Ty::int()));
-        scope.insert("read_file", Ty::func([Ty::str()], Ty::str()));
 
         Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
     }
@@ -376,6 +385,7 @@ impl Lowering<'_> {
         out.push(Item::Function(Function {
             name: &func.ident,
             ident,
+            ty: fn_ty,
             stack_size,
             params: fn_params,
             ret: ret_var,
