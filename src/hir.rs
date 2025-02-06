@@ -199,6 +199,7 @@ impl Lowering<'_> {
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
             Stmt::Struct(struct_) => self.struct_(struct_, out)?,
+            Stmt::Enum(enum_) => self.enum_(enum_, out)?,
             Stmt::Function(func) => self.function(func, out)?,
             Stmt::Return(ret) => self.ret(ret, out)?,
             Stmt::Expr(expr) => out.push(Item::Expr(self.expr(expr)?)),
@@ -321,6 +322,26 @@ impl Lowering<'_> {
             generics: Rc::new([]),
         });
         let prev = self.named_types.insert(&struct_.ident, ty);
+        assert!(prev.is_none());
+        _ = out;
+        Ok(())
+    }
+
+    fn enum_(&mut self, enum_: &ast::Enum, out: &mut Vec<Item>) -> Result<()> {
+        let mut variants = BTreeMap::<&str, _>::new();
+        for (offset, field) in enum_.variants.iter().enumerate() {
+            variants.insert(field, offset as u32);
+        }
+        let variants = Rc::new(variants);
+        let ty = Ty::Con(TyCon {
+            kind: TyKind::Enum { name: &enum_.ident, variants },
+            generics: Rc::new([]),
+        });
+        let var = TyVar::uniq();
+        unify(&Ty::Var(var), &ty, &mut self.subs);
+        let _ = self.insert_scope(&enum_.ident, var);
+
+        let prev = self.named_types.insert(&enum_.ident, ty);
         assert!(prev.is_none());
         _ = out;
         Ok(())
@@ -558,6 +579,9 @@ impl Lowering<'_> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.kind {
             TyKind::Struct { name, fields } => fields.get(field).unwrap().clone(),
+            TyKind::Enum { name, variants } => {
+                Ty::Con(TyCon::from(TyKind::Variant { id: variants[field] }))
+            }
             TyKind::Named("array") => match field {
                 "len" => Ty::int(),
                 _ => todo!("{field:?}"),

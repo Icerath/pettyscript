@@ -27,10 +27,18 @@ pub struct TyCon {
     pub generics: Rc<[Ty]>,
 }
 
+impl From<TyKind> for TyCon {
+    fn from(kind: TyKind) -> Self {
+        Self { kind, generics: Rc::new([]) }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TyKind {
     Named(&'static str),
     Struct { name: &'static str, fields: Rc<BTreeMap<&'static str, Ty>> },
+    Enum { name: &'static str, variants: Rc<BTreeMap<&'static str, u32>> },
+    Variant { id: u32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
