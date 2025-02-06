@@ -338,7 +338,9 @@ impl Lowering<'_> {
         });
         let _ = self.insert_scope(&enum_.ident, ty.clone());
 
-        let prev = self.named_types.insert(&enum_.ident, ty);
+        let prev = self
+            .named_types
+            .insert(&enum_.ident, Ty::Con(TyCon::from(TyKind::Variant { id: enum_id })));
         assert!(prev.is_none());
         _ = out;
         Ok(())
