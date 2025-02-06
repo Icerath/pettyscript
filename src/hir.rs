@@ -152,6 +152,9 @@ impl<'src> Lowering<'src> {
         let assert = Ty::func([Ty::bool()], Ty::bool());
         scope.insert("assert", assert);
 
+        let exit = Ty::func([Ty::int()], Ty::null());
+        scope.insert("exit", exit);
+
         let parse_int = Ty::func([Ty::str()], Ty::int());
         scope.insert("parse_int", parse_int);
 
@@ -624,6 +627,11 @@ impl Lowering<'_> {
             "int" => match method {
                 "abs" => Rc::new([Ty::int()]),
                 _ => todo!("`{method}`"),
+            },
+            "char" => match method {
+                "is_digit" => Rc::new([Ty::bool()]),
+                "is_alphabetic" => Rc::new([Ty::bool()]),
+                _ => todo!("`{method:?}`"),
             },
             "str" => match method {
                 "trim" => Rc::new([Ty::str()]),
