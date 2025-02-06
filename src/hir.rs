@@ -142,6 +142,10 @@ impl<'src> Lowering<'src> {
 
         let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
 
+        let null_var = TyVar::uniq();
+        unify(&Ty::Var(null_var), &Ty::null(), &mut subs);
+        scope.insert("null", null_var);
+
         let println_var = TyVar::uniq();
         let println = Ty::func([Ty::str()], Ty::null());
         unify(&Ty::Var(println_var), &println, &mut subs);
