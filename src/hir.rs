@@ -67,8 +67,8 @@ pub struct IfChain {
 
 #[derive(Debug)]
 pub struct Assign {
-    ident: &'static str,
-    expr: Expr,
+    pub root: Ident,
+    pub expr: Expr,
 }
 
 #[derive(Debug)]
@@ -299,8 +299,8 @@ impl Lowering<'_> {
 
         let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
         unify(&expr.ty, &ty, &mut self.subs);
-        out.push(Item::Assign(Assign { ident, expr }));
-        self.insert_scope(ident, ty);
+        let ident = self.insert_scope(ident, ty).unwrap();
+        out.push(Item::Assign(Assign { root: ident, expr }));
         Ok(())
     }
 
@@ -316,8 +316,10 @@ impl Lowering<'_> {
         }
         let expr = self.expr(&assign.expr)?;
         unify(&var, &expr.ty, &mut self.subs);
+
+        let root = self.load_var(&assign.root).unwrap();
         // TODO: Assignment should pass all segments
-        out.push(Item::Assign(Assign { ident: &assign.root, expr }));
+        out.push(Item::Assign(Assign { root, expr }));
         Ok(())
     }
 

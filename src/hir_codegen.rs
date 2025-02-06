@@ -39,6 +39,7 @@ impl Codegen {
     fn item(&mut self, item: &Item) -> Result<()> {
         match item {
             Item::Function(func) => self.function(func),
+            Item::Assign(assign) => self.assign(assign),
             Item::IfChain(if_chain) => self.if_chain(if_chain),
             Item::ForLoop(for_loop) => self.for_loop(for_loop),
             Item::Expr(expr) => {
@@ -79,6 +80,12 @@ impl Codegen {
         }
 
         self.builder.insert_label(function_end);
+        Ok(())
+    }
+
+    fn assign(&mut self, assign: &Assign) -> Result<()> {
+        self.expr(&assign.expr)?;
+        self.store(assign.root.offset);
         Ok(())
     }
 
