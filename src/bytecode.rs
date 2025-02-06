@@ -67,8 +67,8 @@ trait BcWrite {
 }
 
 macro_rules! impl_int {
-    ($int: ident) => {
-        impl BcRead for $int {
+    ($($int: ident),+) => {
+        $(impl BcRead for $int {
             fn bc_read(bytes: &mut &[u8]) -> Self {
                 let size = size_of::<Self>();
                 let out = Self::from_le_bytes(bytes[0..size].try_into().unwrap());
@@ -87,7 +87,7 @@ macro_rules! impl_int {
             fn bc_write(&self, bytes: &mut Vec<u8>) {
                 bytes.extend(self.to_le_bytes());
             }
-        }
+        })+
     };
 }
 
@@ -110,11 +110,7 @@ macro_rules! impl_from {
     };
 }
 
-impl_int!(u8);
-impl_int!(u16);
-impl_int!(u32);
-impl_int!(i16);
-impl_int!(i64);
+impl_int!(u8, u16, u32, i16, i64);
 impl_from!(char, u32);
 impl_from!(Builtin, u16);
 impl_from!(BuiltinField, u16);
