@@ -14,7 +14,7 @@ mod tests;
 mod typck;
 mod vm;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 
 use clap::Parser;
 use disassemble::disassemble;
@@ -25,18 +25,24 @@ struct Args {
     path: PathBuf,
     #[arg(short, long)]
     output_bytecode: Option<PathBuf>,
-
     #[arg(short, long)]
     disassemble: bool,
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 fn main() -> miette::Result<()> {
     let args = Args::parse();
+    let start = Instant::now();
     let src = std::fs::read_to_string(args.path).unwrap();
     let ast = parse(&src)?;
     let mut hir = hir::Lowering::new(&src);
     let block = hir.block(&ast).unwrap();
     let bytecode = hir_codegen::codegen(&block, hir.subs)?;
+
+    if args.verbose {
+        println!("Compiled in {:?}", start.elapsed());
+    }
 
     if let Some(path) = args.output_bytecode {
         std::fs::write(path, &bytecode).unwrap();
