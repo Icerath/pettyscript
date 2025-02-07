@@ -46,6 +46,7 @@ impl Codegen {
             Item::Loop(block) => self.loop_(block),
             Item::Continue => self.continue_(),
             Item::Break => self.break_(),
+            Item::Return(ret) => self.return_(ret),
             Item::Expr(expr) => {
                 self.expr(expr)?;
                 if self.ty(&expr.ty) != Ty::null() {
@@ -169,6 +170,14 @@ impl Codegen {
 
     fn break_(&mut self) -> Result<()> {
         self.builder.insert(Instr::Jump(self.break_label.unwrap()));
+        Ok(())
+    }
+
+    fn return_(&mut self, ret: &Return) -> Result<()> {
+        if let Some(expr) = &ret.expr {
+            self.expr(expr)?;
+        }
+        self.builder.insert(Instr::Ret);
         Ok(())
     }
 
@@ -306,6 +315,10 @@ impl Codegen {
             BinOp::Add => self.builder.insert(Instr::AddInt),
             BinOp::Mod => self.builder.insert(Instr::Mod),
             BinOp::Eq => self.builder.insert(Instr::Eq),
+            BinOp::Neq => {
+                self.builder.insert(Instr::Eq);
+                self.builder.insert(Instr::Not);
+            }
             BinOp::Less => self.builder.insert(Instr::Less),
             BinOp::Greater => self.builder.insert(Instr::Greater),
             BinOp::Range => self.builder.insert(Instr::Range),

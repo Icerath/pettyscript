@@ -73,7 +73,7 @@ pub struct Assign {
 
 #[derive(Debug)]
 pub struct Return {
-    expr: Option<Expr>,
+    pub expr: Option<Expr>,
 }
 
 #[derive(Debug)]
