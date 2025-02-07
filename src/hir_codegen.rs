@@ -196,6 +196,8 @@ impl Codegen {
             BinOp::Add => self.builder.insert(Instr::AddInt),
             BinOp::Mod => self.builder.insert(Instr::Mod),
             BinOp::Eq => self.builder.insert(Instr::Eq),
+            BinOp::Less => self.builder.insert(Instr::Less),
+            BinOp::Greater => self.builder.insert(Instr::Greater),
             BinOp::Range => self.builder.insert(Instr::Range),
             BinOp::RangeInclusive => self.builder.insert(Instr::RangeInclusive),
             _ => todo!("{op:?}"),
