@@ -2,7 +2,7 @@ use miette::Result;
 
 use crate::{
     builtints::MethodBuiltin,
-    bytecode::{BytecodeBuilder, Instr},
+    bytecode::{BytecodeBuilder, Instr, StrIdent},
     hir::*,
     parser::{BinOp, UnaryOp},
     typck::{Substitutions, Ty, TyKind},
@@ -174,9 +174,14 @@ impl Codegen {
         Ok(())
     }
 
-    fn field_access(&mut self, expr: &Expr, field: &str) -> Result<()> {
+    fn field_access(&mut self, expr: &Expr, field: &'static str) -> Result<()> {
         let ty = &expr.ty.sub(&self.subs);
         let Ty::Con(tycon) = ty else { panic!("Expected `struct` {ty:?}") };
+        if let TyKind::Enum { .. } = &tycon.kind {
+            let [ptr, len] = self.builder.insert_string(field);
+            self.builder.insert(Instr::LoadVariant(StrIdent { ptr, len }));
+            return Ok(());
+        }
         let TyKind::Struct { fields, .. } = &tycon.kind else {
             panic!("Expected `struct` {tycon:?}")
         };
