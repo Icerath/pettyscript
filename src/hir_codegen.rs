@@ -147,6 +147,7 @@ impl Codegen {
             ExprKind::FieldAccess { expr, field } => self.field_access(expr, field)?,
             ExprKind::MethodCall { expr, method, args } => self.method_call(expr, method, args)?,
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
+            ExprKind::Index { expr, index } => self.index(expr, index)?,
             ExprKind::Unary { expr, op } => self.unary_expr(*op, expr)?,
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
             ExprKind::Bool(bool) => self.builder.insert(Instr::LoadBool(*bool)),
@@ -236,6 +237,13 @@ impl Codegen {
         }
         self.expr(expr)?;
         self.builder.insert(Instr::FnCall);
+        Ok(())
+    }
+
+    fn index(&mut self, expr: &Expr, index: &Expr) -> Result<()> {
+        self.expr(expr)?;
+        self.expr(index)?;
+        self.builder.insert(Instr::Index);
         Ok(())
     }
 
