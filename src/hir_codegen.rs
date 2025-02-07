@@ -142,6 +142,8 @@ impl Codegen {
 
     fn expr(&mut self, expr: &Expr) -> Result<()> {
         match &expr.kind {
+            ExprKind::StructInit { fields, .. } => self.struct_init(fields)?,
+            ExprKind::FieldAccess { expr, field } => self.field_access(expr, field)?,
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
             ExprKind::Unary { expr, op } => self.unary_expr(*op, expr)?,
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
@@ -156,6 +158,27 @@ impl Codegen {
             ExprKind::Ident(ident) => self.load(ident.offset),
             kind => todo!("{kind:?}"),
         }
+        Ok(())
+    }
+
+    fn struct_init(&mut self, fields: &[(u32, Expr)]) -> Result<()> {
+        self.builder.insert(Instr::CreateStruct { size: fields.len() as u32 });
+        for (id, expr) in fields {
+            self.expr(expr)?;
+            self.builder.insert(Instr::StoreField(*id));
+        }
+        Ok(())
+    }
+
+    fn field_access(&mut self, expr: &Expr, field: &str) -> Result<()> {
+        let ty = &expr.ty.sub(&self.subs);
+        let Ty::Con(tycon) = ty else { panic!("Expected `struct` {ty:?}") };
+        let TyKind::Struct { fields, .. } = &tycon.kind else {
+            panic!("Expected `struct` {tycon:?}")
+        };
+        let field_id = fields.get(field).unwrap().0;
+        self.expr(expr)?;
+        self.builder.insert(Instr::LoadField(field_id));
         Ok(())
     }
 

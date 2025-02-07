@@ -90,7 +90,7 @@ pub enum ExprKind {
     FieldAccess { expr: Box<Expr>, field: &'static str },
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Index { expr: Box<Expr>, index: Box<Expr> },
-    StructInit { ident: &'static str, fields: Vec<(&'static str, Expr)> },
+    StructInit { ident: &'static str, fields: Vec<(u32, Expr)> },
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Map(Vec<[Expr; 2]>),
@@ -331,9 +331,9 @@ impl Lowering<'_> {
 
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
         let mut fields = BTreeMap::new();
-        for (field, expl_ty) in &struct_.fields {
+        for (field_id, (field, expl_ty)) in struct_.fields.iter().enumerate() {
             let ty = self.load_explicit_type(expl_ty)?;
-            fields.insert(**field, ty);
+            fields.insert(**field, (field_id as u32, ty));
         }
         let fields = Rc::new(fields);
         let ty = Ty::Con(TyCon {
@@ -606,7 +606,7 @@ impl Lowering<'_> {
     fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.kind {
-            TyKind::Struct { fields, .. } => fields.get(field).unwrap().clone(),
+            TyKind::Struct { fields, .. } => fields.get(field).unwrap().1.clone(),
             TyKind::Enum { variants, id, .. } => {
                 assert!(
                     variants.contains_key(field),
@@ -723,7 +723,7 @@ impl Lowering<'_> {
         let TyKind::Struct { fields, .. } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {
-            let ty = fields.get(*init.ident).unwrap();
+            let (field_offset, ty) = &fields.get(*init.ident).unwrap();
             let init_expr = match init.expr.as_ref() {
                 Some(expr) => {
                     let expr = self.expr(expr)?;
@@ -735,7 +735,7 @@ impl Lowering<'_> {
                     kind: ExprKind::Ident(self.load_var(&init.ident).unwrap()),
                 },
             };
-            new_fields.push((*init.ident, init_expr));
+            new_fields.push((*field_offset, init_expr));
         }
         let ty =
             Ty::Con(TyCon { kind: TyKind::Struct { name: ident, fields }, generics: Rc::new([]) });
