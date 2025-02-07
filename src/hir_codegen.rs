@@ -151,6 +151,7 @@ impl Codegen {
                 self.builder.insert(Instr::LoadString { ptr, len });
             }
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
+            ExprKind::Array(arr) => self.array(arr)?,
             ExprKind::Ident(ident) => self.load(ident.offset),
             kind => todo!("{kind:?}"),
         }
@@ -210,6 +211,15 @@ impl Codegen {
             num_segments += 1;
         }
         self.builder.insert(Instr::BuildFstr { num_segments });
+        Ok(())
+    }
+
+    fn array(&mut self, arr: &[Expr]) -> Result<()> {
+        self.builder.insert(Instr::CreateArray);
+        for expr in arr {
+            self.expr(expr)?;
+            self.builder.insert(Instr::ArrayPush);
+        }
         Ok(())
     }
 
