@@ -60,8 +60,9 @@ macro_rules! test_expr {
     ($expr: literal, $expected: expr) => {{
         let src = concat!($expr, ";");
         let ast = parse(src).unwrap();
-        let ast = Ast { src, body: &ast };
-        let bytecode = codegen::codegen(ast).unwrap();
+        let mut hir = crate::hir::Lowering::new(&src);
+        let block = hir.block(&ast).unwrap();
+        let bytecode = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
         let output = exec_vm(&bytecode);
         assert_eq!(output, $expected);
     }};
