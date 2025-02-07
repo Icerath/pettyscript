@@ -3,7 +3,7 @@ use miette::Result;
 use crate::{
     bytecode::{BytecodeBuilder, Instr},
     hir::*,
-    parser::BinOp,
+    parser::{BinOp, UnaryOp},
     typck::{Substitutions, Ty, TyKind},
 };
 
@@ -143,6 +143,7 @@ impl Codegen {
     fn expr(&mut self, expr: &Expr) -> Result<()> {
         match &expr.kind {
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
+            ExprKind::Unary { expr, op } => self.unary_expr(*op, expr)?,
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
             ExprKind::Bool(bool) => self.builder.insert(Instr::LoadBool(*bool)),
             ExprKind::Int(int) => self.builder.insert(Instr::LoadInt(*int)),
@@ -164,6 +165,21 @@ impl Codegen {
         }
         self.expr(expr)?;
         self.builder.insert(Instr::FnCall);
+        Ok(())
+    }
+
+    fn unary_expr(&mut self, op: UnaryOp, expr: &Expr) -> Result<()> {
+        self.expr(expr)?;
+        match op {
+            UnaryOp::Neg => {
+                assert_eq!(expr.ty.sub(&self.subs), Ty::int());
+                self.builder.insert(Instr::Neg);
+            }
+            UnaryOp::Not => {
+                assert_eq!(expr.ty.sub(&self.subs), Ty::bool());
+                self.builder.insert(Instr::Not);
+            }
+        }
         Ok(())
     }
 
