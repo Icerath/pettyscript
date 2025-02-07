@@ -299,8 +299,14 @@ impl Lowering<'_> {
 
         let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
         unify(&expr.ty, &ty, &mut self.subs);
-        let ident = self.insert_scope(ident, ty).unwrap();
-        out.push(Item::Assign(Assign { root: ident, expr }));
+        let item = match *ident {
+            "_" => Item::Expr(expr),
+            _ => {
+                let ident = self.insert_scope(ident, ty).unwrap();
+                Item::Assign(Assign { root: ident, expr })
+            }
+        };
+        out.push(item);
         Ok(())
     }
 
