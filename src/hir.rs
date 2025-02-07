@@ -228,6 +228,10 @@ impl Lowering<'_> {
 
     fn while_loop(&mut self, while_loop: &ast::WhileLoop, out: &mut Vec<Item>) -> Result<()> {
         let branch_expr = self.expr(&while_loop.expr)?;
+        let branch_expr = Expr {
+            ty: Ty::bool(),
+            kind: ExprKind::Unary { expr: Box::new(branch_expr), op: UnaryOp::Not },
+        };
         let exit_condition = Item::IfChain(IfChain {
             chain: vec![(branch_expr, Block { items: vec![Item::Break] })],
             end: Block::EMPTY,
