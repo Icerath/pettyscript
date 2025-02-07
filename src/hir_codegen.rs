@@ -157,6 +157,7 @@ impl Codegen {
             }
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
             ExprKind::Array(arr) => self.array(arr)?,
+            ExprKind::Map(map) => self.map(map)?,
             ExprKind::Ident(ident) => self.load(ident.offset),
             kind => todo!("{kind:?}"),
         }
@@ -301,6 +302,16 @@ impl Codegen {
         for expr in arr {
             self.expr(expr)?;
             self.builder.insert(Instr::ArrayPush);
+        }
+        Ok(())
+    }
+
+    fn map(&mut self, exprs: &[[Expr; 2]]) -> Result<()> {
+        self.builder.insert(Instr::CreateMap);
+        for [key, value] in exprs {
+            self.expr(key)?;
+            self.expr(value)?;
+            self.builder.insert(Instr::InsertMap);
         }
         Ok(())
     }
