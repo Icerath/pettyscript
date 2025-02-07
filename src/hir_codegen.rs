@@ -156,6 +156,7 @@ impl Codegen {
                 self.builder.insert(Instr::LoadString { ptr, len });
             }
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
+            ExprKind::Tuple(tuple) => self.array(tuple)?,
             ExprKind::Array(arr) => self.array(arr)?,
             ExprKind::Map(map) => self.map(map)?,
             ExprKind::Ident(ident) => self.load(ident.offset),
