@@ -43,6 +43,9 @@ impl Codegen {
             Item::Assign(assign) => self.assign(assign),
             Item::IfChain(if_chain) => self.if_chain(if_chain),
             Item::ForLoop(for_loop) => self.for_loop(for_loop),
+            Item::Loop(block) => self.loop_(block),
+            Item::Continue => self.continue_(),
+            Item::Break => self.break_(),
             Item::Expr(expr) => {
                 self.expr(expr)?;
                 if self.ty(&expr.ty) != Ty::null() {
@@ -138,6 +141,34 @@ impl Codegen {
 
         self.continue_label = prev_continue;
         self.break_label = prev_break;
+        Ok(())
+    }
+
+    fn loop_(&mut self, block: &Block) -> Result<()> {
+        let start_label = self.builder.create_label();
+        let end_label = self.builder.create_label();
+
+        let prev_continue = self.continue_label.replace(start_label);
+        let prev_break = self.break_label.replace(end_label);
+
+        self.builder.insert_label(start_label);
+        self.block(block)?;
+        self.builder.insert(Instr::Jump(start_label));
+        self.builder.insert_label(end_label);
+
+        self.continue_label = prev_continue;
+        self.break_label = prev_break;
+
+        Ok(())
+    }
+
+    fn continue_(&mut self) -> Result<()> {
+        self.builder.insert(Instr::Jump(self.continue_label.unwrap()));
+        Ok(())
+    }
+
+    fn break_(&mut self) -> Result<()> {
+        self.builder.insert(Instr::Jump(self.break_label.unwrap()));
         Ok(())
     }
 
