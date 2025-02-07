@@ -152,6 +152,7 @@ impl Codegen {
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
             ExprKind::Bool(bool) => self.builder.insert(Instr::LoadBool(*bool)),
             ExprKind::Int(int) => self.builder.insert(Instr::LoadInt(*int)),
+            ExprKind::Char(char) => self.builder.insert(Instr::LoadChar(*char)),
             ExprKind::Str(str) => {
                 let [ptr, len] = self.builder.insert_string(str);
                 self.builder.insert(Instr::LoadString { ptr, len });
@@ -161,7 +162,6 @@ impl Codegen {
             ExprKind::Array(arr) => self.array(arr)?,
             ExprKind::Map(map) => self.map(map)?,
             ExprKind::Ident(ident) => self.load(ident.offset),
-            kind => todo!("{kind:?}"),
         }
         Ok(())
     }
