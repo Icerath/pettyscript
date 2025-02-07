@@ -185,7 +185,7 @@ impl Codegen {
 
     fn binary_expr(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Result<()> {
         match op {
-            BinOp::Or | BinOp::And => self.logical_bool_expr(op, lhs, rhs)?,
+            BinOp::Or | BinOp::And => return self.logical_bool_expr(op, lhs, rhs),
             _ => {}
         }
         self.expr(lhs)?;
@@ -206,10 +206,17 @@ impl Codegen {
     }
 
     fn logical_bool_expr(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Result<()> {
-        _ = op;
-        _ = lhs;
-        _ = rhs;
-        todo!()
+        let end_label = self.builder.create_label();
+        self.expr(lhs)?;
+        self.builder.insert(Instr::Dup);
+        if op == BinOp::Or {
+            self.builder.insert(Instr::Not);
+        };
+        self.builder.insert(Instr::CJump(end_label));
+        self.builder.insert(Instr::Pop);
+        self.expr(rhs)?;
+        self.builder.insert_label(end_label);
+        Ok(())
     }
 
     fn fstr(&mut self, fstr: &Fstr) -> Result<()> {
