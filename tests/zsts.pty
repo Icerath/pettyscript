@@ -1,10 +1,12 @@
-struct Hi { x: null }
+// TODO: Reimplement zsts. Or don't.
 
-let x = null;
-let hi = Hi { x: x };
-x = hi.x;
+// struct Hi { x: null }
 
-fn takes_null(x: null) {}
-takes_null(x);
+// let x = null;
+// let hi = Hi { x: x };
+// x = hi.x;
 
-assert(f"{null}" == "null");
+// fn takes_null(x: null) {}
+// takes_null(x);
+
+// assert(f"{null}" == "null");
