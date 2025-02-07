@@ -669,12 +669,14 @@ impl Lowering<'_> {
                 "starts_with" => Rc::new([Ty::str(), Ty::bool()]),
                 "is_digit" => Rc::new([Ty::bool()]),
                 "is_alphabetic" => Rc::new([Ty::bool()]),
+                "len" => Rc::new([Ty::int()]),
                 _ => todo!("`{method}`"),
             },
             "array" => match method {
                 "push" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
                 "pop" => Rc::new([tycon.generics[0].clone()]),
                 "sort" => Rc::new([ty.clone()]),
+                "len" => Rc::new([Ty::int()]),
                 _ => todo!("`{method}`"),
             },
             "map" => match method {
