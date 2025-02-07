@@ -1,6 +1,7 @@
 use miette::Result;
 
 use crate::{
+    builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr},
     hir::*,
     parser::{BinOp, UnaryOp},
@@ -144,6 +145,7 @@ impl Codegen {
         match &expr.kind {
             ExprKind::StructInit { fields, .. } => self.struct_init(fields)?,
             ExprKind::FieldAccess { expr, field } => self.field_access(expr, field)?,
+            ExprKind::MethodCall { expr, method, args } => self.method_call(expr, method, args)?,
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
             ExprKind::Unary { expr, op } => self.unary_expr(*op, expr)?,
             ExprKind::Binary { exprs, op } => self.binary_expr(*op, &exprs[0], &exprs[1])?,
@@ -179,6 +181,38 @@ impl Codegen {
         let field_id = fields.get(field).unwrap().0;
         self.expr(expr)?;
         self.builder.insert(Instr::LoadField(field_id));
+        Ok(())
+    }
+
+    fn method_call(&mut self, expr: &Expr, method: &str, args: &[Expr]) -> Result<()> {
+        use MethodBuiltin as M;
+        self.expr(expr)?;
+        let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
+        for expr in args {
+            self.expr(expr)?;
+        }
+        let builtin = match (&tycon.kind, method) {
+            (TyKind::Named("int"), "abs") => M::IntAbs,
+
+            (TyKind::Named("char"), "is_digit") => M::CharIsDigit,
+            (TyKind::Named("char"), "is_alphabetic") => M::CharIsDigit,
+
+            (TyKind::Named("str"), "trim") => M::StrTrim,
+            (TyKind::Named("str"), "is_digit") => M::StrTrim,
+            (TyKind::Named("str"), "is_alphabetic") => M::StrIsAlphabetic,
+            (TyKind::Named("str"), "starts_with") => M::StrIsAlphabetic,
+
+            (TyKind::Named("array"), "push") => M::ArrayPush,
+            (TyKind::Named("array"), "pop") => M::ArrayPop,
+            (TyKind::Named("array"), "sort") if tycon.generics[0] == Ty::int() => M::ArraySortInt,
+
+            (TyKind::Named("map"), "insert") => M::MapInsert,
+            (TyKind::Named("map"), "remove") => M::MapRemove,
+            (TyKind::Named("map"), "get") => M::MapGet,
+
+            kind => todo!("{kind:?}"),
+        };
+        self.builder.insert(Instr::CallBuiltinMethod(builtin));
         Ok(())
     }
 
