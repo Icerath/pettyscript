@@ -2,7 +2,7 @@ use miette::Result;
 
 use crate::{
     builtints::MethodBuiltin,
-    bytecode::{BytecodeBuilder, Instr, StrIdent},
+    bytecode::{BytecodeBuilder, Instr},
     hir::*,
     parser::{BinOp, UnaryOp},
     typck::{Substitutions, Ty, TyKind},
@@ -223,8 +223,8 @@ impl Codegen {
             ExprKind::Int(int) => self.builder.insert(Instr::LoadInt(*int)),
             ExprKind::Char(char) => self.builder.insert(Instr::LoadChar(*char)),
             ExprKind::Str(str) => {
-                let [ptr, len] = self.builder.insert_string(str);
-                self.builder.insert(Instr::LoadString { ptr, len });
+                let str_ident = self.builder.insert_string(str);
+                self.builder.insert(Instr::LoadString(str_ident));
             }
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
             ExprKind::Tuple(tuple) => self.array(tuple)?,
@@ -248,8 +248,8 @@ impl Codegen {
         let ty = &expr.ty.sub(&self.subs);
         let Ty::Con(tycon) = ty else { panic!("Expected `struct` {ty:?}") };
         if let TyKind::Enum { .. } = &tycon.kind {
-            let [ptr, len] = self.builder.insert_string(field);
-            self.builder.insert(Instr::LoadVariant(StrIdent { ptr, len }));
+            let str_ident = self.builder.insert_string(field);
+            self.builder.insert(Instr::LoadVariant(str_ident));
             return Ok(());
         }
         let TyKind::Struct { fields, .. } = &tycon.kind else {
@@ -370,16 +370,16 @@ impl Codegen {
         let mut num_segments = 0;
         for (str, expr) in &fstr.segments {
             if !str.is_empty() {
-                let [ptr, len] = self.builder.insert_string(str);
-                self.builder.insert(Instr::LoadString { ptr, len });
+                let str_ident = self.builder.insert_string(str);
+                self.builder.insert(Instr::LoadString(str_ident));
                 num_segments += 1;
             }
             self.expr(expr)?;
             num_segments += 1;
         }
         if !fstr.remaining.is_empty() {
-            let [ptr, len] = self.builder.insert_string(fstr.remaining);
-            self.builder.insert(Instr::LoadString { ptr, len });
+            let str_ident = self.builder.insert_string(fstr.remaining);
+            self.builder.insert(Instr::LoadString(str_ident));
             num_segments += 1;
         }
         self.builder.insert(Instr::BuildFstr { num_segments });

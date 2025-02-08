@@ -224,7 +224,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 Instr::LoadChar(char) => self.stack.push(Value::Char(char)),
                 Instr::LoadIntSmall(int) => self.stack.push(Value::Int(int as i64)),
                 Instr::LoadInt(int) => self.stack.push(Value::Int(int)),
-                Instr::LoadString { ptr, len } => {
+                Instr::LoadString(StrIdent { ptr, len }) => {
                     self.stack.push(Value::String(PettyStr::Literal(
                         &self.consts[ptr as usize..ptr as usize + len as usize],
                     )));

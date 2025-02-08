@@ -58,9 +58,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),
             Instr::LoadIntSmall(int) => println!("LOAD_INT_SMALL {int}"),
             Instr::LoadInt(int) => println!("LOAD_INT {int}"),
-            Instr::LoadString { ptr, len } => {
-                println!("LOAD_STR {:?}", load_str!(ptr, len))
-            }
+            Instr::LoadString(str) => println!("LOAD_STR {:?}", load_str!(str.ptr, str.len)),
             Instr::Mod => println!("MODULO"),
             Instr::Not => println!("NOT"),
             Instr::Range => println!("RANGE"),

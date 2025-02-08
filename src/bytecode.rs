@@ -40,7 +40,7 @@ pub enum Instr {
     LoadChar(char),
     LoadInt(i64),
     LoadIntSmall(i16),
-    LoadString { ptr: u32, len: u32 },
+    LoadString(StrIdent),
     Jump(u32),
     CJump(u32),
     Load(u32),
@@ -188,13 +188,13 @@ impl BytecodeBuilder {
         instruction.bc_write(&mut self.instruction_data);
     }
 
-    pub fn insert_string(&mut self, str: &'static str) -> [u32; 2] {
+    pub fn insert_string(&mut self, str: &'static str) -> StrIdent {
         let ptr = *self.string_map.entry(str).or_insert_with(|| {
             let ptr = self.string_data.len().try_into().expect("String data has grown too large");
             self.string_data.extend(str.as_bytes());
             ptr
         });
-        [ptr, str.len() as u32]
+        StrIdent { ptr, len: str.len() as u32 }
     }
 
     pub fn finish(mut self) -> Vec<u8> {
