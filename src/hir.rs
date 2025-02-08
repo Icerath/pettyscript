@@ -227,7 +227,7 @@ impl Lowering<'_> {
             Stmt::Continue => out.push(Item::Continue),
             Stmt::Break => out.push(Item::Break),
             Stmt::Expr(expr) => out.push(Item::Expr(self.expr(expr)?)),
-            _ => todo!("{stmt:?}"),
+            Stmt::Block(block) => block.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))?,
         }
         Ok(())
     }
