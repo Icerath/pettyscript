@@ -92,6 +92,7 @@ pub struct Enum {
 #[derive(Debug)]
 pub struct Function {
     pub ident: Spanned<Ident>,
+    pub generics: Box<[Spanned<Ident>]>,
     pub params: Params,
     pub ret_type: Option<Spanned<ExplicitType>>,
     pub body: Spanned<Block>,
@@ -750,6 +751,13 @@ impl Parse for Function {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::Fn)?;
         let ident = Ident::parse(stream)?;
+
+        let mut generics: Box<[_]> = Box::new([]);
+        if stream.peek()? == Token::LBracket {
+            stream.skip();
+            generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
+        }
+
         stream.expect_token(Token::LParen)?;
         let params = stream.parse_separated_ident_types(TokenKind::RParen)?;
         stream.expect_token(Token::RParen)?;
@@ -761,7 +769,7 @@ impl Parse for Function {
         }
 
         let body = Block::parse(stream)?;
-        Ok(Function { ident, params, ret_type, body })
+        Ok(Function { ident, generics, params, ret_type, body })
     }
 }
 
