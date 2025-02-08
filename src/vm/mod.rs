@@ -192,12 +192,9 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     let Value::Map(map) = self.stack.last_mut().unwrap() else { panic!() };
                     map.borrow_mut().insert(key, value);
                 }
-                Instr::CreateArray => self.stack.push(Value::Array(Rc::default())),
-                Instr::ArrayPush => {
-                    let value = self.pop_stack();
-                    let arr = self.stack.last_mut().unwrap();
-                    let Value::Array(arr) = arr else { panic!() };
-                    arr.borrow_mut().push(value);
+                Instr::CreateArray { size } => {
+                    let arr = self.stack.drain((self.stack.len() - size as usize)..).collect();
+                    self.stack.push(Value::Array(Rc::new(RefCell::new(arr))));
                 }
                 Instr::ArrayConcatStack => {
                     let arr = self.pop_arr();

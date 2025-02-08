@@ -379,11 +379,8 @@ impl Codegen {
     }
 
     fn array(&mut self, arr: &[Expr]) -> Result<()> {
-        self.builder.insert(Instr::CreateArray);
-        for expr in arr {
-            self.expr(expr)?;
-            self.builder.insert(Instr::ArrayPush);
-        }
+        arr.iter().try_for_each(|expr| self.expr(expr))?;
+        self.builder.insert(Instr::CreateArray { size: arr.len() as u16 });
         Ok(())
     }
 
