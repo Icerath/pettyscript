@@ -436,6 +436,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
             M::CharIsDigit => Value::Bool(self.pop_char().is_ascii_digit()),
             M::CharIsAlphabetic => Value::Bool(self.pop_char().is_alphabetic()),
 
+            M::StrLen => Value::Int(self.pop_str().len() as i64),
             M::StrIsAlphabetic => {
                 let str = self.pop_str();
                 Value::Bool(str.chars().all(|c| c.is_ascii_alphabetic()))
@@ -455,6 +456,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     .into(),
             )),
 
+            M::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
             M::ArrayPop => self.pop_arr().borrow_mut().pop().unwrap(),
             M::ArrayPush => {
                 let value = self.pop_stack();

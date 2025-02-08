@@ -14,6 +14,7 @@ pub enum Builtin {
 pub enum MethodBuiltin {
     IntAbs,
 
+    StrLen,
     StrTrim,
     StrStartsWith,
     StrIsDigit,
@@ -27,6 +28,7 @@ pub enum MethodBuiltin {
     MapInsert,
     MapRemove,
 
+    ArrayLen,
     ArrayPush,
     ArrayPop,
     ArraySortInt,

@@ -1,7 +1,7 @@
 use miette::Result;
 
 use crate::{
-    builtints::{BuiltinField, MethodBuiltin},
+    builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr, StrIdent},
     hir::*,
     parser::{BinOp, UnaryOp},
@@ -254,18 +254,12 @@ impl Codegen {
             (TyKind::Named("str"), "is_digit") => M::StrIsDigit,
             (TyKind::Named("str"), "is_alphabetic") => M::StrIsAlphabetic,
             (TyKind::Named("str"), "starts_with") => M::StrStartsWith,
-            (TyKind::Named("str"), "len") => {
-                self.builder.insert(Instr::LoadBuiltinField(BuiltinField::StrLen));
-                return Ok(());
-            }
+            (TyKind::Named("str"), "len") => M::StrLen,
 
             (TyKind::Named("array"), "push") => M::ArrayPush,
             (TyKind::Named("array"), "pop") => M::ArrayPop,
             (TyKind::Named("array"), "sort") if tycon.generics[0] == Ty::int() => M::ArraySortInt,
-            (TyKind::Named("array"), "len") => {
-                self.builder.insert(Instr::LoadBuiltinField(BuiltinField::ArrayLen));
-                return Ok(());
-            }
+            (TyKind::Named("array"), "len") => M::ArrayLen,
             (TyKind::Named("map"), "insert") => M::MapInsert,
             (TyKind::Named("map"), "remove") => M::MapRemove,
             (TyKind::Named("map"), "get") => M::MapGet,
