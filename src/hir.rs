@@ -738,7 +738,7 @@ impl Lowering<'_> {
                 }
                 None => Expr {
                     ty: ty.clone(),
-                    kind: ExprKind::Ident(self.load_var(&init.ident).unwrap()),
+                    kind: ExprKind::Ident(self.load_var(&init.ident).expect(&init.ident)),
                 },
             };
             new_fields.push((*field_offset, init_expr));

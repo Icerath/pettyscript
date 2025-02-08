@@ -107,6 +107,7 @@ impl Codegen {
             self.expr(condition)?;
             self.builder.insert(Instr::CJump(next));
             self.block(block)?;
+            self.builder.insert(Instr::Jump(end_label));
         }
         self.builder.insert_label(next);
         self.block(&if_chain.end)?;

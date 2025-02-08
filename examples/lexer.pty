@@ -53,7 +53,7 @@ enum Token {
 fn lexer_next(lexer: Lexer) -> Token {
     let rem = lexer.remaining.trim();
     const first_char = rem[0];
-  // FIXME: Provide a better way to handle default values or late initialization
+    // FIXME: Provide a better way to handle default values or late initialization
     let token = Token.Ident;
 
     while true {

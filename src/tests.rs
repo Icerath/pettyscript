@@ -44,8 +44,9 @@ fn test_lexer_example() {
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
     let ast = parse(src).unwrap();
-    let ast = Ast { src, body: &ast };
-    let code = codegen::codegen(ast).unwrap();
+    let mut hir = crate::hir::Lowering::new(src);
+    let block = hir.block(&ast).unwrap();
+    let code = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
     let result = exec_vm(&code);
 
     let mut expected = String::new();
