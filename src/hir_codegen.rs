@@ -164,6 +164,8 @@ impl Codegen {
         self.builder.insert(Instr::Jump(start_label));
         self.builder.insert_label(end_label);
 
+        self.builder.insert(Instr::Pop);
+
         self.continue_label = prev_continue;
         self.break_label = prev_break;
         Ok(())

@@ -145,6 +145,10 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
         self.stack.last().unwrap_unchecked()
     }
 
+    unsafe fn last_stack_mut(&mut self) -> &mut Value<'src> {
+        self.stack.last_mut().unwrap_unchecked()
+    }
+
     fn new(bytecode: &'src [u8], stdout: &'io mut dyn Write) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
         let version = u32::from_le_bytes(*reader.read::<4>());
@@ -236,11 +240,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     self.stack.push(Value::RangeInclusive([start, end]));
                 }
                 Instr::IterRange => {
-                    let Value::Range([start, end]) = self.pop_stack() else {
+                    let Value::Range([start, end]) = self.last_stack_mut() else {
                         unreachable_unchecked()
                     };
                     if start < end {
-                        self.stack.push(Value::Range([start + 1, end]));
+                        *start += 1;
+                        let start = *start - 1;
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
@@ -248,11 +253,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     }
                 }
                 Instr::IterRangeInclusive => {
-                    let Value::RangeInclusive([start, end]) = self.pop_stack() else {
+                    let Value::RangeInclusive([start, end]) = self.last_stack_mut() else {
                         unreachable_unchecked()
                     };
                     if start <= end {
-                        self.stack.push(Value::RangeInclusive([start + 1, end]));
+                        *start += 1;
+                        let start = *start - 1;
                         self.stack.push(Value::Int(start));
                         self.stack.push(Value::Bool(true));
                     } else {
