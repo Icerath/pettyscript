@@ -2,3 +2,4 @@ assert("123456789".len() == 9);
 assert("  \n   Hello, World!\n  ".trim() == "Hello, World!");
 assert("Hello, World!"[5] == ',');
 assert("Hello, World!"[7..13] == "World!");
+assert("Hello\nWorld".lines() == ["Hello", "World"]);

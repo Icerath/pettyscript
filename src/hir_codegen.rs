@@ -271,6 +271,7 @@ impl Codegen {
             (TyKind::Named("str"), "is_alphabetic") => M::StrIsAlphabetic,
             (TyKind::Named("str"), "starts_with") => M::StrStartsWith,
             (TyKind::Named("str"), "len") => M::StrLen,
+            (TyKind::Named("str"), "lines") => M::StrLines,
 
             (TyKind::Named("array"), "push") => M::ArrayPush,
             (TyKind::Named("array"), "pop") => M::ArrayPop,

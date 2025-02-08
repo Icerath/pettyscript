@@ -682,6 +682,11 @@ impl Lowering<'_> {
                 _ => todo!("`{method:?}`"),
             },
             "str" => match method {
+                "lines" => Rc::new([Ty::array({
+                    let var = TyVar::uniq();
+                    unify(&Ty::Var(var), &Ty::str(), &mut self.subs);
+                    var
+                })]),
                 "trim" => Rc::new([Ty::str()]),
                 "starts_with" => Rc::new([Ty::str(), Ty::bool()]),
                 "is_digit" => Rc::new([Ty::bool()]),
