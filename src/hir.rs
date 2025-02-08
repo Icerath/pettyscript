@@ -553,7 +553,7 @@ impl Lowering<'_> {
 
     fn array(&mut self, aexprs: &[ast::Expr]) -> Result<Expr> {
         let var = TyVar::uniq();
-        let ty = Ty::array(var);
+        let ty = Ty::array(Ty::Var(var));
 
         let mut exprs = vec![];
         for aexpr in aexprs {
@@ -682,11 +682,7 @@ impl Lowering<'_> {
                 _ => todo!("`{method:?}`"),
             },
             "str" => match method {
-                "lines" => Rc::new([Ty::array({
-                    let var = TyVar::uniq();
-                    unify(&Ty::Var(var), &Ty::str(), &mut self.subs);
-                    var
-                })]),
+                "lines" => Rc::new([Ty::array(Ty::str())]),
                 "trim" => Rc::new([Ty::str()]),
                 "starts_with" => Rc::new([Ty::str(), Ty::bool()]),
                 "is_digit" => Rc::new([Ty::bool()]),
@@ -788,8 +784,8 @@ macro_rules! impl_ty_const {
 impl Ty {
     impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
 
-    pub fn array(of: TyVar) -> Ty {
-        Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([Ty::Var(of)]) })
+    pub fn array(of: Ty) -> Ty {
+        Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([of]) })
     }
 
     pub fn map(key: TyVar, val: TyVar) -> Ty {
