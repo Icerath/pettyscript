@@ -264,7 +264,7 @@ impl Codegen {
             (TyKind::Named("int"), "abs") => M::IntAbs,
 
             (TyKind::Named("char"), "is_digit") => M::CharIsDigit,
-            (TyKind::Named("char"), "is_alphabetic") => M::StrIsAlphabetic,
+            (TyKind::Named("char"), "is_alphabetic") => M::CharIsAlphabetic,
 
             (TyKind::Named("str"), "trim") => M::StrTrim,
             (TyKind::Named("str"), "is_digit") => M::StrIsDigit,
