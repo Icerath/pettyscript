@@ -23,7 +23,7 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
                 let ast = parse(&src).unwrap();
                 let mut hir = crate::hir::Lowering::new(src);
                 let block = hir.block(&ast).unwrap();
-                let code = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
+                let code = crate::codegen::codegen(&block, hir.subs).unwrap();
                 unsafe { vm::execute_bytecode(&code) };
             }
         });

@@ -3,7 +3,7 @@ mod bytecode;
 mod disassemble;
 mod hir;
 // mod hir_codegen;
-mod hir_codegen;
+mod codegen;
 mod intern;
 mod lexer;
 mod parser;
@@ -36,7 +36,7 @@ fn main() -> miette::Result<()> {
     let ast = parse(&src)?;
     let mut hir = hir::Lowering::new(&src);
     let block = hir.block(&ast).unwrap();
-    let bytecode = hir_codegen::codegen(&block, hir.subs)?;
+    let bytecode = codegen::codegen(&block, hir.subs)?;
 
     if args.verbose {
         println!("Compiled in {:?}", start.elapsed());

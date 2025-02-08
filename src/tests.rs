@@ -17,7 +17,7 @@ fn test_fizzbuzz_example() {
     let ast = parse(src).unwrap();
     let mut hir = crate::hir::Lowering::new(src);
     let block = hir.block(&ast).unwrap();
-    let code = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
+    let code = crate::codegen::codegen(&block, hir.subs).unwrap();
     let result = exec_vm(&code);
 
     let expected: String = (1..=100)
@@ -43,7 +43,7 @@ fn test_lexer_example() {
     let ast = parse(src).unwrap();
     let mut hir = crate::hir::Lowering::new(src);
     let block = hir.block(&ast).unwrap();
-    let code = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
+    let code = crate::codegen::codegen(&block, hir.subs).unwrap();
     let result = exec_vm(&code);
 
     let mut expected = String::new();
@@ -60,7 +60,7 @@ macro_rules! test_expr {
         let ast = parse(src).unwrap();
         let mut hir = crate::hir::Lowering::new(&src);
         let block = hir.block(&ast).unwrap();
-        let bytecode = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
+        let bytecode = crate::codegen::codegen(&block, hir.subs).unwrap();
         let output = exec_vm(&bytecode);
         assert_eq!(output, $expected);
     }};
@@ -81,7 +81,7 @@ macro_rules! test_fails {
             };
             let mut hir = crate::hir::Lowering::new(src);
             let block = hir.block(&ast).unwrap();
-            crate::hir_codegen::codegen(&block, hir.subs).unwrap();
+            crate::codegen::codegen(&block, hir.subs).unwrap();
         }
     };
 }
