@@ -80,6 +80,7 @@ pub enum AssignSegment {
 #[derive(Debug)]
 pub struct Return {
     pub expr: Option<Expr>,
+    pub pops: usize,
 }
 
 #[derive(Debug)]
@@ -138,6 +139,7 @@ pub struct Lowering<'src> {
 pub struct FnScope {
     ret_var: TyVar,
     variables: FxHashMap<&'static str, Ident>,
+    for_loops: usize,
 }
 
 impl<'src> Lowering<'src> {
@@ -157,7 +159,7 @@ impl<'src> Lowering<'src> {
             );
         }
 
-        let mut scope = FnScope { ret_var, variables: FxHashMap::default() };
+        let mut scope = FnScope { ret_var, variables: FxHashMap::default(), for_loops: 0 };
 
         for builtin in Builtin::ALL {
             let name = builtin.name();
@@ -249,8 +251,8 @@ impl Lowering<'_> {
     }
 
     fn for_loop(&mut self, for_loop: &ast::ForLoop, out: &mut Vec<Item>) -> Result<()> {
+        self.scope().for_loops += 1;
         let iter = self.expr(&for_loop.iter)?;
-        // TODO: Don't fully substitute this type.
         let Ty::Con(iter_typ) = iter.ty.sub(&self.subs) else { panic!() };
         let item_ty = self.iter_item_ty(&iter_typ);
 
@@ -259,6 +261,7 @@ impl Lowering<'_> {
 
         // TODO: Handle for loop sugar here instead of later.
         out.push(Item::ForLoop(ForLoop { ident: iter_ident, iter, body }));
+        self.scope().for_loops -= 1;
         Ok(())
     }
 
@@ -391,7 +394,7 @@ impl Lowering<'_> {
         let ident = self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap();
 
         let ret_var = TyVar::uniq();
-        self.scopes.push(FnScope { ret_var, variables: FxHashMap::default() });
+        self.scopes.push(FnScope { ret_var, variables: FxHashMap::default(), for_loops: 0 });
         let mut params = vec![];
         for (ident, expl_typ) in &func.params {
             let ty = self.load_explicit_type(expl_typ)?;
@@ -442,8 +445,9 @@ impl Lowering<'_> {
             unify(&Ty::null(), &Ty::Var(ret_var), &mut self.subs);
             None
         };
+        let pops = self.scope().for_loops;
 
-        out.push(Item::Return(Return { expr }));
+        out.push(Item::Return(Return { expr, pops }));
         Ok(())
     }
 

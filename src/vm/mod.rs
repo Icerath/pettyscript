@@ -401,6 +401,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 }
             }
         }
+        debug_assert!(
+            self.stack.is_empty(),
+            "len: {}\n{:?}",
+            self.stack.len(),
+            self.stack.last().unwrap()
+        );
         Ok(())
     }
 

@@ -200,6 +200,9 @@ impl Codegen {
     }
 
     fn return_(&mut self, ret: &Return) -> Result<()> {
+        for _ in 0..ret.pops {
+            self.builder.insert(Instr::Pop);
+        }
         if let Some(expr) = &ret.expr {
             self.expr(expr)?;
         }
