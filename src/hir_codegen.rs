@@ -70,6 +70,10 @@ impl Codegen {
         self.builder.insert(Instr::Jump(function_end));
         self.builder.insert_label(function_start);
 
+        for param in &func.params {
+            self.store(param.offset);
+        }
+
         // self.scopes.push(FunctionScope::new(ret.clone()));
         self.block(&func.body)?;
         // let num_scope_vars = self.scopes.last().unwrap().variables.len();
@@ -243,12 +247,12 @@ impl Codegen {
             (TyKind::Named("int"), "abs") => M::IntAbs,
 
             (TyKind::Named("char"), "is_digit") => M::CharIsDigit,
-            (TyKind::Named("char"), "is_alphabetic") => M::CharIsDigit,
+            (TyKind::Named("char"), "is_alphabetic") => M::StrIsAlphabetic,
 
             (TyKind::Named("str"), "trim") => M::StrTrim,
-            (TyKind::Named("str"), "is_digit") => M::StrTrim,
+            (TyKind::Named("str"), "is_digit") => M::StrIsDigit,
             (TyKind::Named("str"), "is_alphabetic") => M::StrIsAlphabetic,
-            (TyKind::Named("str"), "starts_with") => M::StrIsAlphabetic,
+            (TyKind::Named("str"), "starts_with") => M::StrStartsWith,
             (TyKind::Named("str"), "len") => {
                 self.builder.insert(Instr::LoadBuiltinField(BuiltinField::StrLen));
                 return Ok(());

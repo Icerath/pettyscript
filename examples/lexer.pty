@@ -61,10 +61,10 @@ fn lexer_next(lexer: Lexer) -> Token {
 
         if rem.starts_with("//") {
             let i = 2;
-            while i < rem.len && rem[i] != '\n' {
+            while i < rem.len() && rem[i] != '\n' {
                 i = i + 1;
             }
-            rem = rem[i..rem.len];
+            rem = rem[i..rem.len()];
             continue;
         }
         // Keywords
@@ -138,7 +138,7 @@ fn lexer_next(lexer: Lexer) -> Token {
             println(f"Invalid Symbol: {first_char}");
             exit(1);
         }
-        lexer.remaining = rem[skip..rem.len];
+        lexer.remaining = rem[skip..rem.len()];
         return token;
     } 
 }
