@@ -93,8 +93,24 @@ impl Codegen {
     }
 
     fn assign(&mut self, assign: &Assign) -> Result<()> {
+        if assign.segments.is_empty() {
+            self.expr(&assign.expr)?;
+            self.store(assign.root.offset);
+            return Ok(());
+        }
+        self.load(assign.root.offset);
+        let (last, segments) = assign.segments.split_last().unwrap();
+        for segment in segments {
+            match segment {
+                AssignSegment::Field(field) => self.builder.insert(Instr::LoadField(*field)),
+                _ => todo!(),
+            }
+        }
         self.expr(&assign.expr)?;
-        self.store(assign.root.offset);
+        match last {
+            AssignSegment::Field(field) => self.builder.insert(Instr::StoreField(*field)),
+            _ => todo!(),
+        }
         Ok(())
     }
 

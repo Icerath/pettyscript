@@ -12,8 +12,7 @@ use rustc_hash::FxHashMap;
 use crate::{
     builtints::Builtin,
     parser::{
-        self as ast, AssignSegment, BinOp, ExplicitType, Pat, Spanned, Stmt, StructInitField,
-        UnaryOp, VarDecl,
+        self as ast, BinOp, ExplicitType, Pat, Spanned, Stmt, StructInitField, UnaryOp, VarDecl,
     },
     typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
@@ -68,7 +67,14 @@ pub struct IfChain {
 #[derive(Debug)]
 pub struct Assign {
     pub root: Ident,
+    pub segments: Vec<AssignSegment>,
     pub expr: Expr,
+}
+
+#[derive(Debug)]
+pub enum AssignSegment {
+    Field(u32),
+    Index(Expr),
 }
 
 #[derive(Debug)]
@@ -306,8 +312,9 @@ impl Lowering<'_> {
         let item = match *ident {
             "_" => Item::Expr(expr),
             _ => {
+                let segments = vec![];
                 let ident = self.insert_scope(ident, ty).unwrap();
-                Item::Assign(Assign { root: ident, expr })
+                Item::Assign(Assign { root: ident, segments, expr })
             }
         };
         out.push(item);
@@ -316,10 +323,16 @@ impl Lowering<'_> {
 
     fn assign(&mut self, assign: &ast::Assign, out: &mut Vec<Item>) -> Result<()> {
         let mut var = self.load_var(&assign.root).unwrap().ty;
+        let mut segments = Vec::with_capacity(assign.segments.len());
         for segment in &assign.segments {
             match segment {
-                AssignSegment::Index(_) => panic!(),
-                AssignSegment::Field(field) => {
+                ast::AssignSegment::Index(_) => panic!(),
+                ast::AssignSegment::Field(field) => {
+                    var = var.sub(&self.subs);
+
+                    let Ty::Con(tycon) = &var else { panic!() };
+                    let TyKind::Struct { fields, .. } = &tycon.kind else { panic!() };
+                    segments.push(AssignSegment::Field(fields.get(**field).unwrap().0));
                     var = self.field_ty(&var, field);
                 }
             }
@@ -329,7 +342,7 @@ impl Lowering<'_> {
 
         let root = self.load_var(&assign.root).unwrap();
         // TODO: Assignment should pass all segments
-        out.push(Item::Assign(Assign { root, expr }));
+        out.push(Item::Assign(Assign { root, segments, expr }));
         Ok(())
     }
 

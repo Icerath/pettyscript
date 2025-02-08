@@ -6,5 +6,5 @@ assert(f"{Point { x: 1, y: 2 }}" == "{ 1, 2 }");
 
 struct Lexer { str: str }
 let lexer = Lexer { str: "abc" };
-// lexer.str = lexer.str[0..2];
-assert(lexer.str == "abc");
+lexer.str = lexer.str[0..2];
+assert(lexer.str == "ab");
