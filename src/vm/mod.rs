@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    builtints::{Builtin, BuiltinField, MethodBuiltin},
+    builtints::{Builtin, MethodBuiltin},
     bytecode::{Instr, StrIdent, VERSION},
 };
 
@@ -358,7 +358,6 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     self.stack.push(Value::Struct { fields })
                 }
                 Instr::CallBuiltinMethod(method) => self.call_builtin_method(method),
-                Instr::LoadBuiltinField(field) => self.load_builtin_field(field),
                 Instr::LoadField(field) => {
                     let Value::Struct { fields } = self.pop_stack() else {
                         unreachable_unchecked()
@@ -488,15 +487,6 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
             }
         };
         self.stack.push(value);
-    }
-
-    unsafe fn load_builtin_field(&mut self, field: BuiltinField) {
-        use BuiltinField as B;
-        let val = match field {
-            B::StrLen => Value::Int(self.pop_str().len() as i64),
-            B::ArrayLen => Value::Int(self.pop_arr().borrow().len() as i64),
-        };
-        self.stack.push(val);
     }
 }
 

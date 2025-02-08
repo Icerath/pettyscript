@@ -1,8 +1,6 @@
 mod builtints;
 mod bytecode;
-mod codegen;
 mod disassemble;
-mod errors;
 mod hir;
 // mod hir_codegen;
 mod hir_codegen;

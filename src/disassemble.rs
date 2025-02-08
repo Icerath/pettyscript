@@ -54,7 +54,6 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::LoadBool(bool) => println!("LOAD_BOOL: {bool}"),
             Instr::Pop => println!("POP"),
             Instr::LoadField(field) => println!("LOAD_FIELD {field}"),
-            Instr::LoadBuiltinField(field) => println!("LOAD_BUILTIN_FIELD {}", field as u8),
             Instr::CallBuiltinMethod(method) => println!("CALL_BUILTIN_METHOD: {}", method as u8),
             Instr::StoreField(field) => println!("STORE_FIELD {}", field),
             Instr::LoadGlobal(global) => println!("LOAD_GLOBAL {global}"),

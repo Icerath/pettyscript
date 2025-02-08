@@ -1,7 +1,7 @@
 use macros::*;
 use rustc_hash::FxHashMap;
 
-use crate::builtints::{Builtin, BuiltinField, MethodBuiltin};
+use crate::builtints::{Builtin, MethodBuiltin};
 
 pub const VERSION: u32 = 0;
 
@@ -47,7 +47,6 @@ pub enum Instr {
     Load(u32),
     Store(u32),
     LoadGlobal(u32),
-    LoadBuiltinField(BuiltinField),
     CallBuiltinMethod(MethodBuiltin),
     LoadField(u32),
     StoreField(u32),
@@ -113,7 +112,6 @@ macro_rules! impl_from {
 impl_int!(u8, u16, u32, i16, i64);
 impl_from!(char, u32);
 impl_from!(Builtin, u16);
-impl_from!(BuiltinField, u16);
 impl_from!(MethodBuiltin, u8);
 
 impl BcRead for bool {
@@ -179,16 +177,6 @@ impl BytecodeBuilder {
         self.labels[label as usize] = self.instruction_data.len() as u32;
     }
 
-    pub fn create_function(&mut self) -> usize {
-        let out = self.instruction_data.len() + 1;
-        self.insert(Instr::CreateFunction { stack_size: 0 });
-        out
-    }
-
-    pub fn set_function_stack_size(&mut self, label: usize, value: u16) {
-        self.instruction_data[label..label + 2].copy_from_slice(&value.to_le_bytes());
-    }
-
     pub fn insert(&mut self, instruction: Instr) {
         const { assert!(size_of::<Instr>() == 16) };
         const { assert!(size_of::<OpCode>() == 1) };
@@ -199,11 +187,6 @@ impl BytecodeBuilder {
             _ => {}
         }
         instruction.bc_write(&mut self.instruction_data);
-    }
-
-    pub fn insert_identifer(&mut self, ident: &'static str) -> StrIdent {
-        let [ptr, len] = self.insert_string(ident);
-        StrIdent { ptr, len }
     }
 
     pub fn insert_string(&mut self, str: &'static str) -> [u32; 2] {

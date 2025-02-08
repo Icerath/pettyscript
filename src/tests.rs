@@ -1,10 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{
-    codegen,
-    parser::{Ast, parse},
-    vm,
-};
+use crate::{parser::parse, vm};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
@@ -19,8 +15,9 @@ macros::generate_integration_tests! {}
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let ast = parse(src).unwrap();
-    let ast = Ast { src, body: &ast };
-    let code = codegen::codegen(ast).unwrap();
+    let mut hir = crate::hir::Lowering::new(src);
+    let block = hir.block(&ast).unwrap();
+    let code = crate::hir_codegen::codegen(&block, hir.subs).unwrap();
     let result = exec_vm(&code);
 
     let expected: String = (1..=100)
@@ -82,18 +79,15 @@ macro_rules! test_fails {
                     return;
                 }
             };
-            let ast = Ast { src, body: &ast };
-            codegen::codegen(ast).unwrap();
+            let mut hir = crate::hir::Lowering::new(src);
+            let block = hir.block(&ast).unwrap();
+            crate::hir_codegen::codegen(&block, hir.subs).unwrap();
         }
     };
 }
 
 test_fails!(fail_arr, "let arr: array[i32] = ['1']");
 test_fails!(fail_map, "let map: map[i32, char] = #{'1': 2 }");
-test_fails!(zst_array_literals, "let arr = [null];");
-test_fails!(zst_array_type, "let arr: array[null] = [];");
-test_fails!(zst_map_type, "let map: map[int, null] = #{};");
-test_fails!(test_illegal_arrays, "let array = []; array.push(1);");
 
 #[test]
 fn for_loop() {

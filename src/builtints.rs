@@ -45,24 +45,6 @@ impl TryFrom<u8> for MethodBuiltin {
     }
 }
 
-#[derive(macros::NumVariants, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u16)]
-pub enum BuiltinField {
-    StrLen,
-    ArrayLen,
-}
-
-impl TryFrom<u16> for BuiltinField {
-    type Error = ();
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        if value as usize >= Self::VARIANT_COUNT {
-            return Err(());
-        }
-        Ok(unsafe { std::mem::transmute::<u16, Self>(value) })
-    }
-}
-
 impl Builtin {
     pub fn name(self) -> &'static str {
         match self {

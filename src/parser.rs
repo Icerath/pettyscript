@@ -16,12 +16,6 @@ pub type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
 type Params = Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>;
 
-#[derive(Debug, Clone, Copy)]
-pub struct Ast<'src, 'ast> {
-    pub src: &'src str,
-    pub body: &'ast [Spanned<Stmt>],
-}
-
 #[derive(Debug)]
 pub enum Stmt {
     Struct(Struct),
