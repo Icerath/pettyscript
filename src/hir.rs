@@ -590,7 +590,7 @@ impl Lowering<'_> {
 
             entries.push([key, value]);
         }
-        let ty = Ty::map(key_ty, value_ty);
+        let ty = Ty::map(Ty::Var(key_ty), Ty::Var(value_ty));
         Ok(Expr { ty, kind: ExprKind::Map(entries) })
     }
 
@@ -788,11 +788,8 @@ impl Ty {
         Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([of]) })
     }
 
-    pub fn map(key: TyVar, val: TyVar) -> Ty {
-        Ty::Con(TyCon {
-            kind: TyKind::Named("map"),
-            generics: Rc::new([Ty::Var(key), Ty::Var(val)]),
-        })
+    pub fn map(key: Ty, val: Ty) -> Ty {
+        Ty::Con(TyCon { kind: TyKind::Named("map"), generics: Rc::new([key, val]) })
     }
 
     pub fn func(params: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
