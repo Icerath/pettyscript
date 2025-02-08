@@ -80,8 +80,7 @@ impl Codegen {
         // TODO: Remove extra space for ZSTs
         // self.scopes.pop().unwrap();
 
-        let ret = Ty::Var(func.ret).sub(&self.subs);
-        if ret == Ty::null() {
+        if func.ret.sub(&self.subs) == Ty::null() {
             self.builder.insert(Instr::Ret);
         } else {
             // FIXME: Instead produce a compile error when this is possible

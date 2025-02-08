@@ -37,6 +37,7 @@ pub enum Stmt {
 #[derive(Debug)]
 pub enum Pat {
     Ident(Ident),
+    #[expect(unused)]
     Array(Box<[Spanned<Pat>]>),
 }
 

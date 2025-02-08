@@ -38,7 +38,7 @@ pub struct Function {
     pub params: Vec<Ident>,
     pub stack_size: usize,
     pub ty: Ty,
-    pub ret: TyVar,
+    pub ret: Ty,
     pub body: Block,
 }
 
@@ -137,16 +137,14 @@ pub struct Lowering<'src> {
 
 #[derive(Debug)]
 pub struct FnScope {
-    ret_var: TyVar,
+    ret_var: Ty,
     variables: FxHashMap<&'static str, Ident>,
     for_loops: usize,
 }
 
 impl<'src> Lowering<'src> {
     pub fn new(src: &'src str) -> Self {
-        let mut subs = Substitutions::new();
-        let ret_var = TyVar::uniq();
-        unify(&Ty::Var(ret_var), &Ty::null(), &mut subs);
+        let subs = Substitutions::new();
 
         let mut named_types = FxHashMap::default();
 
@@ -159,7 +157,8 @@ impl<'src> Lowering<'src> {
             );
         }
 
-        let mut scope = FnScope { ret_var, variables: FxHashMap::default(), for_loops: 0 };
+        let mut scope =
+            FnScope { ret_var: Ty::null(), variables: FxHashMap::default(), for_loops: 0 };
 
         for builtin in Builtin::ALL {
             let name = builtin.name();
@@ -393,8 +392,16 @@ impl Lowering<'_> {
         let fn_var = TyVar::uniq();
         let ident = self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap();
 
-        let ret_var = TyVar::uniq();
-        self.scopes.push(FnScope { ret_var, variables: FxHashMap::default(), for_loops: 0 });
+        let ret = if let Some(ret_ty) = &func.ret_type {
+            self.load_explicit_type(ret_ty)?
+        } else {
+            Ty::null()
+        };
+        self.scopes.push(FnScope {
+            ret_var: ret.clone(),
+            variables: FxHashMap::default(),
+            for_loops: 0,
+        });
         let mut params = vec![];
         for (ident, expl_typ) in &func.params {
             let ty = self.load_explicit_type(expl_typ)?;
@@ -405,20 +412,13 @@ impl Lowering<'_> {
         }
         let fn_params = params.clone();
 
-        if let Some(ret_ty) = &func.ret_type {
-            let ret_ty = self.load_explicit_type(ret_ty)?;
-            unify(&Ty::Var(ret_var), &ret_ty, &mut self.subs);
-        } else {
-            unify(&Ty::Var(ret_var), &Ty::null(), &mut self.subs);
-        }
-
         let body = self.block(&func.body.stmts)?;
         let last_scope = self.scopes.pop().unwrap();
         let stack_size = last_scope.variables.len();
 
         let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
             params: params.iter().map(|ident| ident.ty.clone()).collect(),
-            ret: Rc::new(Ty::Var(ret_var)),
+            ret: Rc::new(ret.clone()),
         }));
         unify(&Ty::Var(fn_var), &fn_ty, &mut self.subs);
 
@@ -428,21 +428,21 @@ impl Lowering<'_> {
             ty: fn_ty,
             stack_size,
             params: fn_params,
-            ret: ret_var,
+            ret,
             body,
         }));
         Ok(())
     }
 
     fn ret(&mut self, ret: &ast::Return, out: &mut Vec<Item>) -> Result<()> {
-        let ret_var = self.scope().ret_var;
+        let ret_var = self.scope().ret_var.clone();
 
         let expr = if let Some(expr) = &ret.0 {
             let expr = self.expr(expr)?;
-            unify(&expr.ty, &Ty::Var(ret_var), &mut self.subs);
+            unify(&expr.ty, &ret_var, &mut self.subs);
             Some(expr)
         } else {
-            unify(&Ty::null(), &Ty::Var(ret_var), &mut self.subs);
+            unify(&Ty::null(), &ret_var, &mut self.subs);
             None
         };
         let pops = self.scope().for_loops;
