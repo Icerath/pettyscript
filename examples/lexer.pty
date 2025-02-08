@@ -51,7 +51,7 @@ enum Token {
 }
 
 fn lexer_next(lexer: Lexer) -> Token {
-    let rem = lexer.remaining.trim();
+    let rem = lexer.remaining;
     const first_char = rem[0];
     // FIXME: Provide a better way to handle default values or late initialization
     let token = Token.Ident;
@@ -109,7 +109,7 @@ fn lexer_next(lexer: Lexer) -> Token {
         else if first_char == '=' { token = Token.Eq; }
         // Literals
         else if first_char.is_digit() || first_char == '_' {
-            while rem[skip].is_digit() {
+            while skip < rem.len() && rem[skip].is_digit() {
                 skip = skip + 1;
             }
             token = Token.Int;
@@ -117,20 +117,20 @@ fn lexer_next(lexer: Lexer) -> Token {
             skip = skip + 2;
             token = Token.Character;
         } else if first_char == '"' {
-            while rem[skip] != '"' {
+            while skip < rem.len() && rem[skip] != '"' {
                 skip = skip + 1;
             }
             skip = skip + 1;
             token = Token.String;
         } else if rem.starts_with("f\"") {
             skip = skip + 1;
-            while rem[skip] != '"' {
+            while skip < rem.len() && rem[skip] != '"' {
                 skip = skip + 1;
             }
             skip = skip + 1;
             token = Token.FString;
         } else if first_char.is_alphabetic() {
-            while rem[skip].is_alphabetic() {
+            while skip < rem.len() && rem[skip].is_alphabetic() {
                 skip = skip + 1;
             }
             token = Token.Ident;
@@ -138,13 +138,13 @@ fn lexer_next(lexer: Lexer) -> Token {
             println(f"Invalid Symbol: {first_char}");
             exit(1);
         }
-        lexer.remaining = rem[skip..rem.len()];
+        lexer.remaining = rem[skip..rem.len()].trim();
         return token;
     } 
 }
 
 fn main() {
-    let str = read_file("examples/fizzbuzz.pty");
+    let str = read_file("examples/fizzbuzz.pty").trim();
     let lexer = Lexer { str, remaining: str };
     while true {
         let token = lexer_next(lexer);
