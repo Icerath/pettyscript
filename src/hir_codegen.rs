@@ -108,7 +108,10 @@ impl Codegen {
         }
         self.expr(&assign.expr)?;
         match last {
-            AssignSegment::Field(field) => self.builder.insert(Instr::StoreField(*field)),
+            AssignSegment::Field(field) => {
+                self.builder.insert(Instr::StoreField(*field));
+                self.builder.insert(Instr::Pop);
+            }
             _ => todo!(),
         }
         Ok(())
