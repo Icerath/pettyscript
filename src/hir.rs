@@ -405,9 +405,7 @@ impl Lowering<'_> {
         let mut params = vec![];
         for (ident, expl_typ) in &func.params {
             let ty = self.load_explicit_type(expl_typ)?;
-            let var = TyVar::uniq();
-            unify(&Ty::Var(var), &ty, &mut self.subs);
-            let ident = self.insert_scope(ident, Ty::Var(var)).unwrap();
+            let ident = self.insert_scope(ident, ty).unwrap();
             params.push(ident);
         }
         let fn_params = params.clone();
@@ -764,12 +762,6 @@ impl Lowering<'_> {
         let ty =
             Ty::Con(TyCon { kind: TyKind::Struct { name: ident, fields }, generics: Rc::new([]) });
         Ok(Expr { ty, kind: ExprKind::StructInit { ident, fields: new_fields } })
-    }
-}
-
-impl Expr {
-    fn uniq(kind: ExprKind) -> Self {
-        Self { kind, ty: Ty::Var(TyVar::uniq()) }
     }
 }
 
