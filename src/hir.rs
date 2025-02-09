@@ -12,7 +12,8 @@ use rustc_hash::FxHashMap;
 use crate::{
     builtints::Builtin,
     parser::{
-        self as ast, BinOp, ExplicitType, Pat, Spanned, Stmt, StructInitField, UnaryOp, VarDecl,
+        self as ast, BinOp, ExplicitType, ImplBlock, ImplSig, Pat, Spanned, Stmt, StructInitField,
+        UnaryOp, VarDecl,
     },
     typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
@@ -221,6 +222,7 @@ impl Lowering<'_> {
             Stmt::Let(var_decl) => self.var_decl(var_decl, false, out)?,
             Stmt::Const(var_decl) => self.var_decl(var_decl, true, out)?,
             Stmt::Assign(assign) => self.assign(assign, out)?,
+            Stmt::ImplBlock(impl_) => self.impl_(impl_, out)?,
             Stmt::Struct(struct_) => self.struct_(struct_, out)?,
             Stmt::Enum(enum_) => self.enum_(enum_, out)?,
             Stmt::Function(func) => self.function(func, out)?,
@@ -346,6 +348,12 @@ impl Lowering<'_> {
         // TODO: Assignment should pass all segments
         out.push(Item::Assign(Assign { root, segments, expr }));
         Ok(())
+    }
+
+    #[expect(unused)]
+    fn impl_(&mut self, impl_: &ImplBlock, out: &mut Vec<Item>) -> Result<()> {
+        let ImplSig::Inherent(expl_ty) = &*impl_.sig else { panic!() };
+        todo!()
     }
 
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {

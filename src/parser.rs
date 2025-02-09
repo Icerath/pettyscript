@@ -18,6 +18,7 @@ type Params = Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>;
 
 #[derive(Debug)]
 pub enum Stmt {
+    ImplBlock(ImplBlock),
     Struct(Struct),
     Enum(Enum),
     Function(Function),
@@ -32,6 +33,21 @@ pub enum Stmt {
     Continue,
     Break,
     Return(Return),
+}
+
+#[expect(unused)]
+#[derive(Debug)]
+pub struct ImplBlock {
+    pub generics: Box<[Spanned<Ident>]>,
+    pub sig: Spanned<ImplSig>,
+    pub body: Block,
+}
+
+#[derive(Debug)]
+pub enum ImplSig {
+    Inherent(Spanned<ExplicitType>),
+    #[expect(unused)]
+    Trait([Spanned<ExplicitType>; 2]),
 }
 
 #[derive(Debug)]
@@ -683,6 +699,7 @@ impl Parse for Stmt {
                     stream.expect_semicolon()?;
                     Stmt::Continue
                 }
+                Token::Impl => Stmt::ImplBlock(ImplBlock::parse_inner(stream)?),
                 Token::Let => Stmt::Let(stream.parse_let_decl()?),
                 Token::Const => Stmt::Const(stream.parse_const_decl()?),
                 Token::Struct => Stmt::Struct(Struct::parse_inner(stream)?),
@@ -906,5 +923,25 @@ impl Parse for Pat {
 impl Parse for Expr {
     fn parse_inner(stream: &mut Parser) -> Result<Self> {
         stream.parse_expr(0, true)
+    }
+}
+
+impl Parse for ImplBlock {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Impl)?;
+        let mut generics: Box<[Spanned<Ident>]> = Box::new([]);
+        if stream.peek()? == Token::LBracket {
+            stream.skip();
+            generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?
+        }
+        let sig = ImplSig::parse(stream)?;
+        let body = Block::parse_inner(stream)?;
+        Ok(Self { generics, sig, body })
+    }
+}
+
+impl Parse for ImplSig {
+    fn parse_inner(stream: &mut Parser) -> Result<Self> {
+        ExplicitType::parse(stream).map(Self::Inherent)
     }
 }
