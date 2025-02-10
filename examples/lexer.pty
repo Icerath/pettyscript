@@ -50,6 +50,12 @@ enum Token {
     Ident,
 }
 
+impl Lexer {
+    fn skip_whitespace(self: Lexer) {
+        self.remaining = self.remaining.trim();
+    }
+}
+
 fn lexer_next(lexer: Lexer) -> Token {
     let rem = lexer.remaining;
     const first_char = rem[0];
@@ -138,19 +144,17 @@ fn lexer_next(lexer: Lexer) -> Token {
             println(f"Invalid Symbol: {first_char}");
             exit(1);
         }
-        lexer.remaining = rem[skip..rem.len()].trim();
+        lexer.remaining = rem[skip..rem.len()];
         return token;
     } 
 }
 
 fn main() {
-    let str = read_file("examples/fizzbuzz.pty").trim();
+    let str = read_file("examples/fizzbuzz.pty");
     let lexer = Lexer { str, remaining: str };
-    while true {
+    while lexer.remaining != "" {
+        lexer.skip_whitespace();
         let token = lexer_next(lexer);
         println(f"{token}");
-        if lexer.remaining == "" {
-            break;
-        }
     }
 }

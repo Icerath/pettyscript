@@ -12,8 +12,8 @@ use rustc_hash::FxHashMap;
 use crate::{
     builtints::Builtin,
     parser::{
-        self as ast, BinOp, ExplicitType, ImplBlock, ImplSig, Pat, Spanned, Stmt, StructInitField,
-        UnaryOp, VarDecl,
+        self as ast, BinOp, ExplicitType, ImplSig, Pat, Spanned, Stmt, StructInitField, UnaryOp,
+        VarDecl,
     },
     typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
@@ -129,11 +129,17 @@ pub struct Fstr {
 }
 
 pub struct Lowering<'src> {
-    pub named_types: FxHashMap<&'static str, Ty>,
-    pub structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
+    named_types: FxHashMap<&'static str, Ty>,
+    structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
+    methods: FxHashMap<(TyCon, &'static str), Ident>,
     pub subs: Substitutions,
+    impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
     src: &'src str,
+}
+
+pub struct ImplBlock {
+    ty: Ty,
 }
 
 #[derive(Debug)]
@@ -175,7 +181,15 @@ impl<'src> Lowering<'src> {
 
         scope.insert("null", Ty::null(), true);
 
-        Self { src, subs, scopes: vec![scope], named_types, structs: HashMap::default() }
+        Self {
+            src,
+            subs,
+            methods: HashMap::default(),
+            scopes: vec![scope],
+            named_types,
+            structs: HashMap::default(),
+            impl_block: None,
+        }
     }
 }
 
@@ -350,10 +364,12 @@ impl Lowering<'_> {
         Ok(())
     }
 
-    #[expect(unused)]
-    fn impl_(&mut self, impl_: &ImplBlock, out: &mut Vec<Item>) -> Result<()> {
+    fn impl_(&mut self, impl_: &ast::ImplBlock, out: &mut Vec<Item>) -> Result<()> {
         let ImplSig::Inherent(expl_ty) = &*impl_.sig else { panic!() };
-        todo!()
+        assert!(self.impl_block.is_none());
+        let ty = self.load_explicit_type(expl_ty)?;
+        self.impl_block = Some(ImplBlock { ty });
+        impl_.body.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))
     }
 
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
@@ -422,16 +438,22 @@ impl Lowering<'_> {
         let last_scope = self.scopes.pop().unwrap();
         let stack_size = last_scope.variables.len();
 
-        let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
+        let fn_ty = TyCon::from(TyKind::Function {
             params: params.iter().map(|ident| ident.ty.clone()).collect(),
             ret: Rc::new(ret.clone()),
-        }));
-        unify(&Ty::Var(fn_var), &fn_ty, &mut self.subs);
+        });
+
+        unify(&Ty::Var(fn_var), &Ty::Con(fn_ty.clone()), &mut self.subs);
+
+        if let Some(impl_block) = &self.impl_block {
+            let Ty::Con(ty) = impl_block.ty.sub(&self.subs) else { panic!() };
+            self.methods.insert((ty, *func.ident), ident.clone());
+        }
 
         out.push(Item::Function(Function {
             name: &func.ident,
             ident,
-            ty: fn_ty,
+            ty: Ty::Con(fn_ty),
             stack_size,
             params: fn_params,
             ret,
@@ -660,36 +682,60 @@ impl Lowering<'_> {
         args: &[Spanned<ast::Expr>],
     ) -> Result<Expr> {
         let expr = self.expr(expr)?;
-        let params = self.method_params(&expr.ty, method);
+
+        if let Some(params) = self.method_params(&expr.ty, method) {
+            assert_eq!(args.len() + 1, params.len());
+            let mut new_args = Vec::with_capacity(args.len());
+            for (arg, param) in args.iter().zip(&*params) {
+                let arg = self.expr(arg)?;
+                unify(&arg.ty, param, &mut self.subs);
+                new_args.push(arg);
+            }
+            let ret = params.last().unwrap().clone();
+            return Ok(Expr {
+                ty: ret,
+                kind: ExprKind::MethodCall { expr: Box::new(expr), method, args: new_args },
+            });
+        }
+
+        let Ty::Con(expr_ty) = expr.ty.sub(&self.subs) else { panic!() };
+        let ident = self.methods.get(&(expr_ty, method)).expect(method).clone();
+        let Ty::Con(tycon) = ident.ty.sub(&self.subs) else { panic!() };
+        let TyKind::Function { params, ret } = &tycon.kind else { panic!() };
+
         assert_eq!(args.len() + 1, params.len());
-        let mut new_args = Vec::with_capacity(args.len());
-        for (arg, param) in args.iter().zip(&*params) {
+        let mut new_args = Vec::with_capacity(args.len() + 1);
+        new_args.push(expr);
+        for (arg, param) in args.iter().zip(&**params) {
             let arg = self.expr(arg)?;
             unify(&arg.ty, param, &mut self.subs);
             new_args.push(arg);
         }
-        let ret = params.last().unwrap().clone();
+
         Ok(Expr {
-            ty: ret,
-            kind: ExprKind::MethodCall { expr: Box::new(expr), method, args: new_args },
+            ty: ret.as_ref().clone(),
+            kind: ExprKind::FnCall {
+                expr: Box::new(Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) }),
+                args: new_args,
+            },
         })
     }
 
-    fn method_params(&mut self, ty: &Ty, method: &'static str) -> Rc<[Ty]> {
+    fn method_params(&mut self, ty: &Ty, method: &'static str) -> Option<Rc<[Ty]>> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         let name = match tycon.kind {
             TyKind::Named(name) => name,
-            _ => panic!(),
+            _ => return None,
         };
-        match name {
+        Some(match name {
             "int" => match method {
                 "abs" => Rc::new([Ty::int()]),
-                _ => todo!("`{method}`"),
+                _ => return None,
             },
             "char" => match method {
                 "is_digit" => Rc::new([Ty::bool()]),
                 "is_alphabetic" => Rc::new([Ty::bool()]),
-                _ => todo!("`{method:?}`"),
+                _ => return None,
             },
             "str" => match method {
                 "lines" => Rc::new([Ty::array(Ty::str())]),
@@ -698,14 +744,14 @@ impl Lowering<'_> {
                 "is_digit" => Rc::new([Ty::bool()]),
                 "is_alphabetic" => Rc::new([Ty::bool()]),
                 "len" => Rc::new([Ty::int()]),
-                _ => todo!("`{method}`"),
+                _ => return None,
             },
             "array" => match method {
                 "push" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
                 "pop" => Rc::new([tycon.generics[0].clone()]),
                 "sort" => Rc::new([ty.clone()]),
                 "len" => Rc::new([Ty::int()]),
-                _ => todo!("`{method}`"),
+                _ => return None,
             },
             "map" => match method {
                 "insert" => {
@@ -713,11 +759,11 @@ impl Lowering<'_> {
                 }
                 "get" => Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone()]),
                 "remove" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
-                _ => todo!("`{method}`"),
+                _ => return None,
             },
 
             _ => panic!("type `{:?}` does not contain method `{method}`", tycon),
-        }
+        })
     }
 
     fn index(&mut self, expr: &ast::Expr, index: &ast::Expr) -> Result<Expr> {

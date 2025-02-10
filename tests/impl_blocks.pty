@@ -1,9 +1,9 @@
-// struct Point { x: int, y: int }
+struct Point { x: int, y: int }
 
-// impl Point {
-//     fn print(self: Point) -> str {
-//         return f"Point { x: {self.x}, y: {self.y} }";
-//     }
-// }
+impl Point {
+    fn sum(self: Point) -> int {
+        return self.x + self.y;
+    }
+}
 
-// println(Point { x: 1, y: 2 });
+assert((Point { x: 3, y: 4 }).sum() == 7);
