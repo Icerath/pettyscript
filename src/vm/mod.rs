@@ -25,7 +25,7 @@ pub type PettyMap<'src> = BTreeMap<Value<'src>, Value<'src>>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value<'src> {
     Bool(bool),
-    EnumVariant { name: StrIdent },
+    EnumVariant { tag: u16 },
     Char(char),
     Int(i64),
     Callable(Callable),
@@ -177,14 +177,17 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
             let op = Instr::bc_read_unchecked(&self.instructions[self.head..]);
             self.head += 1 + op.size();
             match op {
+                Instr::EnumTag => {
+                    let Value::EnumVariant { tag } = self.pop_stack() else {
+                        unreachable_unchecked()
+                    };
+                    self.stack.push(Value::Int(tag as i64));
+                }
                 Instr::Abort => panic!("ABORTING"),
                 Instr::BuildFstr { num_segments } => {
                     let mut builder = String::new();
                     for value in self.stack.drain(self.stack.len() - num_segments as usize..) {
-                        let _ = write!(builder, "{}", DisplayValue {
-                            value: &value,
-                            consts: self.consts
-                        });
+                        let _ = write!(builder, "{}", DisplayValue { value: &value });
                     }
                     self.stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
                 }
@@ -356,7 +359,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     };
                     fields.borrow_mut()[field as usize] = value;
                 }
-                Instr::LoadVariant(name) => self.stack.push(Value::EnumVariant { name }),
+                Instr::LoadVariant { tag } => self.stack.push(Value::EnumVariant { tag }),
                 Instr::CreateStruct { size } => {
                     let fields: Box<[Value]> =
                         std::iter::repeat_with(|| Value::Bool(false)).take(size as usize).collect();
@@ -509,7 +512,6 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
 
 #[derive(Clone, Copy)]
 struct DisplayValue<'src, 'b> {
-    consts: &'src str,
     value: &'b Value<'src>,
 }
 
@@ -526,23 +528,18 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 let mut debug_map = f.debug_map();
 
                 for (key, value) in &*map.borrow() {
-                    debug_map.entry(&DisplayValue { value: key, ..*self }, &DisplayValue {
-                        value,
-                        ..*self
-                    });
+                    debug_map.entry(&DisplayValue { value: key }, &DisplayValue { value });
                 }
 
                 debug_map.finish()
             }
-            Value::EnumVariant { name: StrIdent { ptr, len } } => {
-                write!(f, "{}", &self.consts[*ptr as usize..*ptr as usize + *len as usize])
-            }
+            Value::EnumVariant { tag } => unreachable!("{tag}"),
             Value::Char(char) => write!(f, "{char}"),
             Value::Struct { fields } => {
                 write!(f, "{{")?;
                 for (i, value) in fields.borrow().iter().enumerate() {
                     let prefix = if i != 0 { "," } else { "" };
-                    write!(f, "{prefix} {}", DisplayValue { value, ..*self })?;
+                    write!(f, "{prefix} {}", DisplayValue { value })?;
                 }
                 write!(f, " }}")
             }
@@ -560,7 +557,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();
                 for value in &*values.borrow() {
-                    debug_list.entry(&format_args!("{}", DisplayValue { value, ..*self }));
+                    debug_list.entry(&format_args!("{}", DisplayValue { value }));
                 }
                 debug_list.finish()
             }

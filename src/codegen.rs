@@ -246,9 +246,8 @@ impl Codegen {
     fn field_access(&mut self, expr: &Expr, field: &'static str) -> Result<()> {
         let ty = &expr.ty.sub(&self.subs);
         let Ty::Con(tycon) = ty else { panic!("Expected `struct` {ty:?}") };
-        if let TyKind::Enum { .. } = &tycon.kind {
-            let str_ident = self.builder.insert_string(field);
-            self.builder.insert(Instr::LoadVariant(str_ident));
+        if let TyKind::Enum { variants, .. } = &tycon.kind {
+            self.builder.insert(Instr::LoadVariant { tag: variants[field] });
             return Ok(());
         }
         let TyKind::Struct { fields, .. } = &tycon.kind else {
@@ -322,6 +321,11 @@ impl Codegen {
             UnaryOp::Not => {
                 assert_eq!(expr.ty.sub(&self.subs), Ty::bool());
                 self.builder.insert(Instr::Not);
+            }
+            UnaryOp::EnumTag => {
+                let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
+                let TyKind::Variant { .. } = &tycon.kind else { panic!() };
+                self.builder.insert(Instr::EnumTag);
             }
         }
         Ok(())

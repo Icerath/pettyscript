@@ -27,6 +27,7 @@ pub fn disassemble(bytecode: &[u8]) {
         reader.head += 1 + op.size();
         print!("{offset}: ");
         match op {
+            Instr::EnumTag => println!("ENUM_TAG"),
             Instr::Abort => println!("ABORT"),
             Instr::BuildFstr { num_segments } => println!("BUILD_FSTR {num_segments:?}"),
             Instr::AddInt => println!("ADD_INT"),
@@ -63,9 +64,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::Range => println!("RANGE"),
             Instr::RangeInclusive => println!("RANGE_INCLUSIVE"),
             Instr::Ret => println!("RET"),
-            Instr::LoadVariant(ident) => {
-                println!("LOAD_VARIANT {}", load_str!(ident.ptr, ident.len))
-            }
+            Instr::LoadVariant { tag } => println!("LOAD_VARIANT {tag}"),
         };
     }
 }

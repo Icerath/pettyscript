@@ -214,6 +214,7 @@ impl TryFrom<TokenKind> for BinOp {
 pub enum UnaryOp {
     Not,
     Neg,
+    EnumTag,
 }
 
 #[derive(Debug)]

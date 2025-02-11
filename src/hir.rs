@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     builtints::Builtin,
+    intern::intern,
     parser::{
         self as ast, BinOp, ExplicitType, ImplSig, Pat, Spanned, Stmt, StructInitField, UnaryOp,
         VarDecl,
@@ -131,11 +132,16 @@ pub struct Fstr {
 pub struct Lowering<'src> {
     named_types: FxHashMap<&'static str, Ty>,
     structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
+    enums_: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
     src: &'src str,
+}
+
+pub struct EnumData {
+    array_str_ident: Ident,
 }
 
 pub struct ImplBlock {
@@ -188,6 +194,7 @@ impl<'src> Lowering<'src> {
             scopes: vec![scope],
             named_types,
             structs: HashMap::default(),
+            enums_: HashMap::default(),
             impl_block: None,
         }
     }
@@ -393,9 +400,13 @@ impl Lowering<'_> {
         static ENUM_ID: AtomicU32 = AtomicU32::new(0);
         let enum_id = ENUM_ID.fetch_add(1, Ordering::Relaxed);
 
+        let name_map = self.create_enum_name_map(enum_, out);
+        self.enums_.insert(enum_id, EnumData { array_str_ident: name_map });
+
         let mut variants = BTreeMap::<&str, _>::new();
-        for (offset, field) in enum_.variants.iter().enumerate() {
-            variants.insert(field, offset as u32);
+        assert!(enum_.variants.len() < u16::MAX as usize);
+        for (offset, field) in (0u16..).zip(&enum_.variants) {
+            variants.insert(field, offset);
         }
         let variants = Rc::new(variants);
         let ty = Ty::Con(TyCon {
@@ -410,6 +421,21 @@ impl Lowering<'_> {
         assert!(prev.is_none());
         _ = out;
         Ok(())
+    }
+
+    fn create_enum_name_map(&mut self, enum_: &ast::Enum, out: &mut Vec<Item>) -> Ident {
+        let array = ExprKind::Array(
+            enum_
+                .variants
+                .iter()
+                .map(|variant| Expr { ty: Ty::str(), kind: ExprKind::Str(variant) })
+                .collect(),
+        );
+        let expr = Expr { ty: Ty::array(Ty::str()), kind: array };
+        let name = intern(&format!("{}_variants", *enum_.ident));
+        let ident = self.insert_scope(name, expr.ty.clone()).unwrap();
+        out.push(Item::Assign(Assign { root: ident.clone(), segments: vec![], expr }));
+        ident
     }
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
@@ -534,10 +560,29 @@ impl Lowering<'_> {
     fn fstr(&mut self, fstring: &ast::FString) -> Result<Expr> {
         let mut segments = vec![];
         for (str, aexpr) in &fstring.segments {
-            segments.push((*str, self.expr(aexpr)?));
+            let mut expr = self.expr(aexpr)?;
+
+            let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
+            if let TyKind::Variant { id } = &tycon.kind {
+                expr = self.enum_variant_str(expr, id);
+            }
+            segments.push((*str, expr));
         }
         let remaining = fstring.remaining;
         Ok(Expr { ty: Ty::str(), kind: ExprKind::Fstr(Fstr { segments, remaining }) })
+    }
+
+    fn enum_variant_str(&mut self, expr: Expr, id: &u32) -> Expr {
+        let ident = self.enums_[id].array_str_ident.clone();
+        let array = Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) };
+        let index = Expr {
+            ty: Ty::int(),
+            kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
+        };
+        Expr {
+            ty: Ty::str(),
+            kind: ExprKind::Index { expr: Box::new(array), index: Box::new(index) },
+        }
     }
 
     fn scope(&mut self) -> &mut FnScope {
