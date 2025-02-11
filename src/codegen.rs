@@ -394,12 +394,11 @@ impl Codegen {
     }
 
     fn map(&mut self, exprs: &[[Expr; 2]]) -> Result<()> {
-        self.builder.insert(Instr::CreateMap);
         for [key, value] in exprs {
             self.expr(key)?;
             self.expr(value)?;
-            self.builder.insert(Instr::InsertMap);
         }
+        self.builder.insert(Instr::CreateMap { num_keys: exprs.len().try_into().unwrap() });
         Ok(())
     }
 

@@ -189,12 +189,16 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     }
                     self.stack.push(Value::String(PettyStr::String(Rc::new(builder.into()))));
                 }
-                Instr::CreateMap => self.stack.push(Value::Map(Rc::default())),
-                Instr::InsertMap => {
-                    let value = self.pop_stack();
-                    let key = self.pop_stack();
-                    let Value::Map(map) = self.stack.last_mut().unwrap() else { panic!() };
-                    map.borrow_mut().insert(key, value);
+                Instr::CreateMap { num_keys } => {
+                    // TODO: Restrict key types and use hashmap.
+                    #[expect(clippy::mutable_key_type)]
+                    let mut map = BTreeMap::new();
+                    for _ in 0..num_keys {
+                        let value = self.pop_stack();
+                        let key = self.pop_stack();
+                        map.insert(key, value);
+                    }
+                    self.stack.push(Value::Map(Rc::new(RefCell::new(map))))
                 }
                 Instr::CreateArray { size } => {
                     let arr = self.stack.drain((self.stack.len() - size as usize)..).collect();
