@@ -440,19 +440,18 @@ impl<'a> Parser<'a> {
     fn parse_map_literal(&mut self) -> Result<Literal> {
         // We expect hash too, but it's already parsed by `parse_literal`
         self.expect_token(Token::LBrace)?;
-        if self.peek()? == Token::RBrace {
-            self.skip();
-            return Ok(Literal::Map([].into()));
-        }
         let mut entries = vec![];
-        loop {
+        while self.peek()? != Token::RBrace {
             let key = self.parse_root_expr()?;
             self.expect_token(Token::Colon)?;
             let value = self.parse_root_expr()?;
             entries.push([key, value]);
             match self.peek()? {
                 Token::RBrace => break,
-                Token::Comma => continue,
+                Token::Comma => {
+                    self.skip();
+                    continue;
+                }
                 got => {
                     return Err(
                         self.expect_failed(got.kind(), &[TokenKind::RBrace, TokenKind::Comma])

@@ -12,4 +12,4 @@ let c: map[str, int] = #{};
 c.insert("Bob", 32);
 assert(f"{c.get("Bob")}" == "32");
 
-assert(f"{#{ "Bob": 32 }}" == "{Bob: 32}");
+assert(f"{#{ "Bob": 32, }}" == "{Bob: 32}");
