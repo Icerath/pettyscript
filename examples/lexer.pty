@@ -89,10 +89,10 @@ const SYMBOLS = #{
 };
 
 impl Lexer {
-    fn skip_whitespace(self: Lexer) {
+    fn skip_whitespace(self: self) {
         self.remaining = self.remaining.trim();
     }
-    fn next(self: Lexer) -> Token {
+    fn next(self: self) -> Token {
         let rem = self.remaining;
         const first_char = rem[0];
         // FIXME: Provide a better way to handle default values or late initialization

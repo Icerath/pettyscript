@@ -482,6 +482,8 @@ impl Lowering<'_> {
     fn load_explicit_type(&self, expl_ty: &Spanned<ExplicitType>) -> Result<Ty> {
         if expl_ty.is_inferred() {
             return Ok(Ty::Var(TyVar::uniq()));
+        } else if expl_ty.is_self() {
+            return Ok(self.impl_block.as_ref().unwrap().ty.clone());
         }
         let ty = self
             .named_types

@@ -67,6 +67,10 @@ impl ExplicitType {
     pub fn is_inferred(&self) -> bool {
         *self.ident == "_"
     }
+
+    pub fn is_self(&self) -> bool {
+        *self.ident == "self"
+    }
 }
 
 #[derive(Debug)]
