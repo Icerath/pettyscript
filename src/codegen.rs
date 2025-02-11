@@ -284,9 +284,11 @@ impl Codegen {
             (TyKind::Named("array"), "pop") => M::ArrayPop,
             (TyKind::Named("array"), "sort") if tycon.generics[0] == Ty::int() => M::ArraySortInt,
             (TyKind::Named("array"), "len") => M::ArrayLen,
+
             (TyKind::Named("map"), "insert") => M::MapInsert,
             (TyKind::Named("map"), "remove") => M::MapRemove,
             (TyKind::Named("map"), "get") => M::MapGet,
+            (TyKind::Named("map"), "contains") => M::MapContains,
 
             kind => todo!("{kind:?}"),
         };

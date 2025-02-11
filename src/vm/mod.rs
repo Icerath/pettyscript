@@ -494,6 +494,11 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 map.borrow_mut().remove(&key);
                 return;
             }
+            M::MapContains => {
+                let key = self.pop_stack();
+                let map = self.pop_map();
+                Value::Bool(map.borrow_mut().contains_key(&key))
+            }
         };
         self.stack.push(value);
     }

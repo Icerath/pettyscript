@@ -24,6 +24,7 @@ pub enum MethodBuiltin {
     CharIsDigit,
     CharIsAlphabetic,
 
+    MapContains,
     MapGet,
     MapInsert,
     MapRemove,

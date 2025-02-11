@@ -758,6 +758,7 @@ impl Lowering<'_> {
                     Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone(), Ty::null()])
                 }
                 "get" => Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone()]),
+                "contains" => Rc::new([tycon.generics[0].clone(), Ty::bool()]),
                 "remove" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
                 _ => return None,
             },
