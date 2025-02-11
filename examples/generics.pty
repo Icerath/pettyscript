@@ -1,8 +1,0 @@
-fn print[T](val: T) {
-    println(f"{val}");
-}
-
-
-fn main() {
-    print(10);
-}
