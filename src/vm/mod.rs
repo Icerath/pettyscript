@@ -180,8 +180,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 Instr::Abort => panic!("ABORTING"),
                 Instr::BuildFstr { num_segments } => {
                     let mut builder = String::new();
-                    for _ in 0..num_segments {
-                        let value = self.pop_stack();
+                    for value in self.stack.drain(self.stack.len() - num_segments as usize..) {
                         let _ = write!(builder, "{}", DisplayValue {
                             value: &value,
                             consts: self.consts
