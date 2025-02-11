@@ -14,7 +14,6 @@ pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
 
 pub type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
-type Params = Box<[(Spanned<Ident>, Spanned<ExplicitType>)]>;
 
 #[derive(Debug)]
 pub enum Stmt {
@@ -100,7 +99,7 @@ pub enum AssignSegment {
 #[derive(Debug)]
 pub struct Struct {
     pub ident: Spanned<Ident>,
-    pub fields: Params,
+    pub fields: Box<[Param]>,
 }
 
 #[derive(Debug)]
@@ -114,9 +113,15 @@ pub struct Function {
     pub ident: Spanned<Ident>,
     #[expect(unused)]
     pub generics: Box<[Spanned<Ident>]>,
-    pub params: Params,
+    pub params: Box<[Param]>,
     pub ret_type: Option<Spanned<ExplicitType>>,
     pub body: Spanned<Block>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Param {
+    pub ident: Spanned<Ident>,
+    pub expl_ty: Spanned<ExplicitType>,
 }
 
 #[derive(Debug)]
@@ -298,11 +303,7 @@ impl<'a> Parser<'a> {
         Ok(root)
     }
 
-    fn parse_separated<T>(
-        &mut self,
-        sep: TokenKind,
-        terminator: TokenKind,
-    ) -> Result<Box<[Spanned<T>]>>
+    fn parse_separated<T>(&mut self, sep: TokenKind, terminator: TokenKind) -> Result<Box<[T]>>
     where
         T: Parse,
     {
@@ -574,21 +575,6 @@ impl<'a> Parser<'a> {
         Ok(Assign { root, segments: segments.into(), expr })
     }
 
-    fn parse_separated_ident_types(&mut self, terminator: TokenKind) -> Result<Params> {
-        let mut params = vec![];
-        while self.peek()?.kind() != terminator {
-            let ident = self.parse()?;
-            self.expect_token(Token::Colon)?;
-            let typ = self.parse()?;
-            params.push((ident, typ));
-            if self.peek()?.kind() == terminator {
-                break;
-            }
-            self.expect_token(Token::Comma)?;
-        }
-        Ok(params.into())
-    }
-
     fn expect_token(&mut self, expected: impl Into<TokenKind>) -> Result<Token> {
         self.expect_any(&[expected.into()])
     }
@@ -784,8 +770,7 @@ impl Parse for Function {
         }
 
         stream.expect_token(Token::LParen)?;
-        let params = stream.parse_separated_ident_types(TokenKind::RParen)?;
-        stream.expect_token(Token::RParen)?;
+        let params = stream.parse_separated(TokenKind::Comma, TokenKind::RParen)?;
 
         let mut ret_type = None;
         if stream.peek()? == Token::ThinArrow {
@@ -823,8 +808,7 @@ impl Parse for Struct {
         stream.expect_token(Token::Struct)?;
         let ident = stream.parse()?;
         stream.expect_token(Token::LBrace)?;
-        let fields = stream.parse_separated_ident_types(TokenKind::RBrace)?;
-        stream.expect_token(Token::RBrace)?;
+        let fields = stream.parse_separated(TokenKind::Comma, TokenKind::RBrace)?;
         Ok(Struct { ident, fields })
     }
 }
@@ -949,5 +933,14 @@ impl Parse for ImplBlock {
 impl Parse for ImplSig {
     fn parse(stream: &mut Parser) -> Result<Self> {
         Spanned::<ExplicitType>::parse(stream).map(Self::Inherent)
+    }
+}
+
+impl Parse for Param {
+    fn parse(stream: &mut Parser) -> Result<Self> {
+        let ident = stream.parse()?;
+        stream.expect_token(Token::Colon)?;
+        let expl_ty = stream.parse()?;
+        Ok(Self { ident, expl_ty })
     }
 }

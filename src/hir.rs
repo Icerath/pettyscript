@@ -374,9 +374,9 @@ impl Lowering<'_> {
 
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
         let mut fields = BTreeMap::new();
-        for (field_id, (field, expl_ty)) in struct_.fields.iter().enumerate() {
-            let ty = self.load_explicit_type(expl_ty)?;
-            fields.insert(**field, (field_id as u32, ty));
+        for (field_id, param) in struct_.fields.iter().enumerate() {
+            let ty = self.load_explicit_type(&param.expl_ty)?;
+            fields.insert(*param.ident, (field_id as u32, ty));
         }
         let fields = Rc::new(fields);
         let ty = Ty::Con(TyCon {
@@ -427,9 +427,9 @@ impl Lowering<'_> {
             for_loops: 0,
         });
         let mut params = vec![];
-        for (ident, expl_typ) in &func.params {
-            let ty = self.load_explicit_type(expl_typ)?;
-            let ident = self.insert_scope(ident, ty).unwrap();
+        for param in &func.params {
+            let ty = self.load_explicit_type(&param.expl_ty)?;
+            let ident = self.insert_scope(&param.ident, ty).unwrap();
             params.push(ident);
         }
         let fn_params = params.clone();
