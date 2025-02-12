@@ -1,5 +1,7 @@
 #![expect(unsafe_op_in_unsafe_fn, reason = "I'm lazy")]
 
+mod variable_stack;
+
 use core::fmt;
 use std::{
     cell::RefCell,
@@ -11,6 +13,8 @@ use std::{
     ops::Deref,
     rc::Rc,
 };
+
+use variable_stack::VariableStack;
 
 use crate::{
     builtints::{Builtin, MethodBuiltin},
@@ -105,7 +109,7 @@ struct VirtualMachine<'src, 'io> {
     head: usize,
     stack: Vec<Value<'src>>,
     call_stack: Vec<usize>,
-    variable_stacks: Vec<Box<[Value<'src>]>>,
+    variable_stacks: VariableStack<'src>,
     stdout: &'io mut dyn Write,
 }
 
@@ -163,12 +167,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
         let stack = vec![];
         let call_stack = vec![];
 
+        let mut variable_stacks = VariableStack::default();
         let global_scope = Builtin::ALL
             .map(|b| Value::Callable(Callable::Builtin(b)))
             .into_iter()
-            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Bool(false)))
-            .collect();
-        let variable_stacks: Vec<Box<[Value<'src>]>> = vec![global_scope];
+            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Bool(false)));
+        variable_stacks.extend_new(global_scope);
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
@@ -212,19 +216,18 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     self.stack.extend_from_slice(&arr.borrow());
                 }
                 Instr::LoadGlobal(offset) => {
-                    unsafe { assert_unchecked(!self.variable_stacks.is_empty()) };
-                    let stack = &self.variable_stacks[0];
+                    let stack = self.variable_stacks.first();
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
                     self.stack.push(stack[offset as usize].clone());
                 }
                 Instr::Load(offset) => {
-                    let stack = self.variable_stacks.last().unwrap_unchecked();
+                    let stack = self.variable_stacks.last();
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
                     self.stack.push(stack[offset as usize].clone());
                 }
                 Instr::Store(offset) => {
                     let offset = offset as usize;
-                    let variable_stack = self.variable_stacks.last_mut().unwrap_unchecked();
+                    let variable_stack = self.variable_stacks.last();
                     unsafe { assert_unchecked(offset < variable_stack.len()) };
                     variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
                 }
@@ -308,7 +311,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                         },
                         Callable::Function { label, stack_size } => {
                             self.variable_stacks
-                                .push((0..stack_size).map(|_| Value::Bool(false)).collect());
+                                .extend_new((0..stack_size).map(|_| Value::Bool(false)));
                             let here = self.head;
                             self.call_stack.push(here);
                             self.head = label as usize;
@@ -351,7 +354,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 }
                 Instr::Ret => {
                     self.head = self.call_stack.pop().unwrap();
-                    self.variable_stacks.pop().unwrap();
+                    self.variable_stacks.pop();
                 }
                 Instr::StoreField(field) => {
                     let value = self.pop_stack();
