@@ -148,7 +148,7 @@ pub struct Lowering<'src> {
 }
 
 pub struct EnumData {
-    array_str_ident: Ident,
+    name_map: Ident,
     variants: Rc<BTreeMap<&'static str, u16>>,
 }
 
@@ -410,8 +410,7 @@ impl Lowering<'_> {
         }
         let variants = Rc::new(variants);
         let name_map = self.create_enum_name_map(enum_, out);
-        self.enums
-            .insert(enum_id, EnumData { array_str_ident: name_map, variants: variants.clone() });
+        self.enums.insert(enum_id, EnumData { name_map, variants: variants.clone() });
 
         let ty = Ty::Con(TyCon {
             kind: TyKind::Enum { id: enum_id, name: &enum_.ident, variants },
@@ -594,7 +593,7 @@ impl Lowering<'_> {
     }
 
     fn enum_variant_str(&mut self, expr: Expr, id: u32) -> Expr {
-        let ident = self.enums[&id].array_str_ident.clone();
+        let ident = self.enums[&id].name_map.clone();
         let index = Expr {
             ty: Ty::int(),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
