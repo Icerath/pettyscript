@@ -381,27 +381,27 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     };
                     self.stack.push(value);
                 }
-                Instr::Index => {
-                    let rhs = self.pop_stack();
-                    let lhs = self.pop_stack();
-                    let value = match lhs {
-                        Value::String(str) => match rhs {
-                            Value::Int(index) => {
-                                Value::Char(str.chars().nth(index as usize).unwrap())
-                            }
-                            Value::RangeInclusive(_) => todo!(),
-                            Value::Range([start, end]) => Value::String(PettyStr::String(Rc::new(
-                                str[start as usize..end as usize].into(),
-                            ))),
-                            _ => panic!("{rhs:?}"),
-                        },
-                        Value::Array(arr) => {
-                            let Value::Int(rhs) = rhs else { unreachable_unchecked() };
-                            arr.borrow()[rhs as usize].clone()
-                        }
-                        _ => todo!("{lhs:?}"),
+                Instr::ArrayIndex => {
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_arr();
+                    self.stack.push(lhs.borrow()[rhs as usize].clone());
+                }
+                Instr::StringIndex => {
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_str();
+                    // TODO: Better string api.
+                    self.stack.push(Value::Char(lhs.chars().nth(rhs as usize).unwrap()));
+                }
+                Instr::StringSliceRange => {
+                    let Value::Range([start, end]) = self.pop_stack() else {
+                        unreachable_unchecked()
                     };
-                    self.stack.push(value);
+                    let range = start as usize..end as usize;
+                    let str = match self.pop_str() {
+                        PettyStr::Literal(str) => PettyStr::Literal(&str[range]),
+                        PettyStr::String(str) => PettyStr::String(Rc::new(str[range].into())),
+                    };
+                    self.stack.push(Value::String(str));
                 }
                 Instr::Not => {
                     let bool = self.pop_bool();

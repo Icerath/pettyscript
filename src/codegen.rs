@@ -307,7 +307,19 @@ impl Codegen {
     fn index(&mut self, expr: &Expr, index: &Expr) -> Result<()> {
         self.expr(expr)?;
         self.expr(index)?;
-        self.builder.insert(Instr::Index);
+        let ty = self.ty(&expr.ty).kind;
+        let index = self.ty(&index.ty).kind;
+        if ty == TyKind::str() {
+            if index == TyKind::int() {
+                self.builder.insert(Instr::StringIndex);
+            } else if index == TyKind::range() {
+                self.builder.insert(Instr::StringSliceRange);
+            } else {
+                panic!()
+            }
+        } else if let TyKind::Named("array") = ty {
+            self.builder.insert(Instr::ArrayIndex);
+        }
         Ok(())
     }
 
