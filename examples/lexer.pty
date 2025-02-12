@@ -89,6 +89,9 @@ const SYMBOLS = #{
 };
 
 impl Lexer {
+    fn new(str: str) -> self {
+        return Lexer { str, remaining: str };
+    }
     fn skip_whitespace(self: self) {
         self.remaining = self.remaining.trim();
     }
@@ -162,7 +165,7 @@ impl Lexer {
 
 fn main() {
     let str = read_file("examples/fizzbuzz.pty").trim();
-    let lexer = Lexer { str, remaining: str };
+    let lexer = Lexer:new(str);
     while lexer.remaining != "" {
         lexer.skip_whitespace();
         println(f"{lexer.next()}");

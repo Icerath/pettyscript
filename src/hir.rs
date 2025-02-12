@@ -137,7 +137,7 @@ pub struct Fstr {
 }
 
 pub struct Lowering<'src> {
-    named_types: FxHashMap<Path, Ty>,
+    named_types: FxHashMap<&'static str, Ty>,
     structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
     enums_: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
@@ -149,6 +149,7 @@ pub struct Lowering<'src> {
 
 pub struct EnumData {
     array_str_ident: Ident,
+    variants: Rc<BTreeMap<&'static str, u16>>,
 }
 
 pub struct ImplBlock {
@@ -172,7 +173,7 @@ impl<'src> Lowering<'src> {
         let builtin_names = ["int", "char", "bool", "str", "null", "array", "map", "tuple"];
         for name in builtin_names {
             named_types.insert(
-                Path::one(name),
+                name,
                 Ty::Con(TyCon { kind: TyKind::Named(name), generics: generics.clone() }),
             );
         }
@@ -392,7 +393,7 @@ impl Lowering<'_> {
         }
         let fields = Rc::new(fields);
         let ty = Ty::Con(TyCon { kind: TyKind::Struct { fields }, generics: Rc::new([]) });
-        let prev = self.named_types.insert(Path::one(&struct_.ident), ty);
+        let prev = self.named_types.insert(&struct_.ident, ty);
         assert!(prev.is_none());
         _ = out;
         Ok(())
@@ -402,15 +403,16 @@ impl Lowering<'_> {
         static ENUM_ID: AtomicU32 = AtomicU32::new(0);
         let enum_id = ENUM_ID.fetch_add(1, Ordering::Relaxed);
 
-        let name_map = self.create_enum_name_map(enum_, out);
-        self.enums_.insert(enum_id, EnumData { array_str_ident: name_map });
-
         let mut variants = BTreeMap::<&str, _>::new();
         assert!(enum_.variants.len() < u16::MAX as usize);
         for (offset, field) in (0u16..).zip(&enum_.variants) {
             variants.insert(field, offset);
         }
         let variants = Rc::new(variants);
+        let name_map = self.create_enum_name_map(enum_, out);
+        self.enums_
+            .insert(enum_id, EnumData { array_str_ident: name_map, variants: variants.clone() });
+
         let ty = Ty::Con(TyCon {
             kind: TyKind::Enum { id: enum_id, name: &enum_.ident, variants },
             generics: Rc::new([]),
@@ -419,7 +421,7 @@ impl Lowering<'_> {
 
         let prev = self
             .named_types
-            .insert(Path::one(&enum_.ident), Ty::Con(TyCon::from(TyKind::Variant { id: enum_id })));
+            .insert(&enum_.ident, Ty::Con(TyCon::from(TyKind::Variant { id: enum_id })));
         assert!(prev.is_none());
         _ = out;
         Ok(())
@@ -443,7 +445,6 @@ impl Lowering<'_> {
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
         let fn_var = TyVar::uniq();
         let ident = self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap();
-
         let ret = if let Some(ret_ty) = &func.ret_type {
             self.load_explicit_type(ret_ty)?
         } else {
@@ -513,11 +514,8 @@ impl Lowering<'_> {
         } else if expl_ty.is_self() {
             return Ok(self.impl_block.as_ref().unwrap().ty.clone());
         }
-        let ty = self
-            .named_types
-            .get(&Path::one(&expl_ty.ident))
-            .unwrap_or_else(|| panic!("{expl_ty:?}"))
-            .clone();
+        let ty =
+            self.named_types.get(*expl_ty.ident).unwrap_or_else(|| panic!("{expl_ty:?}")).clone();
         let Ty::Con(tycon) = ty else { panic!() };
         Ok(Ty::Con(TyCon {
             kind: tycon.kind,
@@ -546,22 +544,24 @@ impl Lowering<'_> {
 
     fn load_path(&mut self, path: &Path) -> Result<Expr> {
         let mut segments = path.segments.iter();
-        let root = self
-            .load_var(segments.next().expect("Paths should always be >= length 1"))
-            .unwrap_or_else(|| panic!("{path:?}"));
+        let root = segments.next().expect("Paths should always be >= length 1");
         if path.segments.len() == 1 {
+            let root = self.load_var(root).unwrap_or_else(|| panic!("{path:?}"));
             return Ok(Expr::ident(root));
         }
-        let next = &path.segments[1];
-        let Ty::Con(ty) = root.ty.sub(&self.subs) else { panic!() };
-        if let TyKind::Enum { id, ref variants, .. } = ty.kind {
-            let variant = *variants.get(next).unwrap();
+        let root = self.named_types.get(root).unwrap();
+        let next = segments.next().unwrap();
+        let Ty::Con(ty) = root.sub(&self.subs) else { panic!() };
+        if let TyKind::Variant { id } = ty.kind {
+            let enum_ = self.enums_.get(&id).unwrap();
+            let variant = *enum_.variants.get(next).unwrap();
             Ok(Expr {
                 ty: Ty::Con(TyCon::from(TyKind::Variant { id })),
                 kind: ExprKind::EnumVariant { tag: variant },
             })
         } else {
-            panic!()
+            let method = self.methods.get(&(ty, next)).unwrap().clone();
+            Ok(Expr::ident(method))
         }
     }
 
@@ -839,7 +839,10 @@ impl Lowering<'_> {
     }
 
     fn init_struct(&mut self, path: &Path, init_fields: &[StructInitField]) -> Result<Expr> {
-        let Ty::Con(tycon) = self.named_types.get(path).unwrap().clone() else { panic!() };
+        assert!(path.segments.len() == 1);
+        let Ty::Con(tycon) = self.named_types.get(&path.segments[0]).unwrap().clone() else {
+            panic!()
+        };
         let TyKind::Struct { fields, .. } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {

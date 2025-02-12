@@ -20,12 +20,6 @@ pub struct Path {
     pub segments: Box<[Ident]>,
 }
 
-impl Path {
-    pub fn one(ident: &'static str) -> Self {
-        Self { segments: Box::new([ident]) }
-    }
-}
-
 #[derive(Debug)]
 pub enum Stmt {
     ImplBlock(ImplBlock),
