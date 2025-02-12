@@ -84,7 +84,7 @@ impl TyVar {
         Self(COUNTER.fetch_add(1, Ordering::Relaxed))
     }
 
-    pub fn occurs_in(&self, ty: &Ty, subs: &Substitutions) -> bool {
+    pub fn occurs_in(self, ty: &Ty, subs: &Substitutions) -> bool {
         match ty {
             Ty::Var(v @ TyVar(i)) => {
                 if let Some(sub) = subs.get(v) {

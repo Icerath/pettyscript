@@ -283,7 +283,7 @@ impl Lowering<'_> {
         self.scope().for_loops += 1;
         let iter = self.expr(&for_loop.iter)?;
         let Ty::Con(iter_typ) = iter.ty.sub(&self.subs) else { panic!() };
-        let item_ty = self.iter_item_ty(&iter_typ);
+        let item_ty = Self::iter_item_ty(&iter_typ);
 
         let iter_ident = self.insert_scope(&for_loop.ident, item_ty);
         let body = self.block(&for_loop.body.stmts)?;
@@ -314,11 +314,10 @@ impl Lowering<'_> {
         Ok(())
     }
 
-    fn iter_item_ty(&mut self, iter: &TyCon) -> Ty {
+    fn iter_item_ty(iter: &TyCon) -> Ty {
         // FIXME: .............
         match iter.kind {
-            TyKind::Named("range") => Ty::int(),
-            TyKind::Named("range_inclusive") => Ty::int(),
+            TyKind::Named("range_inclusive" | "range") => Ty::int(),
             _ => panic!("{iter:?}"),
         }
     }
@@ -341,13 +340,12 @@ impl Lowering<'_> {
 
         let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
         unify(&expr.ty, &ty, &mut self.subs);
-        let item = match *ident {
-            "_" => Item::Expr(expr),
-            _ => {
-                let segments = vec![];
-                let ident = self.insert_scope(ident, ty).unwrap();
-                Item::Assign(Assign { root: ident, segments, expr })
-            }
+        let item = if *ident == "_" {
+            Item::Expr(expr)
+        } else {
+            let segments = vec![];
+            let ident = self.insert_scope(ident, ty).unwrap();
+            Item::Assign(Assign { root: ident, segments, expr })
         };
         out.push(item);
         Ok(())
@@ -518,7 +516,7 @@ impl Lowering<'_> {
         let ty = self
             .named_types
             .get(&Path::one(&expl_ty.ident))
-            .unwrap_or_else(|| panic!("{:?}", expl_ty))
+            .unwrap_or_else(|| panic!("{expl_ty:?}"))
             .clone();
         let Ty::Con(tycon) = ty else { panic!() };
         Ok(Ty::Con(TyCon {
@@ -556,15 +554,14 @@ impl Lowering<'_> {
         }
         let next = &path.segments[1];
         let Ty::Con(ty) = root.ty.sub(&self.subs) else { panic!() };
-        match ty.kind {
-            TyKind::Enum { id, ref variants, .. } => {
-                let variant = *variants.get(next).unwrap();
-                Ok(Expr {
-                    ty: Ty::Con(TyCon::from(TyKind::Variant { id })),
-                    kind: ExprKind::EnumVariant { tag: variant },
-                })
-            }
-            _ => panic!(),
+        if let TyKind::Enum { id, ref variants, .. } = ty.kind {
+            let variant = *variants.get(next).unwrap();
+            Ok(Expr {
+                ty: Ty::Con(TyCon::from(TyKind::Variant { id })),
+                kind: ExprKind::EnumVariant { tag: variant },
+            })
+        } else {
+            panic!()
         }
     }
 
@@ -588,7 +585,7 @@ impl Lowering<'_> {
 
             let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
             if let TyKind::Variant { id } = &tycon.kind {
-                expr = self.enum_variant_str(expr, id);
+                expr = self.enum_variant_str(expr, *id);
             }
             segments.push((*str, expr));
         }
@@ -596,8 +593,8 @@ impl Lowering<'_> {
         Ok(Expr { ty: Ty::str(), kind: ExprKind::Fstr(Fstr { segments, remaining }) })
     }
 
-    fn enum_variant_str(&mut self, expr: Expr, id: &u32) -> Expr {
-        let ident = self.enums_[id].array_str_ident.clone();
+    fn enum_variant_str(&mut self, expr: Expr, id: u32) -> Expr {
+        let ident = self.enums_[&id].array_str_ident.clone();
         let index = Expr {
             ty: Ty::int(),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
@@ -773,12 +770,10 @@ impl Lowering<'_> {
         })
     }
 
+    #[expect(clippy::match_same_arms)]
     fn method_params(&mut self, ty: &Ty, method: &'static str) -> Option<Rc<[Ty]>> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
-        let name = match tycon.kind {
-            TyKind::Named(name) => name,
-            _ => return None,
-        };
+        let TyKind::Named(name) = tycon.kind else { return None };
         Some(match name {
             "int" => match method {
                 "abs" => Rc::new([Ty::int()]),
@@ -815,7 +810,7 @@ impl Lowering<'_> {
                 _ => return None,
             },
 
-            _ => panic!("type `{:?}` does not contain method `{method}`", tycon),
+            _ => panic!("type `{tycon:?}` does not contain method `{method}`"),
         })
     }
 

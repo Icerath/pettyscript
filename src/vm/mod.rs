@@ -172,6 +172,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
 
+    #[expect(clippy::too_many_lines)]
     unsafe fn execute(&mut self) -> io::Result<()> {
         while self.head < self.instructions.len() {
             let op = Instr::bc_read_unchecked(&self.instructions[self.head..]);
@@ -200,7 +201,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                         let key = self.pop_stack();
                         map.insert(key, value);
                     }
-                    self.stack.push(Value::Map(Rc::new(RefCell::new(map))))
+                    self.stack.push(Value::Map(Rc::new(RefCell::new(map))));
                 }
                 Instr::CreateArray { size } => {
                     let arr = self.stack.drain((self.stack.len() - size as usize)..).collect();
@@ -219,7 +220,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 Instr::Load(offset) => {
                     let stack = self.variable_stacks.last().unwrap_unchecked();
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
-                    self.stack.push(stack[offset as usize].clone())
+                    self.stack.push(stack[offset as usize].clone());
                 }
                 Instr::Store(offset) => {
                     let offset = offset as usize;
@@ -326,15 +327,15 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 }
                 Instr::Greater => {
                     let is_greater = self.cmp() == Ordering::Greater;
-                    self.stack.push(Value::Bool(is_greater))
+                    self.stack.push(Value::Bool(is_greater));
                 }
                 Instr::Less => {
                     let is_greater = self.cmp() == Ordering::Less;
-                    self.stack.push(Value::Bool(is_greater))
+                    self.stack.push(Value::Bool(is_greater));
                 }
                 Instr::Eq => {
                     let is_greater = self.cmp() == Ordering::Equal;
-                    self.stack.push(Value::Bool(is_greater))
+                    self.stack.push(Value::Bool(is_greater));
                 }
                 Instr::AddInt => {
                     let Value::Int(lhs) = self.pop_stack() else { unreachable_unchecked() };
@@ -346,7 +347,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     self.stack.push(Value::Callable(Callable::Function {
                         label: self.head as u32 + 5 + 5,
                         stack_size,
-                    }))
+                    }));
                 }
                 Instr::Ret => {
                     self.head = self.call_stack.pop().unwrap();
@@ -364,7 +365,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     let fields: Box<[Value]> =
                         std::iter::repeat_with(|| Value::Bool(false)).take(size as usize).collect();
                     let fields = Rc::new(RefCell::new(fields));
-                    self.stack.push(Value::Struct { fields })
+                    self.stack.push(Value::Struct { fields });
                 }
                 Instr::CallBuiltinMethod(method) => self.call_builtin_method(method),
                 Instr::LoadField(field) => {
@@ -382,7 +383,9 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     let lhs = self.pop_stack();
                     let value = match lhs {
                         Value::String(str) => match rhs {
-                            Value::Int(x) => Value::Char(str.chars().nth(x as usize).unwrap()),
+                            Value::Int(index) => {
+                                Value::Char(str.chars().nth(index as usize).unwrap())
+                            }
                             Value::RangeInclusive(_) => todo!(),
                             Value::Range([start, end]) => Value::String(PettyStr::String(Rc::new(
                                 str[start as usize..end as usize].into(),
@@ -549,10 +552,8 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
-            Value::Range([start, end]) => write!(f, "{}..{}", start, end),
-            Value::RangeInclusive([start, end]) => {
-                write!(f, "{}..={}", start, end)
-            }
+            Value::Range([start, end]) => write!(f, "{start}..{end}"),
+            Value::RangeInclusive([start, end]) => write!(f, "{start}..={end}"),
             Value::String(str) => write!(f, "{}", &str.as_str()),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();

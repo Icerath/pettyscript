@@ -72,12 +72,9 @@ macro_rules! test_fails {
         #[should_panic]
         fn $name() {
             let src = concat!($src, ";");
-            let ast = match parse(src) {
-                Ok(ast) => ast,
-                Err(_) => {
-                    eprintln!("Failed to parse");
-                    return;
-                }
+            let Ok(ast) = parse(src) else {
+                eprintln!("Failed to parse");
+                return;
             };
             let mut hir = crate::hir::Lowering::new(src);
             let block = hir.block(&ast).unwrap();

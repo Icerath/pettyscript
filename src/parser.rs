@@ -441,7 +441,7 @@ impl<'a> Parser<'a> {
             let expr = self.parse_root_expr()?;
             values.push(expr);
             if self.peek()? == Token::Comma {
-                self.skip()
+                self.skip();
             }
         }
         self.skip();
@@ -472,10 +472,7 @@ impl<'a> Parser<'a> {
             entries.push([key, value]);
             match self.peek()? {
                 Token::RBrace => break,
-                Token::Comma => {
-                    self.skip();
-                    continue;
-                }
+                Token::Comma => self.skip(),
                 got => {
                     return Err(
                         self.expect_failed(got.kind(), &[TokenKind::RBrace, TokenKind::Comma])
@@ -493,7 +490,7 @@ impl<'a> Parser<'a> {
         Ok(Literal::Tuple(exprs))
     }
 
-    fn parse_fstring(&mut self, str: &str) -> Result<FString> {
+    fn parse_fstring(str: &str) -> Result<FString> {
         // FIXME: Better error and unicode.
         let mut i = 0;
         let mut section_start = 0;
@@ -628,7 +625,7 @@ impl<'a> Parser<'a> {
         let span = self.lexer.span();
         match self.lexer.next() {
             Some(Ok(tok)) => Ok(tok),
-            Some(Err(_)) => {
+            Some(Err(())) => {
                 let span = LabeledSpan::at_offset(span.end, "here");
                 Err(miette::miette!(labels = vec![span], "Lexer Error")
                     .with_source_code(self.src()))
@@ -890,7 +887,7 @@ impl Parse for Literal {
             Token::Int(int) => Literal::Int(int),
             Token::Char(char) => Literal::Char(char),
             Token::String(str) => Literal::String(str),
-            Token::FString(str) => return stream.parse_fstring(str).map(Literal::FString),
+            Token::FString(str) => return Parser::parse_fstring(str).map(Literal::FString),
             Token::True => Literal::Bool(true),
             Token::False => Literal::Bool(false),
             Token::Hash => match stream.peek()? {
@@ -936,7 +933,7 @@ impl Parse for ImplBlock {
         let mut generics: Box<[Spanned<Ident>]> = Box::new([]);
         if stream.peek()? == Token::LBracket {
             stream.skip();
-            generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?
+            generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
         }
         let sig = stream.parse()?;
         let body = stream.parse()?;

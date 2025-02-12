@@ -70,6 +70,7 @@ pub fn bc_write_derive(input: TokenStream) -> TokenStream {
 
     quote! {
         impl #ident {
+            #[allow(clippy::used_underscore_binding)]
             pub fn bc_write(&self, mut buf: &mut Vec<u8>) {
                 match self {
                     #match_stmt

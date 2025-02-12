@@ -54,7 +54,7 @@ impl Codegen {
                 }
                 Ok(())
             }
-            _ => todo!("{item:?}"),
+            Item::Block(_) => todo!("{item:?}"),
         }
     }
 
@@ -102,7 +102,7 @@ impl Codegen {
         for segment in segments {
             match segment {
                 AssignSegment::Field(field) => self.builder.insert(Instr::LoadField(*field)),
-                _ => todo!(),
+                AssignSegment::Index(_) => todo!(),
             }
         }
         self.expr(&assign.expr)?;
@@ -111,7 +111,7 @@ impl Codegen {
                 self.builder.insert(Instr::StoreField(*field));
                 self.builder.insert(Instr::Pop);
             }
-            _ => todo!(),
+            AssignSegment::Index(_) => todo!(),
         }
         Ok(())
     }
@@ -410,6 +410,7 @@ impl Codegen {
         }
     }
 
+    #[expect(clippy::match_same_arms)]
     fn store(&mut self, offset: Offset) {
         match offset {
             Offset::Local(offset) => self.builder.insert(Instr::Store(offset)),
