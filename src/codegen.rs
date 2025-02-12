@@ -230,7 +230,7 @@ impl Codegen {
             ExprKind::Tuple(tuple) => self.array(tuple)?,
             ExprKind::Array(arr) => self.array(arr)?,
             ExprKind::Map(map) => self.map(map)?,
-            ExprKind::Ident(ident) => self.load(ident.offset),
+            ExprKind::LoadIdent { offset } => self.load(*offset),
         }
         Ok(())
     }

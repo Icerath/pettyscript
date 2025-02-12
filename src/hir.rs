@@ -91,6 +91,12 @@ pub struct Expr {
     pub kind: ExprKind,
 }
 
+impl Expr {
+    pub fn ident(ident: Ident) -> Self {
+        Self { ty: ident.ty, kind: ExprKind::LoadIdent { offset: ident.offset } }
+    }
+}
+
 #[derive(Debug)]
 pub enum ExprKind {
     Unary { expr: Box<Expr>, op: UnaryOp },
@@ -104,7 +110,7 @@ pub enum ExprKind {
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Map(Vec<[Expr; 2]>),
-    Ident(Ident),
+    LoadIdent { offset: Offset },
     Bool(bool),
     Char(char),
     Int(i64),
@@ -546,7 +552,7 @@ impl Lowering<'_> {
             .load_var(segments.next().expect("Paths should always be >= length 1"))
             .unwrap_or_else(|| panic!("{path:?}"));
         if path.segments.len() == 1 {
-            return Ok(Expr { ty: root.ty.clone(), kind: ExprKind::Ident(root) });
+            return Ok(Expr::ident(root));
         }
         let next = &path.segments[1];
         let Ty::Con(ty) = root.ty.sub(&self.subs) else { panic!() };
@@ -592,14 +598,13 @@ impl Lowering<'_> {
 
     fn enum_variant_str(&mut self, expr: Expr, id: &u32) -> Expr {
         let ident = self.enums_[id].array_str_ident.clone();
-        let array = Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) };
         let index = Expr {
             ty: Ty::int(),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
         };
         Expr {
             ty: Ty::str(),
-            kind: ExprKind::Index { expr: Box::new(array), index: Box::new(index) },
+            kind: ExprKind::Index { expr: Box::new(Expr::ident(ident)), index: Box::new(index) },
         }
     }
 
@@ -764,10 +769,7 @@ impl Lowering<'_> {
 
         Ok(Expr {
             ty: ret.as_ref().clone(),
-            kind: ExprKind::FnCall {
-                expr: Box::new(Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) }),
-                args: new_args,
-            },
+            kind: ExprKind::FnCall { expr: Box::new(Expr::ident(ident)), args: new_args },
         })
     }
 
@@ -853,10 +855,7 @@ impl Lowering<'_> {
                     unify(ty, &expr.ty, &mut self.subs);
                     expr
                 }
-                None => Expr {
-                    ty: ty.clone(),
-                    kind: ExprKind::Ident(self.load_var(&init.ident).expect(&init.ident)),
-                },
+                None => Expr::ident(self.load_var(&init.ident).expect(&init.ident)),
             };
             new_fields.push((*field_offset, init_expr));
         }
