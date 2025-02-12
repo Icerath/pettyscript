@@ -863,19 +863,24 @@ impl Lowering<'_> {
 
 macro_rules! impl_ty_const {
     ($($name: ident),+) => {
-        $(pub fn $name() -> Ty {
-            thread_local! {
-                static CACHE: TyCon = TyCon { kind: TyKind::Named(stringify!($name)), generics: Rc::new([]) };
-            }
-            CACHE.with(|ty| Ty::Con(ty.clone()))
-        })+
-
+        impl Ty {
+            $(pub fn $name() -> Self {
+                thread_local! {
+                    static CACHE: TyCon = TyCon { kind: TyKind::Named(stringify!($name)), generics: Rc::new([]) };
+                }
+                CACHE.with(|ty| Ty::Con(ty.clone()))
+            })+
+        }
+        impl TyKind {
+            $(pub fn $name() -> Self {
+                TyKind::Named(stringify!($name))
+            })+
+        }
     };
 }
+impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
 
 impl Ty {
-    impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
-
     pub fn array(of: Ty) -> Ty {
         Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([of]) })
     }
