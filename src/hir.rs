@@ -139,7 +139,7 @@ pub struct Fstr {
 pub struct Lowering<'src> {
     named_types: FxHashMap<&'static str, Ty>,
     structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
-    enums_: FxHashMap<u32, EnumData>,
+    enums: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
@@ -202,7 +202,7 @@ impl<'src> Lowering<'src> {
             scopes: vec![scope],
             named_types,
             structs: HashMap::default(),
-            enums_: HashMap::default(),
+            enums: HashMap::default(),
             impl_block: None,
         }
     }
@@ -410,7 +410,7 @@ impl Lowering<'_> {
         }
         let variants = Rc::new(variants);
         let name_map = self.create_enum_name_map(enum_, out);
-        self.enums_
+        self.enums
             .insert(enum_id, EnumData { array_str_ident: name_map, variants: variants.clone() });
 
         let ty = Ty::Con(TyCon {
@@ -553,7 +553,7 @@ impl Lowering<'_> {
         let next = segments.next().unwrap();
         let Ty::Con(ty) = root.sub(&self.subs) else { panic!() };
         if let TyKind::Variant { id } = ty.kind {
-            let enum_ = self.enums_.get(&id).unwrap();
+            let enum_ = self.enums.get(&id).unwrap();
             let variant = *enum_.variants.get(next).unwrap();
             Ok(Expr {
                 ty: Ty::Con(TyCon::from(TyKind::Variant { id })),
@@ -594,7 +594,7 @@ impl Lowering<'_> {
     }
 
     fn enum_variant_str(&mut self, expr: Expr, id: u32) -> Expr {
-        let ident = self.enums_[&id].array_str_ident.clone();
+        let ident = self.enums[&id].array_str_ident.clone();
         let index = Expr {
             ty: Ty::int(),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
