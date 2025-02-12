@@ -721,21 +721,6 @@ impl Lowering<'_> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
         match tycon.kind {
             TyKind::Struct { fields, .. } => fields.get(field).unwrap().1.clone(),
-            TyKind::Enum { variants, id, .. } => {
-                assert!(
-                    variants.contains_key(field),
-                    "type `{ty:?}` does not contain field: {field:?}"
-                );
-                Ty::Con(TyCon::from(TyKind::Variant { id }))
-            }
-            TyKind::Named("array") => match field {
-                "len" => Ty::int(),
-                _ => todo!("{field:?}"),
-            },
-            TyKind::Named("str") => match field {
-                "len" => Ty::int(),
-                _ => todo!("{field:?}"),
-            },
             _ => todo!("type `{:?}` does not contain field: `{field}`", tycon.kind),
         }
     }
