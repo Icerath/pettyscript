@@ -15,6 +15,17 @@ pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {
 pub type Ident = &'static str;
 type Lexer<'a> = logos::Lexer<'a, Token>;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Path {
+    pub segments: Box<[Ident]>,
+}
+
+impl Path {
+    pub fn one(ident: &'static str) -> Self {
+        Self { segments: Box::new([ident]) }
+    }
+}
+
 #[derive(Debug)]
 pub enum Stmt {
     ImplBlock(ImplBlock),
@@ -135,10 +146,11 @@ pub enum Expr {
     FieldAccess { expr: Box<Expr>, field: Spanned<Ident> },
     MethodCall { expr: Box<Expr>, method: Spanned<Ident>, args: Box<[Spanned<Expr>]> },
     Literal(Spanned<Literal>),
+    Path(Path),
     Binary { op: BinOp, exprs: Box<[Expr; 2]> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     FnCall { function: Box<Expr>, args: Box<[Spanned<Expr>]> },
-    InitStruct { ident: Ident, fields: Box<[StructInitField]> },
+    InitStruct { path: Path, fields: Box<[StructInitField]> },
     Array(Box<[Expr]>),
 }
 
@@ -153,9 +165,8 @@ pub enum Literal {
     Bool(bool),
     Int(i64),
     Char(char),
-    String(Ident),
+    String(&'static str),
     FString(FString),
-    Ident(Ident),
     Map(Box<[[Expr; 2]]>),
     Tuple(Box<[Spanned<Expr>]>),
 }
@@ -355,14 +366,14 @@ impl<'a> Parser<'a> {
             return Ok(expr);
         }
         let Token::LBrace = self.peek()? else { return Ok(expr) };
-        let Expr::Literal(Spanned { inner: Literal::Ident(ident), .. }) = expr else {
+        let Expr::Path(path) = expr else {
             // This is actually an error, but it is better handled later.
             return Ok(expr);
         };
-        self.parse_struct_init(ident)
+        self.parse_struct_init(path)
     }
 
-    fn parse_struct_init(&mut self, ident: Ident) -> Result<Expr> {
+    fn parse_struct_init(&mut self, path: Path) -> Result<Expr> {
         self.expect_token(Token::LBrace)?;
         let mut fields = vec![];
         while self.peek()? != Token::RBrace {
@@ -398,7 +409,7 @@ impl<'a> Parser<'a> {
             fields.push(StructInitField { ident, expr });
         }
         self.skip();
-        Ok(Expr::InitStruct { ident, fields: fields.into() })
+        Ok(Expr::InitStruct { path, fields: fields.into() })
     }
 
     fn parse_unary_expr(&mut self, allow_struct_init: bool) -> Result<Expr> {
@@ -443,6 +454,9 @@ impl<'a> Parser<'a> {
             let expr = self.parse_root_expr()?;
             self.expect_token(Token::RParen)?;
             return Ok(expr);
+        }
+        if self.peek()?.kind() == TokenKind::Ident {
+            return self.parse().map(Expr::Path);
         }
         Spanned::<Literal>::parse(self).map(Expr::Literal)
     }
@@ -875,7 +889,6 @@ impl Parse for Literal {
         Ok(match stream.bump()? {
             Token::Int(int) => Literal::Int(int),
             Token::Char(char) => Literal::Char(char),
-            Token::Ident(ident) => Literal::Ident(ident),
             Token::String(str) => Literal::String(str),
             Token::FString(str) => return stream.parse_fstring(str).map(Literal::FString),
             Token::True => Literal::Bool(true),
@@ -943,5 +956,16 @@ impl Parse for Param {
         stream.expect_token(Token::Colon)?;
         let expl_ty = stream.parse()?;
         Ok(Self { ident, expl_ty })
+    }
+}
+
+impl Parse for Path {
+    fn parse(stream: &mut Parser) -> Result<Self> {
+        let mut segments = vec![stream.parse()?];
+        while stream.peek()? == Token::Colon {
+            stream.skip();
+            segments.push(stream.parse()?);
+        }
+        Ok(Self { segments: segments.into() })
     }
 }

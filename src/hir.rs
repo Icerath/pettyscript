@@ -13,8 +13,8 @@ use crate::{
     builtints::Builtin,
     intern::intern,
     parser::{
-        self as ast, BinOp, ExplicitType, ImplSig, Pat, Spanned, Stmt, StructInitField, UnaryOp,
-        VarDecl,
+        self as ast, BinOp, ExplicitType, ImplSig, Pat, Path, Spanned, Stmt, StructInitField,
+        UnaryOp, VarDecl,
     },
     typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
@@ -99,7 +99,8 @@ pub enum ExprKind {
     FieldAccess { expr: Box<Expr>, field: &'static str },
     MethodCall { expr: Box<Expr>, method: &'static str, args: Vec<Expr> },
     Index { expr: Box<Expr>, index: Box<Expr> },
-    StructInit { ident: &'static str, fields: Vec<(u32, Expr)> },
+    StructInit { fields: Vec<(u32, Expr)> },
+    EnumVariant { tag: u16 },
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Map(Vec<[Expr; 2]>),
@@ -130,7 +131,7 @@ pub struct Fstr {
 }
 
 pub struct Lowering<'src> {
-    named_types: FxHashMap<&'static str, Ty>,
+    named_types: FxHashMap<Path, Ty>,
     structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
     enums_: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
@@ -159,13 +160,13 @@ impl<'src> Lowering<'src> {
     pub fn new(src: &'src str) -> Self {
         let subs = Substitutions::new();
 
-        let mut named_types = FxHashMap::default();
+        let mut named_types = HashMap::default();
 
         let generics = Rc::new([]);
         let builtin_names = ["int", "char", "bool", "str", "null", "array", "map", "tuple"];
         for name in builtin_names {
             named_types.insert(
-                name,
+                Path::one(name),
                 Ty::Con(TyCon { kind: TyKind::Named(name), generics: generics.clone() }),
             );
         }
@@ -386,11 +387,8 @@ impl Lowering<'_> {
             fields.insert(*param.ident, (field_id as u32, ty));
         }
         let fields = Rc::new(fields);
-        let ty = Ty::Con(TyCon {
-            kind: TyKind::Struct { name: &struct_.ident, fields },
-            generics: Rc::new([]),
-        });
-        let prev = self.named_types.insert(&struct_.ident, ty);
+        let ty = Ty::Con(TyCon { kind: TyKind::Struct { fields }, generics: Rc::new([]) });
+        let prev = self.named_types.insert(Path::one(&struct_.ident), ty);
         assert!(prev.is_none());
         _ = out;
         Ok(())
@@ -417,7 +415,7 @@ impl Lowering<'_> {
 
         let prev = self
             .named_types
-            .insert(&enum_.ident, Ty::Con(TyCon::from(TyKind::Variant { id: enum_id })));
+            .insert(Path::one(&enum_.ident), Ty::Con(TyCon::from(TyKind::Variant { id: enum_id })));
         assert!(prev.is_none());
         _ = out;
         Ok(())
@@ -513,7 +511,7 @@ impl Lowering<'_> {
         }
         let ty = self
             .named_types
-            .get(&**expl_ty.ident)
+            .get(&Path::one(&expl_ty.ident))
             .unwrap_or_else(|| panic!("{:?}", expl_ty))
             .clone();
         let Ty::Con(tycon) = ty else { panic!() };
@@ -529,6 +527,7 @@ impl Lowering<'_> {
 
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         match expr {
+            ast::Expr::Path(path) => self.load_path(path),
             ast::Expr::Literal(literal) => self.literal(literal),
             ast::Expr::Unary { op, expr } => self.unary(*op, expr),
             ast::Expr::Binary { op, exprs } => self.binary(*op, &exprs[0], &exprs[1]),
@@ -537,7 +536,29 @@ impl Lowering<'_> {
             ast::Expr::FieldAccess { expr, field } => self.field_access(expr, field),
             ast::Expr::MethodCall { expr, method, args } => self.method_call(expr, method, args),
             ast::Expr::Index { expr, index } => self.index(expr, index),
-            ast::Expr::InitStruct { ident, fields } => self.init_struct(ident, fields),
+            ast::Expr::InitStruct { path, fields } => self.init_struct(path, fields),
+        }
+    }
+
+    fn load_path(&mut self, path: &Path) -> Result<Expr> {
+        let mut segments = path.segments.iter();
+        let root = self
+            .load_var(segments.next().expect("Paths should always be >= length 1"))
+            .unwrap_or_else(|| panic!("{path:?}"));
+        if path.segments.len() == 1 {
+            return Ok(Expr { ty: root.ty.clone(), kind: ExprKind::Ident(root) });
+        }
+        let next = &path.segments[1];
+        let Ty::Con(ty) = root.ty.sub(&self.subs) else { panic!() };
+        match ty.kind {
+            TyKind::Enum { id, ref variants, .. } => {
+                let variant = *variants.get(next).unwrap();
+                Ok(Expr {
+                    ty: Ty::Con(TyCon::from(TyKind::Variant { id })),
+                    kind: ExprKind::EnumVariant { tag: variant },
+                })
+            }
+            _ => panic!(),
         }
     }
 
@@ -548,10 +569,7 @@ impl Lowering<'_> {
             ast::Literal::Char(char) => Expr { ty: Ty::char(), kind: ExprKind::Char(*char) },
             ast::Literal::String(str) => Expr { ty: Ty::str(), kind: ExprKind::Str(str) },
             ast::Literal::FString(fstring) => self.fstr(fstring)?,
-            ast::Literal::Ident(ident) => {
-                let ident = self.load_var(ident).expect(ident);
-                Expr { ty: ident.ty.clone(), kind: ExprKind::Ident(ident) }
-            }
+
             ast::Literal::Map(map) => self.map(map)?,
             ast::Literal::Tuple(tuple) => self.tuple(tuple)?,
         })
@@ -590,9 +608,9 @@ impl Lowering<'_> {
     }
 
     fn load_var(&mut self, name: &'static str) -> Option<Ident> {
-        match self.scopes.last().unwrap().variables.get(name) {
+        match self.scopes.last().unwrap().variables.get(&name) {
             Some(ident) => Some(ident.clone()),
-            None => self.scopes.first().unwrap().variables.get(name).cloned(),
+            None => self.scopes.first().unwrap().variables.get(&name).cloned(),
         }
     }
 
@@ -838,12 +856,8 @@ impl Lowering<'_> {
         }
     }
 
-    fn init_struct(
-        &mut self,
-        ident: &'static str,
-        init_fields: &[StructInitField],
-    ) -> Result<Expr> {
-        let Ty::Con(tycon) = self.named_types.get(ident).unwrap().clone() else { panic!() };
+    fn init_struct(&mut self, path: &Path, init_fields: &[StructInitField]) -> Result<Expr> {
+        let Ty::Con(tycon) = self.named_types.get(path).unwrap().clone() else { panic!() };
         let TyKind::Struct { fields, .. } = tycon.kind else { panic!() };
         let mut new_fields = vec![];
         for init in init_fields {
@@ -861,9 +875,8 @@ impl Lowering<'_> {
             };
             new_fields.push((*field_offset, init_expr));
         }
-        let ty =
-            Ty::Con(TyCon { kind: TyKind::Struct { name: ident, fields }, generics: Rc::new([]) });
-        Ok(Expr { ty, kind: ExprKind::StructInit { ident, fields: new_fields } })
+        let ty = Ty::Con(TyCon { kind: TyKind::Struct { fields }, generics: Rc::new([]) });
+        Ok(Expr { ty, kind: ExprKind::StructInit { fields: new_fields } })
     }
 }
 

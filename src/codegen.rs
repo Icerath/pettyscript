@@ -211,8 +211,9 @@ impl Codegen {
 
     fn expr(&mut self, expr: &Expr) -> Result<()> {
         match &expr.kind {
-            ExprKind::StructInit { fields, .. } => self.struct_init(fields)?,
+            ExprKind::StructInit { fields } => self.struct_init(fields)?,
             ExprKind::FieldAccess { expr, field } => self.field_access(expr, field)?,
+            ExprKind::EnumVariant { tag } => self.builder.insert(Instr::LoadVariant { tag: *tag }),
             ExprKind::MethodCall { expr, method, args } => self.method_call(expr, method, args)?,
             ExprKind::FnCall { expr, args } => self.fn_call(expr, args)?,
             ExprKind::Index { expr, index } => self.index(expr, index)?,
@@ -246,10 +247,6 @@ impl Codegen {
     fn field_access(&mut self, expr: &Expr, field: &'static str) -> Result<()> {
         let ty = &expr.ty.sub(&self.subs);
         let Ty::Con(tycon) = ty else { panic!("Expected `struct` {ty:?}") };
-        if let TyKind::Enum { variants, .. } = &tycon.kind {
-            self.builder.insert(Instr::LoadVariant { tag: variants[field] });
-            return Ok(());
-        }
         let TyKind::Struct { fields, .. } = &tycon.kind else {
             panic!("Expected `struct` {tycon:?}")
         };
