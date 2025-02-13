@@ -1,9 +1,3 @@
-enum Order {
-    Less,
-    Eq,
-    Greater,
-}
-
 trait Add {
     fn add(self: self, other: self) -> self;
 }
@@ -22,6 +16,12 @@ trait Div {
 
 trait Mod {
     fn mod(self: self, other: self) -> self;
+}
+
+enum Order {
+    Less,
+    Eq,
+    Greater,
 }
 
 trait Ord {
