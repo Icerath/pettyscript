@@ -179,6 +179,7 @@ pub struct ImplBlock {
 pub struct FnScope {
     ret_var: Ty,
     variables: FxHashMap<&'static str, Ident>,
+    var_counter: usize,
     for_loops: usize,
 }
 
@@ -197,8 +198,12 @@ impl<'src> Lowering<'src> {
             );
         }
 
-        let mut scope =
-            FnScope { ret_var: Ty::null(), variables: FxHashMap::default(), for_loops: 0 };
+        let mut scope = FnScope {
+            ret_var: Ty::null(),
+            variables: FxHashMap::default(),
+            for_loops: 0,
+            var_counter: 0,
+        };
 
         for builtin in Builtin::ALL {
             let name = builtin.name();
@@ -235,7 +240,8 @@ impl FnScope {
         if name == "_" {
             return None;
         }
-        let offset = self.variables.len() as u32;
+        let offset = self.var_counter as u32;
+        self.var_counter += 1;
         let offset = if is_global { Offset::Global(offset) } else { Offset::Local(offset) };
         let ident = Ident { ty, offset };
         let prev = self.variables.insert(name, ident.clone());
@@ -552,7 +558,14 @@ impl Lowering<'_> {
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
         let fn_var = TyVar::uniq();
-        let ident = self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap();
+        let ident = if self.impl_block.is_none() {
+            self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap()
+        } else {
+            let offset = self.scopes[0].var_counter;
+            let ident = Ident { offset: Offset::Global(offset as u32), ty: Ty::Var(fn_var) };
+            self.scopes[0].var_counter += 1;
+            ident
+        };
         let ret = if let Some(ret_ty) = &func.ret_type {
             self.load_explicit_type(ret_ty)?
         } else {
@@ -561,6 +574,7 @@ impl Lowering<'_> {
         self.scopes.push(FnScope {
             ret_var: ret.clone(),
             variables: FxHashMap::default(),
+            var_counter: 0,
             for_loops: 0,
         });
         let mut params = vec![];
