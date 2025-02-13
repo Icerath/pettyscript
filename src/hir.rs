@@ -753,13 +753,28 @@ impl Lowering<'_> {
         let right = self.expr(right)?;
         unify(&left.ty, &right.ty, &mut self.subs);
         let ty = self.binary_op_out(op, &left.ty);
-
         Ok(Expr { ty, kind: ExprKind::Binary { exprs: Box::new([left, right]), op } })
     }
 
     fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
+        let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
+
+        macro_rules! ret {
+            ($method: literal) => {{
+                // TODO: Keep track of trait methods.
+                let fn_ty = &self.methods.get(&(tycon, $method)).unwrap().ty;
+                let Ty::Con(fn_tycon) = fn_ty.sub(&self.subs) else { panic!() };
+                let TyKind::Function { ret, .. } = &fn_tycon.kind else { panic!() };
+                ret.as_ref().clone()
+            }};
+        }
+
         match op {
-            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => ty.clone(),
+            BinOp::Add => ret!("add"),
+            BinOp::Sub => ret!("sub"),
+            BinOp::Mul => ret!("mul"),
+            BinOp::Div => ret!("div"),
+            BinOp::Mod => ret!("mod"),
             BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::bool(),
             BinOp::Range => {
                 unify(ty, &Ty::int(), &mut self.subs);

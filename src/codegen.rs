@@ -343,7 +343,6 @@ impl Codegen {
         }
         self.expr(lhs)?;
         self.expr(rhs)?;
-        assert_eq!(self.ty(&lhs.ty), self.ty(&rhs.ty));
 
         match op {
             BinOp::Add => self.builder.insert(Instr::AddInt),

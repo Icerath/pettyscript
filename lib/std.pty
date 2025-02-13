@@ -8,6 +8,22 @@ trait Add {
     fn add(self: self, other: self) -> self;
 }
 
+trait Sub {
+    fn sub(self: self, other: self) -> self;
+}
+
+trait Mul {
+    fn mul(self: self, other: self) -> self;
+}
+
+trait Div {
+    fn div(self: self, other: self) -> self;
+}
+
+trait Mod {
+    fn mod(self: self, other: self) -> self;
+}
+
 trait Ord {
     fn cmp(self: self, other: self) -> Order;
 }
@@ -15,6 +31,36 @@ trait Ord {
 impl int {
     fn abs(self: self) -> self {
         return self.abs();
+    }
+}
+
+impl Add for int {
+    fn add(self: self, other: self) -> self {
+        return self + other;
+    }
+}
+
+impl Sub for int {
+    fn sub(self: self, other: self) -> self {
+        return self - other;
+    }
+}
+
+impl Mul for int {
+    fn mul(self: self, other: self) -> self {
+        return self * other;
+    }
+}
+
+impl Div for int {
+    fn div(self: self, other: self) -> self {
+        return self / other;
+    }
+}
+
+impl Mod for int {
+    fn mod(self: self, other: self) -> self {
+        return self % other;
     }
 }
 
