@@ -179,26 +179,13 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                 Instr::RangeInclusive => {
                     let end = self.pop_int();
                     let start = self.pop_int();
-                    self.stack.push(Value::RangeInclusive([start, end]));
+                    self.stack.push(Value::Range([start, end + 1]));
                 }
                 Instr::IterRange => {
                     let Value::Range([start, end]) = self.last_stack_mut() else {
                         unreachable_unchecked()
                     };
                     if start < end {
-                        *start += 1;
-                        let start = *start - 1;
-                        self.stack.push(Value::Int(start));
-                        self.stack.push(Value::Bool(true));
-                    } else {
-                        self.stack.push(Value::Bool(false));
-                    }
-                }
-                Instr::IterRangeInclusive => {
-                    let Value::RangeInclusive([start, end]) = self.last_stack_mut() else {
-                        unreachable_unchecked()
-                    };
-                    if start <= end {
                         *start += 1;
                         let start = *start - 1;
                         self.stack.push(Value::Int(start));
@@ -488,7 +475,6 @@ impl fmt::Display for DisplayValue<'_, '_> {
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
             Value::Range([start, end]) => write!(f, "{start}..{end}"),
-            Value::RangeInclusive([start, end]) => write!(f, "{start}..={end}"),
             Value::String(str) => write!(f, "{}", &str.as_str()),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();

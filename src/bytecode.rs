@@ -54,7 +54,6 @@ pub enum Instr {
     Pop,
     Dup,
     IterRange,
-    IterRangeInclusive,
 }
 
 trait BcRead: Sized {

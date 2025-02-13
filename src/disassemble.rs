@@ -48,7 +48,6 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::CreateStruct { size } => println!("EMPTY_STRUCT {size}"),
             Instr::FnCall => println!("FN_CALL"),
             Instr::IterRange => println!("ITER_RANGE"),
-            Instr::IterRangeInclusive => println!("ITER_RANGE_INCLUSIVE"),
             Instr::Load(ident) => println!("LOAD {ident}"),
             Instr::Store(ident) => println!("STORE {ident}"),
             Instr::LoadChar(char) => println!("LOAD_CHAR {char:?}"),

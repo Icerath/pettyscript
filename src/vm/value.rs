@@ -18,7 +18,6 @@ pub enum Value<'src> {
     Array(Rc<RefCell<Vec<Value<'src>>>>),
     Map(Rc<RefCell<PettyMap<'src>>>),
     Range([i64; 2]),
-    RangeInclusive([i64; 2]),
     Struct { fields: Rc<RefCell<Box<[Value<'src>]>>> },
 }
 

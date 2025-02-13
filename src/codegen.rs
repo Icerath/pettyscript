@@ -149,8 +149,7 @@ impl Codegen {
 
         self.builder.insert_label(start_label);
         let iter_op = match self.ty(&for_loop.iter.ty).kind {
-            TyKind::Named("range") => Instr::IterRange,
-            TyKind::Named("range_inclusive") => Instr::IterRangeInclusive,
+            TyKind::Named("range" | "range_inclusive") => Instr::IterRange,
             ty => panic!("{ty:?}"),
         };
         self.builder.insert(iter_op);
