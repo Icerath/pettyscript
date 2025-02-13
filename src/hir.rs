@@ -382,7 +382,9 @@ impl Lowering<'_> {
         assert!(self.impl_block.is_none());
         let ty = self.load_explicit_type(expl_ty)?;
         self.impl_block = Some(ImplBlock { ty });
-        impl_.body.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))
+        impl_.body.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))?;
+        self.impl_block = None;
+        Ok(())
     }
 
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
