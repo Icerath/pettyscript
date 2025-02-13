@@ -5,9 +5,7 @@ enum Order {
 }
 
 // trait Add {
-//     fn add(self: self, other: self) -> self {
-//         return self + other;
-//     }
+//     fn add(self: self, other: self) -> self;
 // }
 
 // trait Ord {

@@ -127,7 +127,7 @@ pub struct Function {
     pub generics: Box<[Spanned<Ident>]>,
     pub params: Box<[Param]>,
     pub ret_type: Option<Spanned<ExplicitType>>,
-    pub body: Spanned<Block>,
+    pub body: Option<Spanned<Block>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -792,7 +792,12 @@ impl Parse for Function {
             ret_type = Some(stream.parse()?);
         }
 
-        let body = stream.parse()?;
+        let body = if stream.peek()? == Token::Semicolon {
+            stream.skip();
+            None
+        } else {
+            Some(stream.parse()?)
+        };
         Ok(Function { ident, generics, params, ret_type, body })
     }
 }

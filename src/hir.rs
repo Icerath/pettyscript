@@ -469,7 +469,7 @@ impl Lowering<'_> {
         }
         let fn_params = params.clone();
 
-        let body = self.block(&func.body.stmts)?;
+        let body = self.block(&func.body.as_ref().unwrap().stmts)?;
         let last_scope = self.scopes.pop().unwrap();
         let stack_size = last_scope.variables.len();
 
