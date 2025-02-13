@@ -1,5 +1,3 @@
-use std::hint::unreachable_unchecked;
-
 use super::Value;
 
 macro_rules! ptr {
@@ -24,7 +22,7 @@ impl<'src> VariableStack<'src> {
     }
 
     pub unsafe fn pop(&mut self) {
-        self.inner.resize_with(ptr!(self), || unreachable_unchecked());
+        self.inner.truncate(ptr!(self));
         self.ptrs.pop().unwrap_unchecked();
     }
 
