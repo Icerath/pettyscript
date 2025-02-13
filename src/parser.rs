@@ -949,7 +949,12 @@ impl Parse for ImplBlock {
 
 impl Parse for ImplSig {
     fn parse(stream: &mut Parser) -> Result<Self> {
-        Spanned::<ExplicitType>::parse(stream).map(Self::Inherent)
+        let ident = Spanned::<ExplicitType>::parse(stream)?;
+        if stream.peek()? != Token::For {
+            return Ok(Self::Inherent(ident));
+        }
+        stream.skip();
+        Ok(Self::Trait([ident, stream.parse()?]))
     }
 }
 
