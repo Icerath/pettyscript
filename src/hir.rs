@@ -118,6 +118,23 @@ pub enum ExprKind {
     Fstr(Fstr),
 }
 
+#[derive(Debug)]
+struct Trait {
+    expected_functions: Vec<TraitFnSig>,
+}
+
+#[derive(Debug)]
+struct TraitFnSig {
+    params: Vec<ParamTy>,
+    ret: ParamTy,
+}
+
+#[derive(Debug)]
+enum ParamTy {
+    Ty(Ty),
+    Self_,
+}
+
 #[derive(Debug, Clone)]
 pub struct Ident {
     pub ty: Ty,
@@ -141,6 +158,7 @@ pub struct Lowering<'src> {
     structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
     enums: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
+    traits: FxHashMap<&'static str, Trait>,
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
@@ -199,6 +217,7 @@ impl<'src> Lowering<'src> {
             src,
             subs,
             methods: HashMap::default(),
+            traits: HashMap::default(),
             scopes: vec![scope],
             named_types,
             structs: HashMap::default(),
@@ -266,7 +285,33 @@ impl Lowering<'_> {
     }
 
     fn trait_(&mut self, trait_: &ast::Trait, out: &mut Vec<Item>) -> Result<()> {
-        todo!("{trait_:?}")
+        _ = out;
+        let mut expected_functions = vec![];
+
+        for stmt in &trait_.body.stmts {
+            match &**stmt {
+                Stmt::Function(func) => {
+                    assert!(func.generics.is_empty());
+                    assert!(func.body.is_none());
+                    let mut params = vec![];
+                    for param in &func.params {
+                        params.push(self.load_param_ty(&param.expl_ty)?);
+                    }
+                    let ret = match &func.ret_type {
+                        Some(ret) => self.load_param_ty(ret)?,
+                        None => ParamTy::Ty(Ty::null()),
+                    };
+                    expected_functions.push(TraitFnSig { params, ret });
+                }
+                _ => panic!("{stmt:?}"),
+            }
+        }
+        self.traits.insert(trait_.name, Trait { expected_functions });
+        Ok(())
+    }
+
+    fn load_param_ty(&self, ty: &Spanned<ExplicitType>) -> Result<ParamTy> {
+        if ty.is_self() { Ok(ParamTy::Self_) } else { self.load_explicit_type(ty).map(ParamTy::Ty) }
     }
 
     fn while_loop(&mut self, while_loop: &ast::WhileLoop, out: &mut Vec<Item>) -> Result<()> {

@@ -123,7 +123,6 @@ pub struct Enum {
 #[derive(Debug)]
 pub struct Function {
     pub ident: Spanned<Ident>,
-    #[expect(unused)]
     pub generics: Box<[Spanned<Ident>]>,
     pub params: Box<[Param]>,
     pub ret_type: Option<Spanned<ExplicitType>>,

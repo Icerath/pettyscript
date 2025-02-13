@@ -4,13 +4,13 @@ enum Order {
     Greater,
 }
 
-// trait Add {
-//     fn add(self: self, other: self) -> self;
-// }
+trait Add {
+    fn add(self: self, other: self) -> self;
+}
 
-// trait Ord {
-//     fn cmp(self: self, other: self) -> Order;
-// }
+trait Ord {
+    fn cmp(self: self, other: self) -> Order;
+}
 
 // impl Ord for int {
 //     fn cmp(self: self, other: self) -> Order {
