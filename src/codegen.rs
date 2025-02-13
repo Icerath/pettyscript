@@ -74,7 +74,7 @@ impl Codegen {
         self.builder.insert(Instr::Jump(function_end));
         self.builder.insert_label(function_start);
 
-        for param in &func.params {
+        for param in func.params.iter().rev() {
             self.store(param.offset);
         }
 
