@@ -12,14 +12,14 @@ trait Ord {
     fn cmp(self: self, other: self) -> Order;
 }
 
-// impl Ord for int {
-//     fn cmp(self: self, other: self) -> Order {
-//         if self < other {
-//             return Order:Less;
-//         } else if self > other {
-//             return Order:Greater;
-//         } else {
-//             return Order:Eq;
-//         }
-//     }
-// }
+impl Ord for int {
+    fn cmp(self: self, other: self) -> Order {
+        if self < other {
+            return Order:Less;
+        } else if self > other {
+            return Order:Greater;
+        } else {
+            return Order:Eq;
+        }
+    }
+}

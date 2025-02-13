@@ -1,13 +1,13 @@
 #![expect(dead_code)]
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
     sync::atomic::{AtomicU32, Ordering},
 };
 
 use miette::Result;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     builtints::Builtin,
@@ -118,13 +118,14 @@ pub enum ExprKind {
     Fstr(Fstr),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Trait {
-    expected_functions: Vec<TraitFnSig>,
+    expected_functions: Rc<[TraitFnSig]>,
 }
 
 #[derive(Debug)]
 struct TraitFnSig {
+    name: &'static str,
     params: Vec<ParamTy>,
     ret: ParamTy,
 }
@@ -159,6 +160,7 @@ pub struct Lowering<'src> {
     enums: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
     traits: FxHashMap<&'static str, Trait>,
+    trait_impls: FxHashSet<(TyCon, &'static str)>,
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
@@ -218,6 +220,7 @@ impl<'src> Lowering<'src> {
             subs,
             methods: HashMap::default(),
             traits: HashMap::default(),
+            trait_impls: HashSet::default(),
             scopes: vec![scope],
             named_types,
             structs: HashMap::default(),
@@ -301,12 +304,12 @@ impl Lowering<'_> {
                         Some(ret) => self.load_param_ty(ret)?,
                         None => ParamTy::Ty(Ty::null()),
                     };
-                    expected_functions.push(TraitFnSig { params, ret });
+                    expected_functions.push(TraitFnSig { name: *func.ident, params, ret });
                 }
                 _ => panic!("{stmt:?}"),
             }
         }
-        self.traits.insert(trait_.name, Trait { expected_functions });
+        self.traits.insert(trait_.name, Trait { expected_functions: expected_functions.into() });
         Ok(())
     }
 
@@ -428,11 +431,66 @@ impl Lowering<'_> {
     }
 
     fn impl_(&mut self, impl_: &ast::ImplBlock, out: &mut Vec<Item>) -> Result<()> {
-        let ImplSig::Inherent(expl_ty) = &*impl_.sig else { panic!() };
         assert!(self.impl_block.is_none());
+        match &*impl_.sig {
+            ImplSig::Inherent(sig) => self.inherent_impl(sig, &impl_.body, out),
+            ImplSig::Trait(sig) => self.trait_impl(sig, &impl_.body, out),
+        }
+    }
+
+    fn inherent_impl(
+        &mut self,
+        expl_ty: &Spanned<ExplicitType>,
+        body: &ast::Block,
+        out: &mut Vec<Item>,
+    ) -> Result<()> {
         let ty = self.load_explicit_type(expl_ty)?;
         self.impl_block = Some(ImplBlock { ty });
-        impl_.body.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))?;
+        body.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))?;
+        self.impl_block = None;
+        Ok(())
+    }
+
+    fn trait_impl(
+        &mut self,
+        [trait_, expl_ty]: &[Spanned<ExplicitType>; 2],
+        body: &ast::Block,
+        out: &mut Vec<Item>,
+    ) -> Result<()> {
+        let ty = self.load_explicit_type(expl_ty)?;
+        let Ty::Con(ty) = ty else { panic!() };
+        self.impl_block = Some(ImplBlock { ty: Ty::Con(ty.clone()) });
+
+        let trait_ident = *trait_.ident;
+        let trait_ = self.traits.get(trait_ident).unwrap().clone();
+        // TODO: Don't be dependant on order.
+        for (impl_item, stmt) in trait_.expected_functions.iter().zip(&body.stmts) {
+            let Stmt::Function(func) = &**stmt else { panic!() };
+            assert_eq!(impl_item.name, *func.ident);
+            for (expected, param) in impl_item.params.iter().zip(&func.params) {
+                let param_ty = self.load_explicit_type(&param.expl_ty)?;
+                let Ty::Con(param_ty) = param_ty else { panic!() };
+                let expected_ty = match expected {
+                    ParamTy::Self_ => &ty,
+                    ParamTy::Ty(Ty::Con(ty)) => ty,
+                    ParamTy::Ty(Ty::Var(..)) => panic!(),
+                };
+                assert_eq!(param_ty, *expected_ty);
+            }
+            let ret_ty = match &func.ret_type {
+                Some(expl_ty) => self.load_explicit_type(expl_ty)?,
+                None => Ty::null(),
+            };
+            let Ty::Con(ret_ty) = ret_ty else { panic!() };
+            let expected_ty = match &impl_item.ret {
+                ParamTy::Self_ => &ty,
+                ParamTy::Ty(Ty::Con(ty)) => ty,
+                ParamTy::Ty(Ty::Var(..)) => panic!(),
+            };
+            assert_eq!(ret_ty, *expected_ty);
+            self.function(func, out)?;
+        }
+        self.trait_impls.insert((ty, trait_ident));
         self.impl_block = None;
         Ok(())
     }

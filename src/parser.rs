@@ -57,7 +57,6 @@ pub struct ImplBlock {
 #[derive(Debug)]
 pub enum ImplSig {
     Inherent(Spanned<ExplicitType>),
-    #[expect(unused)]
     Trait([Spanned<ExplicitType>; 2]),
 }
 
