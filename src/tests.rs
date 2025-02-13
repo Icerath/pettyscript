@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{parser::parse, vm};
+use crate::{compile::compile, vm};
 
 fn exec_vm(bytecode: &[u8]) -> String {
     let mut output = vec![];
@@ -14,10 +14,7 @@ macros::generate_integration_tests! {}
 #[test]
 fn test_fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
-    let ast = parse(src).unwrap();
-    let mut hir = crate::hir::Lowering::new(src);
-    let block = hir.block(&ast).unwrap();
-    let code = crate::codegen::codegen(&block, hir.subs).unwrap();
+    let code = compile(src).unwrap();
     let result = exec_vm(&code);
 
     let expected: String = (1..=100)
@@ -40,10 +37,7 @@ fn test_lexer_example() {
     use crate::lexer::Token;
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
-    let ast = parse(src).unwrap();
-    let mut hir = crate::hir::Lowering::new(src);
-    let block = hir.block(&ast).unwrap();
-    let code = crate::codegen::codegen(&block, hir.subs).unwrap();
+    let code = compile(src).unwrap();
     let result = exec_vm(&code);
 
     let mut expected = String::new();
@@ -57,11 +51,8 @@ fn test_lexer_example() {
 macro_rules! test_expr {
     ($expr: literal, $expected: expr) => {{
         let src = concat!($expr, ";");
-        let ast = parse(src).unwrap();
-        let mut hir = crate::hir::Lowering::new(&src);
-        let block = hir.block(&ast).unwrap();
-        let bytecode = crate::codegen::codegen(&block, hir.subs).unwrap();
-        let output = exec_vm(&bytecode);
+        let code = compile(src).unwrap();
+        let output = exec_vm(&code);
         assert_eq!(output, $expected);
     }};
 }
@@ -71,14 +62,7 @@ macro_rules! test_fails {
         #[test]
         #[should_panic]
         fn $name() {
-            let src = concat!($src, ";");
-            let Ok(ast) = parse(src) else {
-                eprintln!("Failed to parse");
-                return;
-            };
-            let mut hir = crate::hir::Lowering::new(src);
-            let block = hir.block(&ast).unwrap();
-            crate::codegen::codegen(&block, hir.subs).unwrap();
+            compile(concat!($src, ";")).unwrap();
         }
     };
 }

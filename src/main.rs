@@ -4,6 +4,7 @@ mod disassemble;
 mod hir;
 // mod hir_codegen;
 mod codegen;
+mod compile;
 mod intern;
 mod lexer;
 mod parser;
@@ -16,7 +17,6 @@ use std::{path::PathBuf, time::Instant};
 
 use clap::Parser;
 use disassemble::disassemble;
-use parser::parse;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -33,10 +33,7 @@ fn main() -> miette::Result<()> {
     let args = Args::parse();
     let start = Instant::now();
     let src = std::fs::read_to_string(args.path).unwrap();
-    let ast = parse(&src)?;
-    let mut hir = hir::Lowering::new(&src);
-    let block = hir.block(&ast).unwrap();
-    let bytecode = codegen::codegen(&block, hir.subs)?;
+    let bytecode = compile::compile(&src)?;
 
     if args.verbose {
         println!("Compiled in {:?}", start.elapsed());

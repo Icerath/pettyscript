@@ -20,10 +20,7 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
             #[test]
             fn #test_name () {
                 let src = include_str!(#src);
-                let ast = parse(&src).unwrap();
-                let mut hir = crate::hir::Lowering::new(src);
-                let block = hir.block(&ast).unwrap();
-                let code = crate::codegen::codegen(&block, hir.subs).unwrap();
+                let code = crate::compile::compile(src).unwrap();
                 unsafe { vm::execute_bytecode(&code) };
             }
         });
