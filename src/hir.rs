@@ -26,7 +26,6 @@ pub enum Item {
     ForLoop(ForLoop),
     IfChain(IfChain),
     Expr(Expr),
-    Block(Block),
     Assign(Assign),
     Continue,
     Break,

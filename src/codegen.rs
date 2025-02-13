@@ -59,7 +59,6 @@ impl Codegen {
                 }
                 Ok(())
             }
-            Item::Block(_) => todo!("{item:?}"),
         }
     }
 
