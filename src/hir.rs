@@ -32,7 +32,6 @@ pub enum Item {
 
 #[derive(Debug)]
 pub struct Function {
-    pub name: &'static str,
     pub ident: Ident,
     pub params: Vec<Ident>,
     pub stack_size: usize,
@@ -159,6 +158,7 @@ pub struct Lowering<'src> {
     methods: FxHashMap<(TyCon, &'static str), Ident>,
     traits: FxHashMap<&'static str, Trait>,
     trait_impls: FxHashSet<(TyCon, &'static str)>,
+    pub main_fn: Option<Offset>,
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
@@ -215,6 +215,7 @@ impl<'src> Lowering<'src> {
         scope.insert("null", Ty::null(), true);
 
         Self {
+            main_fn: None,
             src,
             subs,
             methods: HashMap::default(),
@@ -579,6 +580,12 @@ impl Lowering<'_> {
             ret: Rc::new(ret.clone()),
         });
 
+        if *func.ident == "main" {
+            assert!(params.is_empty());
+            // TODO: Assert ret is null
+            self.main_fn = Some(ident.offset);
+        }
+
         unify(&Ty::Var(fn_var), &Ty::Con(fn_ty.clone()), &mut self.subs);
 
         if let Some(impl_block) = &self.impl_block {
@@ -587,7 +594,6 @@ impl Lowering<'_> {
         }
 
         out.push(Item::Function(Function {
-            name: &func.ident,
             ident,
             ty: Ty::Con(fn_ty),
             stack_size,

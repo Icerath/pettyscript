@@ -8,12 +8,12 @@ use crate::{
     typck::{Substitutions, Ty, TyCon, TyKind},
 };
 
-pub fn codegen(block: &Block, subs: Substitutions) -> Result<Vec<u8>> {
+pub fn codegen(block: &Block, subs: Substitutions, main_fn: Option<Offset>) -> Result<Vec<u8>> {
     let mut codegen = Codegen { subs, ..Default::default() };
     codegen.block(block)?;
     // TODO: Actually count this.
     codegen.builder.set_global_stack_size(64);
-    if let Some(offset) = codegen.main_fn {
+    if let Some(offset) = main_fn {
         codegen.load(offset);
         codegen.builder.insert(Instr::FnCall);
     }
@@ -24,7 +24,6 @@ pub fn codegen(block: &Block, subs: Substitutions) -> Result<Vec<u8>> {
 struct Codegen {
     subs: Substitutions,
     builder: BytecodeBuilder,
-    main_fn: Option<Offset>,
     continue_label: Option<u32>,
     break_label: Option<u32>,
 }
@@ -66,9 +65,6 @@ impl Codegen {
         let function_start = self.builder.create_label();
         let function_end = self.builder.create_label();
 
-        if func.name == "main" {
-            self.main_fn = Some(func.ident.offset);
-        }
         self.builder.insert(Instr::CreateFunction { stack_size: func.stack_size as u16 });
         self.store(func.ident.offset);
         self.builder.insert(Instr::Jump(function_end));

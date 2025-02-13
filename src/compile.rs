@@ -12,5 +12,5 @@ pub fn compile(src: &str) -> miette::Result<Vec<u8>> {
     let mut std = hir.block(&std)?;
     let block = hir.block(&ast)?;
     std.items.extend(block.items);
-    codegen::codegen(&std, hir.subs)
+    codegen::codegen(&std, hir.subs, hir.main_fn)
 }
