@@ -759,7 +759,7 @@ impl Lowering<'_> {
 
     fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
         match op {
-            BinOp::Add | BinOp::Mod => ty.clone(),
+            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => ty.clone(),
             BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::bool(),
             BinOp::Range => {
                 unify(ty, &Ty::int(), &mut self.subs);

@@ -347,6 +347,9 @@ impl Codegen {
 
         match op {
             BinOp::Add => self.builder.insert(Instr::AddInt),
+            BinOp::Sub => self.builder.insert(Instr::SubInt),
+            BinOp::Mul => self.builder.insert(Instr::MulInt),
+            BinOp::Div => self.builder.insert(Instr::DivInt),
             BinOp::Mod => self.builder.insert(Instr::Mod),
             BinOp::Eq => self.builder.insert(Instr::Eq),
             BinOp::Neq => {

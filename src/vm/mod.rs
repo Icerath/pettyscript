@@ -260,9 +260,24 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     self.stack.push(Value::Bool(is_greater));
                 }
                 Instr::AddInt => {
-                    let Value::Int(lhs) = self.pop_stack() else { unreachable_unchecked() };
-                    let Value::Int(rhs) = self.pop_stack() else { unreachable_unchecked() };
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
                     self.stack.push(Value::Int(lhs + rhs));
+                }
+                Instr::SubInt => {
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
+                    self.stack.push(Value::Int(lhs - rhs));
+                }
+                Instr::MulInt => {
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
+                    self.stack.push(Value::Int(lhs * rhs));
+                }
+                Instr::DivInt => {
+                    let rhs = self.pop_int();
+                    let lhs = self.pop_int();
+                    self.stack.push(Value::Int(lhs / rhs));
                 }
                 Instr::LoadBool(bool) => self.stack.push(Value::Bool(bool)),
                 Instr::CreateFunction { stack_size } => {

@@ -1,2 +1,6 @@
 assert(parse_int("20") == 20);
 assert((-30).abs() == 30);
+assert(3 + 2 == 5);
+assert(3 - 2 == 1);
+assert(3 * 2 == 6);
+assert(3 / 2 == 1);
