@@ -12,6 +12,12 @@ trait Ord {
     fn cmp(self: self, other: self) -> Order;
 }
 
+impl int {
+    fn abs(self: self) -> self {
+        return self.abs();
+    }
+}
+
 impl Ord for int {
     fn cmp(self: self, other: self) -> Order {
         if self < other {

@@ -585,10 +585,6 @@ impl Lowering<'_> {
         }
         let fn_params = params.clone();
 
-        let body = self.block(&func.body.as_ref().unwrap().stmts)?;
-        let last_scope = self.scopes.pop().unwrap();
-        let stack_size = last_scope.variables.len();
-
         let fn_ty = TyCon::from(TyKind::Function {
             params: params.iter().map(|ident| ident.ty.clone()).collect(),
             ret: Rc::new(ret.clone()),
@@ -606,6 +602,10 @@ impl Lowering<'_> {
             let Ty::Con(ty) = impl_block.ty.sub(&self.subs) else { panic!() };
             self.methods.insert((ty, *func.ident), ident.clone());
         }
+        let body = self.block(&func.body.as_ref().unwrap().stmts)?;
+
+        let last_scope = self.scopes.pop().unwrap();
+        let stack_size = last_scope.variables.len();
 
         out.push(Item::Function(Function {
             ident,
@@ -936,8 +936,7 @@ impl Lowering<'_> {
                 "remove" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
                 _ => return None,
             },
-
-            _ => panic!("type `{tycon:?}` does not contain method `{method}`"),
+            _ => return None,
         })
     }
 

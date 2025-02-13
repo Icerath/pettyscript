@@ -1,2 +1,2 @@
 assert(parse_int("20") == 20);
-assert(30.abs() == 30);
+assert((-30).abs() == 30);

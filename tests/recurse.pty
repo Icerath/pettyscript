@@ -1,0 +1,14 @@
+
+struct Sum { n: int }
+
+fn recurse(n: int, sum: Sum) {
+    if n > 5 {
+        return;
+    }
+    sum.n = sum.n + n;
+    return recurse(n + 1, sum);
+}
+
+let sum = Sum { n: 0 };
+recurse(0, sum);
+assert(sum.n == 15);
