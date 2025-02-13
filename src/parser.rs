@@ -22,6 +22,7 @@ pub struct Path {
 
 #[derive(Debug)]
 pub enum Stmt {
+    Trait(Trait),
     ImplBlock(ImplBlock),
     Struct(Struct),
     Enum(Enum),
@@ -37,6 +38,12 @@ pub enum Stmt {
     Continue,
     Break,
     Return(Return),
+}
+
+#[derive(Debug)]
+pub struct Trait {
+    pub name: Ident,
+    pub body: Block,
 }
 
 #[expect(unused)]
@@ -698,6 +705,7 @@ impl Parse for Stmt {
                     stream.expect_semicolon()?;
                     Stmt::Continue
                 }
+                Token::Trait => Stmt::Trait(Trait::parse(stream)?),
                 Token::Impl => Stmt::ImplBlock(ImplBlock::parse(stream)?),
                 Token::Let => Stmt::Let(stream.parse_let_decl()?),
                 Token::Const => Stmt::Const(stream.parse_const_decl()?),
@@ -958,5 +966,12 @@ impl Parse for Path {
             segments.push(stream.parse()?);
         }
         Ok(Self { segments: segments.into() })
+    }
+}
+
+impl Parse for Trait {
+    fn parse(stream: &mut Parser) -> Result<Self> {
+        stream.expect_token(Token::Trait)?;
+        Ok(Self { name: stream.parse()?, body: stream.parse()? })
     }
 }

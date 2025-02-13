@@ -1,5 +1,27 @@
-impl int {
-    fn eq(self: self, other: self) -> bool {
-        return self == other;
-    }
+enum Order {
+    Less,
+    Eq,
+    Greater,
 }
+
+// trait Add {
+//     fn add(self: self, other: self) -> self {
+//         return self + other;
+//     }
+// }
+
+// trait Ord {
+//     fn cmp(self: self, other: self) -> Order;
+// }
+
+// impl Ord for int {
+//     fn cmp(self: self, other: self) -> Order {
+//         if self < other {
+//             return Order:Less;
+//         } else if self > other {
+//             return Order:Greater;
+//         } else {
+//             return Order:Eq;
+//         }
+//     }
+// }

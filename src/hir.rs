@@ -245,6 +245,7 @@ impl Lowering<'_> {
 
     fn stmt(&mut self, stmt: &Stmt, out: &mut Vec<Item>) -> Result<()> {
         match stmt {
+            Stmt::Trait(trait_) => self.trait_(trait_, out)?,
             Stmt::WhileLoop(while_loop) => self.while_loop(while_loop, out)?,
             Stmt::ForLoop(for_loop) => self.for_loop(for_loop, out)?,
             Stmt::IfChain(if_chain) => self.if_chain(if_chain, out)?,
@@ -262,6 +263,10 @@ impl Lowering<'_> {
             Stmt::Block(block) => block.stmts.iter().try_for_each(|stmt| self.stmt(stmt, out))?,
         }
         Ok(())
+    }
+
+    fn trait_(&mut self, trait_: &ast::Trait, out: &mut Vec<Item>) -> Result<()> {
+        todo!("{trait_:?}")
     }
 
     fn while_loop(&mut self, while_loop: &ast::WhileLoop, out: &mut Vec<Item>) -> Result<()> {
