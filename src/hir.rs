@@ -1,5 +1,3 @@
-#![expect(dead_code)]
-
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
@@ -38,6 +36,7 @@ pub struct Function {
     pub ident: Ident,
     pub params: Vec<Ident>,
     pub stack_size: usize,
+    #[expect(unused)]
     pub ty: Ty,
     pub ret: Ty,
     pub body: Block,
@@ -75,6 +74,7 @@ pub struct Assign {
 #[derive(Debug)]
 pub enum AssignSegment {
     Field(u32),
+    #[expect(unused)]
     Index(Expr),
 }
 
@@ -155,7 +155,6 @@ pub struct Fstr {
 
 pub struct Lowering<'src> {
     named_types: FxHashMap<&'static str, Ty>,
-    structs: FxHashMap<&'static str, Rc<BTreeMap<&'static str, Ty>>>,
     enums: FxHashMap<u32, EnumData>,
     methods: FxHashMap<(TyCon, &'static str), Ident>,
     traits: FxHashMap<&'static str, Trait>,
@@ -163,6 +162,7 @@ pub struct Lowering<'src> {
     pub subs: Substitutions,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
+    #[expect(unused)]
     src: &'src str,
 }
 
@@ -222,7 +222,6 @@ impl<'src> Lowering<'src> {
             trait_impls: HashSet::default(),
             scopes: vec![scope],
             named_types,
-            structs: HashMap::default(),
             enums: HashMap::default(),
             impl_block: None,
         }
@@ -972,6 +971,7 @@ impl Lowering<'_> {
 
 macro_rules! impl_ty_const {
     ($($name: ident),+) => {
+        #[allow(unused)]
         impl Ty {
             $(pub fn $name() -> Self {
                 thread_local! {
@@ -980,6 +980,7 @@ macro_rules! impl_ty_const {
                 CACHE.with(|ty| Ty::Con(ty.clone()))
             })+
         }
+        #[allow(unused)]
         impl TyKind {
             $(pub fn $name() -> Self {
                 TyKind::Named(stringify!($name))
