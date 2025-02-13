@@ -557,15 +557,6 @@ impl Lowering<'_> {
     }
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
-        let fn_var = TyVar::uniq();
-        let ident = if self.impl_block.is_none() {
-            self.insert_scope(&func.ident, Ty::Var(fn_var)).unwrap()
-        } else {
-            let offset = self.scopes[0].var_counter;
-            let ident = Ident { offset: Offset::Global(offset as u32), ty: Ty::Var(fn_var) };
-            self.scopes[0].var_counter += 1;
-            ident
-        };
         let ret = if let Some(ret_ty) = &func.ret_type {
             self.load_explicit_type(ret_ty)?
         } else {
@@ -585,18 +576,28 @@ impl Lowering<'_> {
         }
         let fn_params = params.clone();
 
-        let fn_ty = TyCon::from(TyKind::Function {
+        let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
             params: params.iter().map(|ident| ident.ty.clone()).collect(),
             ret: Rc::new(ret.clone()),
-        });
+        }));
+
+        let ident = if self.impl_block.is_none() {
+            let scope = self.scopes.pop().unwrap();
+            let ident = self.insert_scope(&func.ident, fn_ty.clone()).unwrap();
+            self.scopes.push(scope);
+            ident
+        } else {
+            let offset = self.scopes[0].var_counter;
+            let ident = Ident { offset: Offset::Global(offset as u32), ty: fn_ty.clone() };
+            self.scopes[0].var_counter += 1;
+            ident
+        };
 
         if *func.ident == "main" {
             assert!(params.is_empty());
             // TODO: Assert ret is null
             self.main_fn = Some(ident.offset);
         }
-
-        unify(&Ty::Var(fn_var), &Ty::Con(fn_ty.clone()), &mut self.subs);
 
         if let Some(impl_block) = &self.impl_block {
             let Ty::Con(ty) = impl_block.ty.sub(&self.subs) else { panic!() };
@@ -609,7 +610,7 @@ impl Lowering<'_> {
 
         out.push(Item::Function(Function {
             ident,
-            ty: Ty::Con(fn_ty),
+            ty: fn_ty,
             stack_size,
             params: fn_params,
             ret,
