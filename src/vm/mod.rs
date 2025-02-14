@@ -200,7 +200,9 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     }
                 }
                 Instr::FnCall => 'fn_call: {
-                    let Value::Callable(callable) = self.pop_stack() else { panic!() };
+                    let Value::Callable(callable) = self.pop_stack() else {
+                        unreachable_unchecked()
+                    };
                     let value = match callable {
                         Callable::Builtin(builtin) => match builtin {
                             Builtin::ParseInt => {
