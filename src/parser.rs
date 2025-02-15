@@ -120,9 +120,15 @@ pub struct Enum {
 }
 
 #[derive(Debug)]
+pub struct Generic {
+    name: Spanned<Ident>,
+    bounds: Option<Box<[Spanned<Path>]>>,
+}
+
+#[derive(Debug)]
 pub struct Function {
     pub ident: Spanned<Ident>,
-    pub generics: Box<[Spanned<Ident>]>,
+    pub generics: Box<[Generic]>,
     pub params: Box<[Param]>,
     pub ret_type: Option<Spanned<ExplicitType>>,
     pub body: Option<Spanned<Block>>,
@@ -981,5 +987,23 @@ impl Parse for Trait {
     fn parse(stream: &mut Parser) -> Result<Self> {
         stream.expect_token(Token::Trait)?;
         Ok(Self { name: stream.parse()?, body: stream.parse()? })
+    }
+}
+
+impl Parse for Generic {
+    fn parse(stream: &mut Parser) -> Result<Self> {
+        let name = stream.parse()?;
+
+        let bounds = if stream.peek()? == Token::Colon {
+            stream.skip();
+
+            // TODO: Parse multiple bounds (Add + Sub)
+            let bounds = vec![stream.parse()?];
+            Some(bounds.into_boxed_slice())
+        } else {
+            None
+        };
+
+        Ok(Self { name, bounds })
     }
 }
