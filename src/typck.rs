@@ -123,7 +123,7 @@ impl Ty {
 mod tests {
     use super::*;
     macro_rules! tyvar {
-        ($i: expr) => {
+        ($i:expr) => {
             Ty::Var(TyVar($i))
         };
     }

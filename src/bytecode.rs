@@ -94,7 +94,7 @@ macro_rules! impl_int {
 }
 
 macro_rules! impl_from {
-    ($ty: ident, $int: ident) => {
+    ($ty:ident, $int:ident) => {
         impl BcRead for $ty {
             fn bc_read(bytes: &mut &[u8]) -> Self {
                 Self::try_from($int::bc_read(bytes)).unwrap()

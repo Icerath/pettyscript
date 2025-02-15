@@ -761,7 +761,7 @@ impl Lowering<'_> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
 
         macro_rules! ret {
-            ($method: literal) => {{
+            ($method:literal) => {{
                 // TODO: Keep track of trait methods.
                 let fn_ty = &self.methods.get(&(tycon, $method)).unwrap().ty;
                 let Ty::Con(fn_tycon) = fn_ty.sub(&self.subs) else { panic!() };

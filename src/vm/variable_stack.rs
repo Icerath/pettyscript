@@ -1,7 +1,7 @@
 use super::Value;
 
 macro_rules! ptr {
-    ($stack: ident) => {
+    ($stack:ident) => {
         *$stack.ptrs.last().unwrap_unchecked()
     };
 }

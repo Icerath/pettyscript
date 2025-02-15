@@ -49,7 +49,7 @@ fn test_lexer_example() {
 }
 
 macro_rules! test_expr {
-    ($expr: literal, $expected: expr) => {{
+    ($expr:literal, $expected:expr) => {{
         let src = concat!($expr, ";");
         let code = compile(src).unwrap();
         let output = exec_vm(&code);
@@ -58,7 +58,7 @@ macro_rules! test_expr {
 }
 
 macro_rules! test_fails {
-    ($name: ident, $src: literal) => {
+    ($name:ident, $src:literal) => {
         #[test]
         #[should_panic]
         fn $name() {

@@ -17,7 +17,7 @@ pub fn disassemble(bytecode: &[u8]) {
     reader.bytes = &reader.bytes[len_consts..];
 
     macro_rules! load_str {
-        ($ptr: expr, $len: expr) => {{
+        ($ptr:expr, $len:expr) => {{
             let ptr = $ptr;
             &consts[ptr as usize..ptr as usize + $len as usize]
         }};

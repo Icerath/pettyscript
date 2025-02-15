@@ -46,7 +46,7 @@ struct VirtualMachine<'src, 'io> {
 }
 
 macro_rules! impl_pop_helper {
-    ($name: ident, $variant: ident, $typ: ty) => {
+    ($name:ident, $variant:ident, $typ:ty) => {
         unsafe fn $name(&mut self) -> $typ {
             match self.pop_stack() {
                 Value::$variant(inner) => inner,
@@ -362,7 +362,7 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
         let rhs = self.pop_stack();
         let lhs = self.pop_stack();
         macro_rules! glue {
-            ($typ: tt, $lhs: ident) => {{
+            ($typ:tt, $lhs:ident) => {{
                 let Value::$typ(rhs) = rhs else { unreachable_unchecked() };
                 $lhs.cmp(&rhs)
             }};
