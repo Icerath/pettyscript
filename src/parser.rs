@@ -119,6 +119,7 @@ pub struct Enum {
     pub variants: Box<[Spanned<Ident>]>,
 }
 
+#[expect(unused)]
 #[derive(Debug)]
 pub struct Generic {
     name: Spanned<Ident>,
