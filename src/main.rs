@@ -1,10 +1,9 @@
 mod builtints;
 mod bytecode;
-mod disassemble;
-mod hir;
-// mod hir_codegen;
 mod codegen;
 mod compile;
+mod disassemble;
+mod hir;
 mod intern;
 mod lexer;
 mod parser;
