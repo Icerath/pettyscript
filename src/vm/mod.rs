@@ -468,23 +468,15 @@ impl fmt::Display for DisplayValue<'_, '_> {
         match self.value {
             Value::Map(map) => {
                 let mut debug_map = f.debug_map();
-
                 for (key, value) in &*map.borrow() {
                     debug_map.entry(&DisplayValue { value: key }, &DisplayValue { value });
                 }
-
                 debug_map.finish()
             }
             Value::EnumVariant { tag } => unreachable!("{tag}"),
             Value::Char(char) => write!(f, "{char}"),
-            Value::Struct { fields } => unreachable!("{fields:?}"),
-            Value::Callable(Callable::Function { label, stack_size: _ }) => {
-                write!(f, "Function at {label}")
-            }
-            Value::Callable(Callable::Builtin(function)) => write!(f, "Function: {function:?}"),
             Value::Bool(bool) => write!(f, "{bool}"),
             Value::Int(int) => write!(f, "{int}"),
-            Value::Range([start, end]) => write!(f, "{start}..{end}"),
             Value::String(str) => write!(f, "{}", &str.as_str()),
             Value::Array(values) => {
                 let mut debug_list = f.debug_list();
@@ -493,6 +485,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
                 }
                 debug_list.finish()
             }
+            _ => unreachable!("{:?}", self.value),
         }
     }
 }
