@@ -1,0 +1,7 @@
+// ignore
+
+fn print[T: Display](val: T) {
+    println(f"{val}");
+}
+
+print(1);

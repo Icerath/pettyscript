@@ -13,13 +13,20 @@ pub fn generate_integration_tests(input: TokenStream) -> TokenStream {
     let mut tests = quote! {};
     for dir_entry in std::fs::read_dir("tests").unwrap() {
         let entry = dir_entry.unwrap();
-        let src = Path::new("..").join(entry.path()).display().to_string();
+        let src_path = Path::new("..").join(entry.path()).display().to_string();
+        let src = std::fs::read_to_string(&entry.path()).unwrap();
+
+        let mut ignore = quote! {};
+        if src.starts_with("// ignore") {
+            ignore = quote! { #[ignore] };
+        }
         let test_name =
             Ident::new(&entry.path().file_stem().unwrap().to_str().unwrap(), Span::call_site());
         tests.extend(quote! {
             #[test]
+            #ignore
             fn #test_name () {
-                let src = include_str!(#src);
+                let src = include_str!(#src_path);
                 let code = crate::compile::compile(src).unwrap();
                 unsafe { vm::execute_bytecode(&code) };
             }
