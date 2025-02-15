@@ -477,14 +477,7 @@ impl fmt::Display for DisplayValue<'_, '_> {
             }
             Value::EnumVariant { tag } => unreachable!("{tag}"),
             Value::Char(char) => write!(f, "{char}"),
-            Value::Struct { fields } => {
-                write!(f, "{{")?;
-                for (i, value) in fields.borrow().iter().enumerate() {
-                    let prefix = if i != 0 { "," } else { "" };
-                    write!(f, "{prefix} {}", DisplayValue { value })?;
-                }
-                write!(f, " }}")
-            }
+            Value::Struct { fields } => unreachable!("{fields:?}"),
             Value::Callable(Callable::Function { label, stack_size: _ }) => {
                 write!(f, "Function at {label}")
             }

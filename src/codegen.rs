@@ -208,7 +208,11 @@ impl Codegen {
     }
 
     fn expr(&mut self, expr: &Expr) -> Result<()> {
-        match &expr.kind {
+        self.expr_kind(&expr.kind)
+    }
+
+    fn expr_kind(&mut self, expr: &ExprKind) -> Result<()> {
+        match &expr {
             ExprKind::StructInit { fields } => self.struct_init(fields)?,
             ExprKind::FieldAccess { expr, field } => self.field_access(expr, field)?,
             ExprKind::EnumVariant { tag } => self.builder.insert(Instr::LoadVariant { tag: *tag }),
@@ -224,6 +228,7 @@ impl Codegen {
                 let str_ident = self.builder.insert_string(str);
                 self.builder.insert(Instr::LoadString(str_ident));
             }
+            ExprKind::Format(expr) => self.format(expr)?,
             ExprKind::Fstr(fstr) => self.fstr(fstr)?,
             ExprKind::Tuple(tuple) => self.array(tuple)?,
             ExprKind::Array(arr) => self.array(arr)?,
@@ -378,6 +383,12 @@ impl Codegen {
         Ok(())
     }
 
+    fn format(&mut self, format: &Expr) -> Result<()> {
+        self.expr(format)?;
+        self.builder.insert(Instr::BuildFstr { num_segments: 1 });
+        Ok(())
+    }
+
     fn fstr(&mut self, fstr: &Fstr) -> Result<()> {
         let mut num_segments = 0;
         for (str, expr) in &fstr.segments {
@@ -386,7 +397,7 @@ impl Codegen {
                 self.builder.insert(Instr::LoadString(str_ident));
                 num_segments += 1;
             }
-            self.expr(expr)?;
+            self.expr_kind(expr)?;
             num_segments += 1;
         }
         if !fstr.remaining.is_empty() {

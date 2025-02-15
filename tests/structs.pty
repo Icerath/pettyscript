@@ -2,7 +2,15 @@ struct Point {
     x: int,
     y: int,
 }
-assert(f"{Point { x: 1, y: 2 }}" == "{ 1, 2 }");
+
+impl Display for Point {
+    fn to_str(self: self) -> str {
+        // TODO: Support escaping '{' and '}'
+        return f"Point [ x: {self.x}, y: {self.y} ]";
+    }
+}
+
+assert(f"{Point { x: 1, y: 2 }}" == "Point [ x: 1, y: 2 ]");
 
 struct Lexer { str: str }
 let lexer = Lexer { str: "abc" };

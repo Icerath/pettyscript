@@ -75,3 +75,31 @@ impl Ord for int {
         }
     }
 }
+
+trait Display {
+    fn to_str(self: self) -> str;
+}
+
+impl Display for int {
+    fn to_str(self: self) -> str {
+        return f"{self}";
+    }
+}
+
+impl Display for str {
+    fn to_str(self: self) -> str {
+        return self;
+    }
+}
+
+impl Display for bool {
+    fn to_str(self: self) -> str {
+        if self { return "true"; } else { return "false"; }
+    }
+}
+
+impl Display for char {
+    fn to_str(self: self) -> str {
+        return f"{self}";
+    }
+}

@@ -114,6 +114,8 @@ pub enum ExprKind {
     Int(i64),
     Str(&'static str),
     Fstr(Fstr),
+    // Temporary until generic impls are supported
+    Format(Box<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -148,7 +150,7 @@ pub enum Offset {
 
 #[derive(Debug)]
 pub struct Fstr {
-    pub segments: Vec<(&'static str, Expr)>,
+    pub segments: Vec<(&'static str, ExprKind)>,
     pub remaining: &'static str,
 }
 
@@ -709,28 +711,37 @@ impl Lowering<'_> {
     fn fstr(&mut self, fstring: &ast::FString) -> Result<Expr> {
         let mut segments = vec![];
         for (str, aexpr) in &fstring.segments {
-            let mut expr = self.expr(aexpr)?;
-
+            let expr = self.expr(aexpr)?;
             let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
-            if let TyKind::Variant { id } = &tycon.kind {
-                expr = self.enum_variant_str(expr, *id);
-            }
+            let expr = match &tycon.kind {
+                // TODO: Don't support arrays/maps/tuples here.
+                TyKind::Named("int" | "char" | "bool" | "str" | "array" | "map" | "tuple") => {
+                    ExprKind::Format(Box::new(expr))
+                }
+                TyKind::Variant { id } => self.enum_variant_str(expr, *id),
+                _ => {
+                    assert!(self.trait_impls.contains(&(tycon.clone(), "Display")), "{tycon:?}");
+                    let method = self.methods.get(&(tycon, "to_str")).unwrap();
+                    ExprKind::FnCall {
+                        expr: Box::new(Expr::ident(method.clone())),
+                        args: vec![expr],
+                    }
+                }
+            };
+
             segments.push((*str, expr));
         }
         let remaining = fstring.remaining;
         Ok(Expr { ty: Ty::str(), kind: ExprKind::Fstr(Fstr { segments, remaining }) })
     }
 
-    fn enum_variant_str(&mut self, expr: Expr, id: u32) -> Expr {
+    fn enum_variant_str(&mut self, expr: Expr, id: u32) -> ExprKind {
         let ident = self.enums[&id].name_map.clone();
         let index = Expr {
             ty: Ty::int(),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
         };
-        Expr {
-            ty: Ty::str(),
-            kind: ExprKind::Index { expr: Box::new(Expr::ident(ident)), index: Box::new(index) },
-        }
+        ExprKind::Index { expr: Box::new(Expr::ident(ident)), index: Box::new(index) }
     }
 
     fn scope(&mut self) -> &mut FnScope {
