@@ -53,7 +53,7 @@ impl Codegen {
             Item::Return(ret) => self.return_(ret),
             Item::Expr(expr) => {
                 self.expr(expr)?;
-                if self.ty(&expr.ty).kind != TyKind::null() {
+                if self.ty(&expr.ty).kind != TyKind::Null {
                     self.builder.insert(Instr::Pop);
                 }
                 Ok(())
@@ -80,7 +80,7 @@ impl Codegen {
         // TODO: Remove extra space for ZSTs
         // self.scopes.pop().unwrap();
 
-        if self.ty(&func.ret).kind == TyKind::null() {
+        if self.ty(&func.ret).kind == TyKind::Null {
             self.builder.insert(Instr::Ret);
         } else {
             // FIXME: Instead produce a compile error when this is possible
@@ -144,7 +144,7 @@ impl Codegen {
 
         self.builder.insert_label(start_label);
         let iter_op = match self.ty(&for_loop.iter.ty).kind {
-            TyKind::Named("range" | "range_inclusive") => Instr::IterRange,
+            TyKind::Range | TyKind::RangeInclusive => Instr::IterRange,
             ty => panic!("{ty:?}"),
         };
         self.builder.insert(iter_op);
@@ -266,27 +266,27 @@ impl Codegen {
 
         let ty = self.ty(&expr.ty);
         let builtin = match (&ty.kind, method) {
-            (TyKind::Named("int"), "abs") => M::IntAbs,
+            (TyKind::Int, "abs") => M::IntAbs,
 
-            (TyKind::Named("char"), "is_digit") => M::CharIsDigit,
-            (TyKind::Named("char"), "is_alphabetic") => M::CharIsAlphabetic,
+            (TyKind::Char, "is_digit") => M::CharIsDigit,
+            (TyKind::Char, "is_alphabetic") => M::CharIsAlphabetic,
 
-            (TyKind::Named("str"), "trim") => M::StrTrim,
-            (TyKind::Named("str"), "is_digit") => M::StrIsDigit,
-            (TyKind::Named("str"), "is_alphabetic") => M::StrIsAlphabetic,
-            (TyKind::Named("str"), "starts_with") => M::StrStartsWith,
-            (TyKind::Named("str"), "len") => M::StrLen,
-            (TyKind::Named("str"), "lines") => M::StrLines,
+            (TyKind::Str, "trim") => M::StrTrim,
+            (TyKind::Str, "is_digit") => M::StrIsDigit,
+            (TyKind::Str, "is_alphabetic") => M::StrIsAlphabetic,
+            (TyKind::Str, "starts_with") => M::StrStartsWith,
+            (TyKind::Str, "len") => M::StrLen,
+            (TyKind::Str, "lines") => M::StrLines,
 
-            (TyKind::Named("array"), "push") => M::ArrayPush,
-            (TyKind::Named("array"), "pop") => M::ArrayPop,
-            (TyKind::Named("array"), "sort") if ty.generics[0] == Ty::int() => M::ArraySortInt,
-            (TyKind::Named("array"), "len") => M::ArrayLen,
+            (TyKind::Array, "push") => M::ArrayPush,
+            (TyKind::Array, "pop") => M::ArrayPop,
+            (TyKind::Array, "sort") if ty.generics[0] == Ty::from(TyKind::Int) => M::ArraySortInt,
+            (TyKind::Array, "len") => M::ArrayLen,
 
-            (TyKind::Named("map"), "insert") => M::MapInsert,
-            (TyKind::Named("map"), "remove") => M::MapRemove,
-            (TyKind::Named("map"), "get") => M::MapGet,
-            (TyKind::Named("map"), "contains") => M::MapContains,
+            (TyKind::Map, "insert") => M::MapInsert,
+            (TyKind::Map, "remove") => M::MapRemove,
+            (TyKind::Map, "get") => M::MapGet,
+            (TyKind::Map, "contains") => M::MapContains,
 
             kind => todo!("{kind:?}"),
         };
@@ -308,15 +308,15 @@ impl Codegen {
         self.expr(index)?;
         let ty = self.ty(&expr.ty).kind;
         let index = self.ty(&index.ty).kind;
-        if ty == TyKind::str() {
-            if index == TyKind::int() {
+        if ty == TyKind::Str {
+            if index == TyKind::Int {
                 self.builder.insert(Instr::StringIndex);
-            } else if index == TyKind::range() {
+            } else if index == TyKind::Range {
                 self.builder.insert(Instr::StringSliceRange);
             } else {
                 panic!()
             }
-        } else if let TyKind::Named("array") = ty {
+        } else if let TyKind::Array = ty {
             self.builder.insert(Instr::ArrayIndex);
         }
         Ok(())
@@ -326,11 +326,11 @@ impl Codegen {
         self.expr(expr)?;
         match op {
             UnaryOp::Neg => {
-                assert_eq!(self.ty(&expr.ty).kind, TyKind::int());
+                assert_eq!(self.ty(&expr.ty).kind, TyKind::Int);
                 self.builder.insert(Instr::Neg);
             }
             UnaryOp::Not => {
-                assert_eq!(self.ty(&expr.ty).kind, TyKind::bool());
+                assert_eq!(self.ty(&expr.ty).kind, TyKind::Bool);
                 self.builder.insert(Instr::Not);
             }
             UnaryOp::EnumTag => {

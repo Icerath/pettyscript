@@ -190,16 +190,22 @@ impl<'src> Lowering<'src> {
         let mut named_types = HashMap::default();
 
         let generics = Rc::new([]);
-        let builtin_names = ["int", "char", "bool", "str", "null", "array", "map", "tuple"];
-        for name in builtin_names {
-            named_types.insert(
-                name,
-                Ty::Con(TyCon { kind: TyKind::Named(name), generics: generics.clone() }),
-            );
+        let builtin_types = [
+            ("null", TyKind::Null),
+            ("bool", TyKind::Bool),
+            ("int", TyKind::Int),
+            ("char", TyKind::Char),
+            ("str", TyKind::Str),
+            ("array", TyKind::Array),
+            ("map", TyKind::Map),
+            ("tuple", TyKind::Tuple),
+        ];
+        for (name, kind) in builtin_types {
+            named_types.insert(name, Ty::Con(TyCon { kind, generics: generics.clone() }));
         }
 
         let mut scope = FnScope {
-            ret_var: Ty::null(),
+            ret_var: Ty::from(TyKind::Null),
             variables: FxHashMap::default(),
             for_loops: 0,
             var_counter: 0,
@@ -208,16 +214,16 @@ impl<'src> Lowering<'src> {
         for builtin in Builtin::ALL {
             let name = builtin.name();
             let ty = match builtin {
-                Builtin::Println => Ty::func([Ty::str()], Ty::null()),
-                Builtin::Assert => Ty::func([Ty::bool()], Ty::bool()),
-                Builtin::Exit => Ty::func([Ty::int()], Ty::null()),
-                Builtin::ParseInt => Ty::func([Ty::str()], Ty::int()),
-                Builtin::ReadFile => Ty::func([Ty::str()], Ty::str()),
+                Builtin::Println => Ty::func([Ty::from(TyKind::Str)], Ty::from(TyKind::Null)),
+                Builtin::Assert => Ty::func([Ty::from(TyKind::Bool)], Ty::from(TyKind::Bool)),
+                Builtin::Exit => Ty::func([Ty::from(TyKind::Int)], Ty::from(TyKind::Null)),
+                Builtin::ParseInt => Ty::func([Ty::from(TyKind::Str)], Ty::from(TyKind::Int)),
+                Builtin::ReadFile => Ty::func([Ty::from(TyKind::Str)], Ty::from(TyKind::Str)),
             };
             scope.insert(name, ty, true);
         }
 
-        scope.insert("null", Ty::null(), true);
+        scope.insert("null", Ty::from(TyKind::Null), true);
 
         Self {
             main_fn: None,
@@ -307,7 +313,7 @@ impl Lowering<'_> {
                     }
                     let ret = match &func.ret_type {
                         Some(ret) => self.load_param_ty(ret)?,
-                        None => ParamTy::Ty(Ty::null()),
+                        None => ParamTy::Ty(Ty::from(TyKind::Null)),
                     };
                     expected_functions.push(TraitFnSig { name: *func.ident, params, ret });
                 }
@@ -325,7 +331,7 @@ impl Lowering<'_> {
     fn while_loop(&mut self, while_loop: &ast::WhileLoop, out: &mut Vec<Item>) -> Result<()> {
         let branch_expr = self.expr(&while_loop.expr)?;
         let branch_expr = Expr {
-            ty: Ty::bool(),
+            ty: Ty::from(TyKind::Bool),
             kind: ExprKind::Unary { expr: Box::new(branch_expr), op: UnaryOp::Not },
         };
         let exit_condition = Item::IfChain(IfChain {
@@ -358,7 +364,7 @@ impl Lowering<'_> {
 
         for if_stmt in [&if_chain.first].into_iter().chain(&if_chain.r#else_ifs) {
             let condition = self.expr(&if_stmt.condition)?;
-            unify(&condition.ty, &Ty::bool(), &mut self.subs);
+            unify(&condition.ty, &Ty::from(TyKind::Bool), &mut self.subs);
             let block = self.block(&if_stmt.body.stmts)?;
             chain.push((condition, block));
         }
@@ -376,7 +382,7 @@ impl Lowering<'_> {
     fn iter_item_ty(iter: &TyCon) -> Ty {
         // FIXME: .............
         match iter.kind {
-            TyKind::Named("range_inclusive" | "range") => Ty::int(),
+            TyKind::Range | TyKind::RangeInclusive => Ty::from(TyKind::Int),
             _ => panic!("{iter:?}"),
         }
     }
@@ -484,7 +490,7 @@ impl Lowering<'_> {
             }
             let ret_ty = match &func.ret_type {
                 Some(expl_ty) => self.load_explicit_type(expl_ty)?,
-                None => Ty::null(),
+                None => Ty::from(TyKind::Null),
             };
             let Ty::Con(ret_ty) = ret_ty else { panic!() };
             let expected_ty = match &impl_item.ret {
@@ -546,10 +552,10 @@ impl Lowering<'_> {
             enum_
                 .variants
                 .iter()
-                .map(|variant| Expr { ty: Ty::str(), kind: ExprKind::Str(variant) })
+                .map(|variant| Expr { ty: Ty::from(TyKind::Str), kind: ExprKind::Str(variant) })
                 .collect(),
         );
-        let expr = Expr { ty: Ty::array(Ty::str()), kind: array };
+        let expr = Expr { ty: Ty::array(Ty::from(TyKind::Str)), kind: array };
         let name = intern(&format!("{}_variants", *enum_.ident));
         let ident = self.insert_scope(name, expr.ty.clone()).unwrap();
         out.push(Item::Assign(Assign { root: ident.clone(), segments: vec![], expr }));
@@ -560,7 +566,7 @@ impl Lowering<'_> {
         let ret = if let Some(ret_ty) = &func.ret_type {
             self.load_explicit_type(ret_ty)?
         } else {
-            Ty::null()
+            Ty::from(TyKind::Null)
         };
         self.scopes.push(FnScope {
             ret_var: ret.clone(),
@@ -626,7 +632,7 @@ impl Lowering<'_> {
             unify(&expr.ty, &ret_var, &mut self.subs);
             Some(expr)
         } else {
-            unify(&Ty::null(), &ret_var, &mut self.subs);
+            unify(&Ty::from(TyKind::Null), &ret_var, &mut self.subs);
             None
         };
         let pops = self.scope().for_loops;
@@ -694,10 +700,16 @@ impl Lowering<'_> {
 
     fn literal(&mut self, literal: &ast::Literal) -> Result<Expr> {
         Ok(match literal {
-            ast::Literal::Bool(bool) => Expr { ty: Ty::bool(), kind: ExprKind::Bool(*bool) },
-            ast::Literal::Int(int) => Expr { ty: Ty::int(), kind: ExprKind::Int(*int) },
-            ast::Literal::Char(char) => Expr { ty: Ty::char(), kind: ExprKind::Char(*char) },
-            ast::Literal::String(str) => Expr { ty: Ty::str(), kind: ExprKind::Str(str) },
+            ast::Literal::Bool(bool) => {
+                Expr { ty: Ty::from(TyKind::Bool), kind: ExprKind::Bool(*bool) }
+            }
+            ast::Literal::Int(int) => Expr { ty: Ty::from(TyKind::Int), kind: ExprKind::Int(*int) },
+            ast::Literal::Char(char) => {
+                Expr { ty: Ty::from(TyKind::Char), kind: ExprKind::Char(*char) }
+            }
+            ast::Literal::String(str) => {
+                Expr { ty: Ty::from(TyKind::Str), kind: ExprKind::Str(str) }
+            }
             ast::Literal::FString(fstring) => self.fstr(fstring)?,
 
             ast::Literal::Map(map) => self.map(map)?,
@@ -712,9 +724,13 @@ impl Lowering<'_> {
             let Ty::Con(tycon) = expr.ty.sub(&self.subs) else { panic!() };
             let expr = match &tycon.kind {
                 // TODO: Don't support arrays/maps/tuples here.
-                TyKind::Named("int" | "char" | "bool" | "str" | "array" | "map" | "tuple") => {
-                    ExprKind::Format(Box::new(expr))
-                }
+                TyKind::Int
+                | TyKind::Char
+                | TyKind::Bool
+                | TyKind::Str
+                | TyKind::Array
+                | TyKind::Map
+                | TyKind::Tuple => ExprKind::Format(Box::new(expr)),
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
                 _ => {
                     assert!(self.trait_impls.contains(&(tycon.clone(), "Display")), "{tycon:?}");
@@ -729,13 +745,13 @@ impl Lowering<'_> {
             segments.push((*str, expr));
         }
         let remaining = fstring.remaining;
-        Ok(Expr { ty: Ty::str(), kind: ExprKind::Fstr(Fstr { segments, remaining }) })
+        Ok(Expr { ty: Ty::from(TyKind::Str), kind: ExprKind::Fstr(Fstr { segments, remaining }) })
     }
 
     fn enum_variant_str(&mut self, expr: Expr, id: u32) -> ExprKind {
         let ident = self.enums[&id].name_map.clone();
         let index = Expr {
-            ty: Ty::int(),
+            ty: Ty::from(TyKind::Int),
             kind: ExprKind::Unary { expr: Box::new(expr), op: UnaryOp::EnumTag },
         };
         ExprKind::Index { expr: Box::new(Expr::ident(ident)), index: Box::new(index) }
@@ -784,18 +800,18 @@ impl Lowering<'_> {
             BinOp::Mul => ret!("mul"),
             BinOp::Div => ret!("div"),
             BinOp::Mod => ret!("mod"),
-            BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::bool(),
+            BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::from(TyKind::Bool),
             BinOp::Range => {
-                unify(ty, &Ty::int(), &mut self.subs);
-                Ty::range()
+                unify(ty, &Ty::from(TyKind::Int), &mut self.subs);
+                Ty::from(TyKind::Range)
             }
             BinOp::RangeInclusive => {
-                unify(ty, &Ty::int(), &mut self.subs);
-                Ty::range_inclusive()
+                unify(ty, &Ty::from(TyKind::Int), &mut self.subs);
+                Ty::from(TyKind::RangeInclusive)
             }
             BinOp::And | BinOp::Or => {
-                unify(ty, &Ty::bool(), &mut self.subs);
-                Ty::bool()
+                unify(ty, &Ty::from(TyKind::Bool), &mut self.subs);
+                Ty::from(TyKind::Bool)
             }
             _ => todo!("{op:?}"),
         }
@@ -924,40 +940,41 @@ impl Lowering<'_> {
     #[expect(clippy::match_same_arms)]
     fn method_params(&mut self, ty: &Ty, method: &'static str) -> Option<Rc<[Ty]>> {
         let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
-        let TyKind::Named(name) = tycon.kind else { return None };
-        Some(match name {
-            "int" => match method {
-                "abs" => Rc::new([Ty::int()]),
+        Some(match &tycon.kind {
+            TyKind::Int => match method {
+                "abs" => Rc::new([Ty::from(TyKind::Int)]),
                 _ => return None,
             },
-            "char" => match method {
-                "is_digit" => Rc::new([Ty::bool()]),
-                "is_alphabetic" => Rc::new([Ty::bool()]),
+            TyKind::Char => match method {
+                "is_digit" => Rc::new([Ty::from(TyKind::Bool)]),
+                "is_alphabetic" => Rc::new([Ty::from(TyKind::Bool)]),
                 _ => return None,
             },
-            "str" => match method {
-                "lines" => Rc::new([Ty::array(Ty::str())]),
-                "trim" => Rc::new([Ty::str()]),
-                "starts_with" => Rc::new([Ty::str(), Ty::bool()]),
-                "is_digit" => Rc::new([Ty::bool()]),
-                "is_alphabetic" => Rc::new([Ty::bool()]),
-                "len" => Rc::new([Ty::int()]),
+            TyKind::Str => match method {
+                "lines" => Rc::new([Ty::array(Ty::from(TyKind::Str))]),
+                "trim" => Rc::new([Ty::from(TyKind::Str)]),
+                "starts_with" => Rc::new([Ty::from(TyKind::Str), Ty::from(TyKind::Bool)]),
+                "is_digit" => Rc::new([Ty::from(TyKind::Bool)]),
+                "is_alphabetic" => Rc::new([Ty::from(TyKind::Bool)]),
+                "len" => Rc::new([Ty::from(TyKind::Int)]),
                 _ => return None,
             },
-            "array" => match method {
-                "push" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
+            TyKind::Array => match method {
+                "push" => Rc::new([tycon.generics[0].clone(), Ty::from(TyKind::Null)]),
                 "pop" => Rc::new([tycon.generics[0].clone()]),
                 "sort" => Rc::new([ty.clone()]),
-                "len" => Rc::new([Ty::int()]),
+                "len" => Rc::new([Ty::from(TyKind::Int)]),
                 _ => return None,
             },
-            "map" => match method {
-                "insert" => {
-                    Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone(), Ty::null()])
-                }
+            TyKind::Map => match method {
+                "insert" => Rc::new([
+                    tycon.generics[0].clone(),
+                    tycon.generics[1].clone(),
+                    Ty::from(TyKind::Null),
+                ]),
                 "get" => Rc::new([tycon.generics[0].clone(), tycon.generics[1].clone()]),
-                "contains" => Rc::new([tycon.generics[0].clone(), Ty::bool()]),
-                "remove" => Rc::new([tycon.generics[0].clone(), Ty::null()]),
+                "contains" => Rc::new([tycon.generics[0].clone(), Ty::from(TyKind::Bool)]),
+                "remove" => Rc::new([tycon.generics[0].clone(), Ty::from(TyKind::Null)]),
                 _ => return None,
             },
             _ => return None,
@@ -976,14 +993,12 @@ impl Lowering<'_> {
         let Ty::Con(index) = index.sub(&self.subs) else { panic!() };
         let Ty::Con(ty) = ty.sub(&self.subs) else { panic!() };
         assert!(index.generics.is_empty());
-        let TyKind::Named(ty_name) = ty.kind else { panic!() };
-        let TyKind::Named(index_name) = index.kind else { panic!() };
 
-        match (ty_name, index_name) {
-            ("array", "int") => ty.generics[0].clone(),
-            ("array", "range") => Ty::Con(ty),
-            ("str", "int") => Ty::char(),
-            ("str", "range") => Ty::str(),
+        match (&ty.kind, &index.kind) {
+            (TyKind::Array, TyKind::Int) => ty.generics[0].clone(),
+            (TyKind::Array, TyKind::Range) => Ty::Con(ty),
+            (TyKind::Str, TyKind::Int) => Ty::from(TyKind::Char),
+            (TyKind::Str, TyKind::Range) => Ty::from(TyKind::Str),
             _ => todo!("{ty:?}"),
         }
     }
@@ -1012,34 +1027,13 @@ impl Lowering<'_> {
     }
 }
 
-macro_rules! impl_ty_const {
-    ($($name: ident),+) => {
-        #[allow(unused)]
-        impl Ty {
-            $(pub fn $name() -> Self {
-                thread_local! {
-                    static CACHE: TyCon = TyCon { kind: TyKind::Named(stringify!($name)), generics: Rc::new([]) };
-                }
-                CACHE.with(|ty| Ty::Con(ty.clone()))
-            })+
-        }
-        #[allow(unused)]
-        impl TyKind {
-            $(pub fn $name() -> Self {
-                TyKind::Named(stringify!($name))
-            })+
-        }
-    };
-}
-impl_ty_const!(str, int, bool, char, null, range, range_inclusive);
-
 impl Ty {
     pub fn array(of: Ty) -> Ty {
-        Ty::Con(TyCon { kind: TyKind::Named("array"), generics: Rc::new([of]) })
+        Ty::Con(TyCon { kind: TyKind::Array, generics: Rc::new([of]) })
     }
 
     pub fn map(key: Ty, val: Ty) -> Ty {
-        Ty::Con(TyCon { kind: TyKind::Named("map"), generics: Rc::new([key, val]) })
+        Ty::Con(TyCon { kind: TyKind::Map, generics: Rc::new([key, val]) })
     }
 
     pub fn func(params: impl IntoIterator<Item = Ty>, ret: Ty) -> Ty {
@@ -1050,6 +1044,6 @@ impl Ty {
     }
 
     pub fn tuple(generics: Rc<[Ty]>) -> Ty {
-        Ty::Con(TyCon { kind: TyKind::Named("tuple"), generics })
+        Ty::Con(TyCon { kind: TyKind::Tuple, generics })
     }
 }

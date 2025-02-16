@@ -33,9 +33,24 @@ impl From<TyKind> for TyCon {
     }
 }
 
+impl From<TyKind> for Ty {
+    fn from(kind: TyKind) -> Self {
+        Self::Con(TyCon::from(kind))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TyKind {
-    Named(&'static str),
+    Null,
+    Bool,
+    Int,
+    Char,
+    Str,
+    Range,
+    RangeInclusive,
+    Array,
+    Map,
+    Tuple,
     Struct { fields: Rc<BTreeMap<&'static str, (u32, Ty)>> },
     Enum { id: u32, name: &'static str, variants: Rc<BTreeMap<&'static str, u16>> },
     Function { params: Rc<[Ty]>, ret: Rc<Ty> },
@@ -128,9 +143,9 @@ mod tests {
         };
     }
     macro_rules! tycon {
-        ($name:expr,$($generic:expr)*) => {
+        ($kind:expr,$($generic:expr)*) => {
             Ty::Con(TyCon {
-                kind: TyKind::Named($name),
+                kind: $kind,
                 generics: vec![$($generic),*].into(),
             })
         };
@@ -140,19 +155,19 @@ mod tests {
     fn test() {
         let mut subs = HashMap::new();
 
-        unify(&tyvar!(3), &tycon!("array", tyvar!(5)), &mut subs);
-        unify(&tyvar!(4), &tycon!("int"), &mut subs);
+        unify(&tyvar!(3), &tycon!(TyKind::Array, tyvar!(5)), &mut subs);
+        unify(&tyvar!(4), &tycon!(TyKind::Int), &mut subs);
         unify(&tyvar!(4), &tyvar!(1), &mut subs);
-        unify(&tyvar!(4), &tycon!("int"), &mut subs);
-        unify(&tyvar!(3), &tycon!("array", tyvar!(6)), &mut subs);
+        unify(&tyvar!(4), &tycon!(TyKind::Int), &mut subs);
+        unify(&tyvar!(3), &tycon!(TyKind::Array, tyvar!(6)), &mut subs);
         unify(&tyvar!(6), &tyvar!(4), &mut subs);
         unify(&tyvar!(3), &tyvar!(2), &mut subs);
 
-        assert_eq!(tyvar!(1).sub(&subs), tycon!("int"));
-        assert_eq!(tyvar!(2).sub(&subs), tycon!("array", tycon!("int")));
-        assert_eq!(tyvar!(3).sub(&subs), tycon!("array", tycon!("int")));
-        assert_eq!(tyvar!(4).sub(&subs), tycon!("int"));
-        assert_eq!(tyvar!(5).sub(&subs), tycon!("int"));
-        assert_eq!(tyvar!(6).sub(&subs), tycon!("int"));
+        assert_eq!(tyvar!(1).sub(&subs), tycon!(TyKind::Int));
+        assert_eq!(tyvar!(2).sub(&subs), tycon!(TyKind::Array, tycon!(TyKind::Int)));
+        assert_eq!(tyvar!(3).sub(&subs), tycon!(TyKind::Array, tycon!(TyKind::Int)));
+        assert_eq!(tyvar!(4).sub(&subs), tycon!(TyKind::Int));
+        assert_eq!(tyvar!(5).sub(&subs), tycon!(TyKind::Int));
+        assert_eq!(tyvar!(6).sub(&subs), tycon!(TyKind::Int));
     }
 }
