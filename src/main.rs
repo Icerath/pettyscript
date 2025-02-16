@@ -3,9 +3,9 @@ mod bytecode;
 mod codegen;
 mod compile;
 mod disassemble;
-mod hir;
 mod intern;
 mod lexer;
+mod mir;
 mod parser;
 #[cfg(test)]
 mod tests;

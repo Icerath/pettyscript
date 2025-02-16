@@ -3,7 +3,7 @@ use miette::Result;
 use crate::{
     builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr},
-    hir::*,
+    mir::*,
     parser::{BinOp, UnaryOp},
     typck::{Substitutions, Ty, TyCon, TyKind},
 };
