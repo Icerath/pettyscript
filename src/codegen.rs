@@ -66,7 +66,7 @@ impl Codegen {
         let function_end = self.builder.create_label();
 
         self.builder.insert(Instr::CreateFunction { stack_size: func.stack_size as u16 });
-        self.store(func.ident.offset);
+        self.store(func.offset);
         self.builder.insert(Instr::Jump(function_end));
         self.builder.insert_label(function_start);
 

@@ -32,11 +32,9 @@ pub enum Item {
 
 #[derive(Debug)]
 pub struct Function {
-    pub ident: Ident,
+    pub offset: Offset,
     pub params: Vec<Ident>,
     pub stack_size: usize,
-    #[expect(unused)]
-    pub ty: Ty,
     pub ret: Ty,
     pub body: Block,
 }
@@ -611,8 +609,7 @@ impl Lowering<'_> {
         let stack_size = last_scope.variables.len();
 
         out.push(Item::Function(Function {
-            ident,
-            ty: fn_ty,
+            offset: ident.offset,
             stack_size,
             params: fn_params,
             ret,
