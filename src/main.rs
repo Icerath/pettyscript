@@ -1,3 +1,5 @@
+#![feature(test)]
+
 mod builtints;
 mod bytecode;
 mod codegen;

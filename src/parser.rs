@@ -1008,3 +1008,24 @@ impl Parse for Generic {
         Ok(Self { name, bounds })
     }
 }
+
+#[cfg(test)]
+mod benches {
+    use std::hint::black_box;
+
+    use super::parse;
+
+    extern crate test;
+
+    #[bench]
+    fn fizzbuzz(b: &mut test::Bencher) {
+        let src = include_str!("../examples/fizzbuzz.pty");
+        b.iter(|| parse(black_box(src)));
+    }
+
+    #[bench]
+    fn long_expr(b: &mut test::Bencher) {
+        let src = "1 + (2 + (3 + (4 + (5 + (6 + (7 + 8) * 6) * 5) * 4) * 3) * 2) * 1;";
+        b.iter(|| parse(black_box(src)));
+    }
+}
