@@ -614,6 +614,8 @@ impl<'a> Stream<'a> {
         }
     }
 
+    #[cold]
+    #[inline(never)]
     fn expect_failed(&self, got: TokenKind, one_of: &[TokenKind]) -> Error {
         debug_assert_ne!(one_of.len(), 0);
         let expect_msg = {
@@ -628,19 +630,34 @@ impl<'a> Stream<'a> {
     }
 
     fn bump(&mut self) -> Result<Token> {
+        self.process_new()
+    }
+
+    fn process_new(&mut self) -> Result<Token> {
+        #[cold]
+        #[inline(never)]
+        fn handle_bump_err(
+            state: Option<&Result<Token, ()>>,
+            src: &str,
+            span: Span,
+        ) -> Result<Token> {
+            let src = src.to_string();
+            match state {
+                Some(Ok(..)) => unreachable!(),
+                Some(Err(())) => {
+                    let span = LabeledSpan::at_offset(span.end, "here");
+                    Err(miette::miette!(labels = vec![span], "Lexer Error").with_source_code(src))
+                }
+                None => {
+                    let span = LabeledSpan::at(span, "here");
+                    Err(miette::miette!(labels = vec![span], "Lexer Error").with_source_code(src))
+                }
+            }
+        }
         let span = self.lexer.span();
         match self.lexer.next() {
             Some(Ok(tok)) => Ok(tok),
-            Some(Err(())) => {
-                let span = LabeledSpan::at_offset(span.end, "here");
-                Err(miette::miette!(labels = vec![span], "Lexer Error")
-                    .with_source_code(self.src()))
-            }
-            None => {
-                let span = LabeledSpan::at(span, "here");
-                Err(miette::miette!(labels = vec![span], "Lexer Error")
-                    .with_source_code(self.src()))
-            }
+            other => handle_bump_err(other.as_ref(), self.lexer.source(), span),
         }
     }
 
