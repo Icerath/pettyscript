@@ -263,11 +263,12 @@ pub struct IfStmt {
 #[derive(Clone)]
 struct Stream<'a> {
     lexer: Lexer<'a>,
+    prev_end: usize,
 }
 
 impl<'a> Stream<'a> {
     fn new(content: &'a str) -> Self {
-        Self { lexer: Token::lexer(content) }
+        Self { lexer: Token::lexer(content), prev_end: 0 }
     }
 
     fn parse<T: Parse>(&mut self) -> Result<T> {
@@ -396,8 +397,6 @@ impl<'a> Stream<'a> {
                         Token::Comma => self.skip(),
                         Token::RBrace => {}
                         got => {
-                            // TODO: Better error placement
-                            self.skip();
                             return Err(self.expect_failed(got.kind(), &[
                                 TokenKind::Comma,
                                 TokenKind::LBrace,
@@ -599,12 +598,7 @@ impl<'a> Stream<'a> {
 
     /// Semicolons specifically should not show as expected over the next token.
     fn expect_semicolon(&mut self) -> Result<()> {
-        let span = self.lexer.span().end..self.lexer.span().end;
-        if let Token::Semicolon = self.bump()? {
-            return Ok(());
-        }
-        let span = LabeledSpan::at(span, "expected ';' here");
-        Err(miette::miette!(labels = vec![span], "Missing ';'").with_source_code(self.src()))
+        self.expect_token(TokenKind::Semicolon).map(|_| ())
     }
 
     fn expect_any(&mut self, one_of: &[TokenKind]) -> Result<Token> {
@@ -624,7 +618,12 @@ impl<'a> Stream<'a> {
             reprs.extend(one_of.iter().map(|kind| format!("'{}'", kind.repr())));
             prefix.to_string() + &reprs.join("|")
         };
-        let span = LabeledSpan::at(self.lexer.span(), format!("expected {expect_msg} here"));
+        let span_message = format!("expected {expect_msg} here");
+        let span = if one_of.iter().all(|tok| tok.repr().len() == 1) {
+            LabeledSpan::at_offset(self.prev_end, span_message)
+        } else {
+            LabeledSpan::at(self.lexer.span(), span_message)
+        };
         miette::miette!(labels = vec![span], "Expected: {expect_msg}, Got: '{got}'")
             .with_source_code(self.src())
     }
@@ -655,6 +654,7 @@ impl<'a> Stream<'a> {
             }
         }
         let span = self.lexer.span();
+        self.prev_end = span.end;
         match self.lexer.next() {
             Some(Ok(tok)) => Ok(tok),
             other => handle_bump_err(other.as_ref(), self.lexer.source(), span),
@@ -783,7 +783,6 @@ impl Parse for IfChain {
                     break;
                 }
                 got => {
-                    stream.skip();
                     return Err(
                         stream.expect_failed(got.kind(), &[TokenKind::If, TokenKind::LBrace])
                     );
