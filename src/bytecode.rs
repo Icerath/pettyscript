@@ -50,6 +50,7 @@ pub enum Instr {
     CJump(u32),
     Load(u32),
     Store(u32),
+    StoreGlobal(u32),
     LoadGlobal(u32),
     CallBuiltinMethod(MethodBuiltin),
     LoadField(u32),

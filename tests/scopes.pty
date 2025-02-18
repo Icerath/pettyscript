@@ -1,0 +1,12 @@
+let i = 0;
+assert(i == 0);
+
+fn inner() {
+    assert(i == 0);
+    i = 1;
+    assert(i == 1);
+    let i = 2;
+    assert(i == 2);
+}
+inner();
+assert(i == 1);

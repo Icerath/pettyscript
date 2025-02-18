@@ -435,12 +435,10 @@ impl Codegen {
         }
     }
 
-    #[expect(clippy::match_same_arms)]
     fn store(&mut self, offset: Offset) {
         match offset {
             Offset::Local(offset) => self.builder.insert(Instr::Store(offset)),
-            // ???
-            Offset::Global(offset) => self.builder.insert(Instr::Store(offset)),
+            Offset::Global(offset) => self.builder.insert(Instr::StoreGlobal(offset)),
         }
     }
 }

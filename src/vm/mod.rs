@@ -152,6 +152,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     unsafe { assert_unchecked((offset as usize) < stack.len()) };
                     self.stack.push(stack[offset as usize].clone());
                 }
+                Instr::StoreGlobal(offset) => {
+                    let offset = offset as usize;
+                    let variable_stack = self.variable_stacks.first();
+                    unsafe { assert_unchecked(offset < variable_stack.len()) };
+                    variable_stack[offset] = Self::partial_pop_stack(&mut self.stack);
+                }
                 Instr::Store(offset) => {
                     let offset = offset as usize;
                     let variable_stack = self.variable_stacks.last();
