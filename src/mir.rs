@@ -265,6 +265,10 @@ impl Lowering<'_> {
             self.scope().insert(name, ty, false)
         }
     }
+
+    pub fn global_scope_size(&self) -> usize {
+        self.scopes[0].var_counter
+    }
 }
 
 impl Lowering<'_> {

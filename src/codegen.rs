@@ -8,11 +8,15 @@ use crate::{
     typck::{Substitutions, Ty, TyCon, TyKind},
 };
 
-pub fn codegen(block: &Block, subs: Substitutions, main_fn: Option<Offset>) -> Result<Vec<u8>> {
+pub fn codegen(
+    block: &Block,
+    subs: Substitutions,
+    main_fn: Option<Offset>,
+    global_scope: u32,
+) -> Result<Vec<u8>> {
     let mut codegen = Codegen { subs, ..Default::default() };
     codegen.block(block)?;
-    // TODO: Actually count this.
-    codegen.builder.set_global_stack_size(64);
+    codegen.builder.set_global_stack_size(global_scope);
     if let Some(offset) = main_fn {
         codegen.load(offset);
         codegen.builder.insert(Instr::FnCall);
