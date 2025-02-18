@@ -1,5 +1,6 @@
 use crate::{
     bytecode::{Instr, VERSION},
+    compile::compile,
     vm::BytecodeReader,
 };
 
@@ -28,8 +29,11 @@ pub fn disassemble(bytecode: &[u8]) {
     println!("GLOBAL_STACK_SIZE {global_stack_size}");
     println!();
 
+    let size_std = sizeof_std();
+    reader.head += size_std;
+
     while reader.head < reader.bytes.len() {
-        let offset = reader.head;
+        let offset = reader.head - size_std;
         let op = Instr::bc_read(&reader.bytes[reader.head..]);
         reader.head += 1 + op.size();
         print!("{offset}: ");
@@ -78,4 +82,17 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::LoadVariant { tag } => p!("LOAD_VARIANT {tag}"),
         };
     }
+}
+
+fn sizeof_std() -> usize {
+    // TODO: dedup header parsing.
+    let std = compile("").expect("std lib should compile");
+    let mut reader = BytecodeReader::new(&std);
+    let _version = u32::from_le_bytes(*reader.read::<4>());
+    let _global_stack_size = u32::from_le_bytes(*reader.read::<4>());
+    let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
+    reader.bytes = &reader.bytes[reader.head..];
+    reader.head = 0;
+    reader.bytes = &reader.bytes[len_consts..];
+    reader.bytes.len()
 }
