@@ -8,7 +8,7 @@ pub fn disassemble(bytecode: &[u8]) {
 
     let mut reader = BytecodeReader::new(bytecode);
     let version = u32::from_le_bytes(*reader.read::<4>());
-    let _global_stack_size = u32::from_le_bytes(*reader.read::<4>());
+    let global_stack_size = u32::from_le_bytes(*reader.read::<4>());
     assert_eq!(version, VERSION);
     let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
     reader.bytes = &reader.bytes[reader.head..];
@@ -22,6 +22,11 @@ pub fn disassemble(bytecode: &[u8]) {
             &consts[ptr as usize..ptr as usize + $len as usize]
         }};
     }
+
+    println!("VERSION {version}");
+    println!("LEN CONSTS {len_consts}");
+    println!("GLOBAL_STACK_SIZE {global_stack_size}");
+    println!();
 
     while reader.head < reader.bytes.len() {
         let offset = reader.head;
