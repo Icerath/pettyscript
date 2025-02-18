@@ -12,7 +12,7 @@ fn exec_vm(bytecode: &[u8]) -> String {
 macros::generate_integration_tests! {}
 
 #[test]
-fn test_fizzbuzz_example() {
+fn fizzbuzz_example() {
     let src = include_str!("../examples/fizzbuzz.pty");
     let code = compile(src).unwrap();
     let result = exec_vm(&code);
@@ -31,7 +31,7 @@ fn test_fizzbuzz_example() {
 
 #[test]
 #[cfg(not(miri))]
-fn test_lexer_example() {
+fn lexer_example() {
     use logos::Logos;
 
     use crate::lexer::Token;
