@@ -1,42 +1,34 @@
 use crate::{
-    bytecode::{Instr, VERSION},
+    bytecode::Instr,
     compile::compile,
-    vm::BytecodeReader,
+    vm::{BytecodeHeader, BytecodeReader},
 };
 
 pub fn disassemble(bytecode: &[u8]) {
     use println as p;
 
-    let mut reader = BytecodeReader::new(bytecode);
-    let version = u32::from_le_bytes(*reader.read::<4>());
-    let global_stack_size = u32::from_le_bytes(*reader.read::<4>());
-    assert_eq!(version, VERSION);
-    let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
-    reader.bytes = &reader.bytes[reader.head..];
-    reader.head = 0;
-    let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
-    reader.bytes = &reader.bytes[len_consts..];
+    let BytecodeHeader { version, global_stack_size, str_data, instructions } =
+        { BytecodeReader::new(bytecode).read_header() };
 
     macro_rules! load_str {
         ($ptr:expr, $len:expr) => {{
             let ptr = $ptr;
-            &consts[ptr as usize..ptr as usize + $len as usize]
+            &str_data[ptr as usize..ptr as usize + $len as usize]
         }};
     }
 
-    println!("VERSION {version}");
-    println!("LEN CONSTS {len_consts}");
-    println!("GLOBAL_STACK_SIZE {global_stack_size}");
-    println!();
+    p!("VERSION {version}");
+    p!("LEN CONSTS {}", str_data.len());
+    p!("GLOBAL_STACK_SIZE {global_stack_size}");
+    p!();
 
-    let size_std = sizeof_std();
-    reader.head += size_std;
+    let instructions = &instructions[sizeof_std()..];
+    let mut head = 0;
 
-    while reader.head < reader.bytes.len() {
-        let offset = reader.head - size_std;
-        let op = Instr::bc_read(&reader.bytes[reader.head..]);
-        reader.head += 1 + op.size();
-        print!("{offset}: ");
+    while head < instructions.len() {
+        let op = Instr::bc_read(&instructions[head..]);
+        print!("{head}: ");
+        head += 1 + op.size();
         match op {
             Instr::EnumTag => p!("ENUM_TAG"),
             Instr::Abort => p!("ABORT"),
@@ -85,14 +77,6 @@ pub fn disassemble(bytecode: &[u8]) {
 }
 
 fn sizeof_std() -> usize {
-    // TODO: dedup header parsing.
     let std = compile("").expect("std lib should compile");
-    let mut reader = BytecodeReader::new(&std);
-    let _version = u32::from_le_bytes(*reader.read::<4>());
-    let _global_stack_size = u32::from_le_bytes(*reader.read::<4>());
-    let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
-    reader.bytes = &reader.bytes[reader.head..];
-    reader.head = 0;
-    reader.bytes = &reader.bytes[len_consts..];
-    reader.bytes.len()
+    BytecodeReader::new(&std).read_header().instructions.len()
 }

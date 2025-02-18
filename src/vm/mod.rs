@@ -87,23 +87,18 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
 
     fn new(bytecode: &'src [u8], stdout: &'io mut dyn Write) -> Self {
         let mut reader = BytecodeReader::new(bytecode);
-        let version = u32::from_le_bytes(*reader.read::<4>());
-        assert_eq!(version, VERSION);
-        let global_stack_size = u32::from_le_bytes(*reader.read::<4>()) as usize;
 
-        let len_consts = u32::from_le_bytes(*reader.read::<4>()) as usize;
-        reader.bytes = &reader.bytes[reader.head..];
-        let consts = std::str::from_utf8(&reader.bytes[..len_consts]).unwrap();
-        let instructions = &reader.bytes[len_consts..];
+        let BytecodeHeader { global_stack_size, str_data: consts, instructions, .. } =
+            reader.read_header();
 
         let stack = vec![];
         let call_stack = vec![];
 
         let mut variable_stacks = VariableStack::default();
-        let global_scope = Builtin::ALL
-            .map(|b| Value::Callable(Callable::Builtin(b)))
-            .into_iter()
-            .chain((0..global_stack_size - Builtin::ALL.len()).map(|_| Value::Bool(false)));
+        let global_scope =
+            Builtin::ALL.map(|b| Value::Callable(Callable::Builtin(b))).into_iter().chain(
+                (0..global_stack_size as usize - Builtin::ALL.len()).map(|_| Value::Bool(false)),
+            );
         variable_stacks.extend_new(global_scope);
         Self { consts, instructions, head: 0, stack, call_stack, variable_stacks, stdout }
     }
@@ -505,4 +500,23 @@ impl<'a> BytecodeReader<'a> {
         self.head += N;
         bytes
     }
+
+    pub fn read_header(&mut self) -> BytecodeHeader<'a> {
+        let version = u32::from_le_bytes(*self.read::<4>());
+        assert_eq!(version, VERSION);
+        let global_stack_size = u32::from_le_bytes(*self.read::<4>());
+
+        let len_str_data = u32::from_le_bytes(*self.read::<4>()) as usize;
+        self.bytes = &self.bytes[self.head..];
+        let str_data = std::str::from_utf8(&self.bytes[..len_str_data]).unwrap();
+        let instructions = &self.bytes[len_str_data..];
+        BytecodeHeader { version, global_stack_size, str_data, instructions }
+    }
+}
+
+pub struct BytecodeHeader<'a> {
+    pub version: u32,
+    pub global_stack_size: u32,
+    pub str_data: &'a str,
+    pub instructions: &'a [u8],
 }
