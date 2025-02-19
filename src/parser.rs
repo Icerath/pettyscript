@@ -537,11 +537,6 @@ impl<'a> Stream<'a> {
         self.expect_any(&[expected.into()])
     }
 
-    /// Semicolons specifically should not show as expected over the next token.
-    fn expect_semicolon(&mut self) -> Result<()> {
-        self.expect_token(TokenKind::Semicolon).map(|_| ())
-    }
-
     fn expect_any(&mut self, one_of: &[TokenKind]) -> Result<Token> {
         match self.bump()? {
             got if one_of.contains(&got.kind()) => Ok(got),
@@ -670,12 +665,12 @@ impl Parse for Stmt {
                 Token::Return => Stmt::Return(Return::parse(stream)?),
                 Token::Break => {
                     stream.skip();
-                    stream.expect_semicolon()?;
+                    stream.expect_token(Token::Semicolon)?;
                     Stmt::Break
                 }
                 Token::Continue => {
                     stream.skip();
-                    stream.expect_semicolon()?;
+                    stream.expect_token(Token::Semicolon)?;
                     Stmt::Continue
                 }
                 Token::Trait => Stmt::Trait(Trait::parse(stream)?),
@@ -695,14 +690,14 @@ impl Parse for Stmt {
                     let Ok(assign) = stream.parse() else {
                         *stream = prev;
                         let expr = stream.parse_root_expr()?;
-                        stream.expect_semicolon()?;
+                        stream.expect_token(Token::Semicolon)?;
                         break Ok(Stmt::Expr(expr));
                     };
                     Stmt::Assign(assign)
                 }
                 _ => {
                     let expr = stream.parse_root_expr()?;
-                    stream.expect_semicolon()?;
+                    stream.expect_token(Token::Semicolon)?;
                     Stmt::Expr(expr)
                 }
             });
@@ -727,7 +722,7 @@ impl Parse for Assign {
             }
         }
         let expr = stream.parse_root_expr()?;
-        stream.expect_semicolon()?;
+        stream.expect_token(Token::Semicolon)?;
         Ok(Assign { root, segments: segments.into(), expr })
     }
 }
@@ -737,7 +732,7 @@ impl Parse for Return {
         stream.expect_token(Token::Return)?;
         let expr =
             if stream.peek()? == Token::Semicolon { None } else { Some(stream.parse_root_expr()?) };
-        stream.expect_semicolon()?;
+        stream.expect_token(Token::Semicolon)?;
         Ok(Return(expr))
     }
 }
@@ -1010,7 +1005,7 @@ impl Parse for VarDecl {
                 );
             }
         };
-        stream.expect_semicolon()?;
+        stream.expect_token(Token::Semicolon)?;
         Ok(VarDecl { pat, typ, expr: Some(expr) })
     }
 }
