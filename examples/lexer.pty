@@ -90,82 +90,72 @@ impl Lexer {
     fn new(str: str) -> self {
         return Lexer { str, remaining: str };
     }
-    fn skip_whitespace(self: self) {
-        self.remaining = self.remaining.trim();
-    }
     fn next(self: self) -> Token {
-        let rem = self.remaining;
-        const first_char = rem[0];
-        // FIXME: Provide a better way to handle default values or late initialization
+        let rem = self.remaining.trim();
+        while rem.starts_with("//") {
+            let i = 2;
+            while i < rem.len() && rem[i] != '\n' {
+                i = i + 1;
+            }
+            rem = rem[i..rem.len()].trim();
+        }
+        // FIXME: better late initialization
         let token = Token:Ident;
-
-        while true {
-            let skip = 1;
-
-            if rem.starts_with("//") {
-                let i = 2;
-                while i < rem.len() && rem[i] != '\n' {
-                    i = i + 1;
-                }
-                rem = rem[i..rem.len()];
-                continue;
+        let skip = 1;
+        const first_char = rem[0];
+        // Symbols
+        if rem.starts_with("||") { token = Token:Or; skip = 2; }
+        else if rem.starts_with("&&") { token = Token:And; skip = 2; }
+        else if rem.starts_with("==") { token = Token:EqEq; skip = 2; }
+        else if rem.starts_with("!=") { token = Token:BangEq; skip = 2; }
+        else if rem.starts_with("<=") { token = Token:LAngleEq; skip = 2; }
+        else if rem.starts_with(">=") { token = Token:RAngleEq; skip = 2; }
+        else if rem.starts_with("..=") { token = Token:RangeInclusive; skip = 3; }
+        else if rem.starts_with("..") { token = Token:Range; skip = 2; }
+        else if SYMBOLS.contains(first_char) { token = SYMBOLS.get(first_char); }
+        // Literals
+        else if first_char.is_digit() || first_char == '_' {
+            while skip < rem.len() && rem[skip].is_digit() {
+                skip = skip + 1;
             }
-            // Symbols
-            else if rem.starts_with("||") { token = Token:Or; skip = 2; }
-            else if rem.starts_with("&&") { token = Token:And; skip = 2; }
-            else if rem.starts_with("==") { token = Token:EqEq; skip = 2; }
-            else if rem.starts_with("!=") { token = Token:BangEq; skip = 2; }
-            else if rem.starts_with("<=") { token = Token:LAngleEq; skip = 2; }
-            else if rem.starts_with(">=") { token = Token:RAngleEq; skip = 2; }
-            else if rem.starts_with("..=") { token = Token:RangeInclusive; skip = 3; }
-            else if rem.starts_with("..") { token = Token:Range; skip = 2; }
-            else if SYMBOLS.contains(first_char) { token = SYMBOLS.get(first_char); }
-            // Literals
-            else if first_char.is_digit() || first_char == '_' {
-                while skip < rem.len() && rem[skip].is_digit() {
-                    skip = skip + 1;
-                }
-                token = Token:Int;
-            } else if first_char == '\'' {
-                skip = skip + 2;
-                token = Token:Character;
-            } else if first_char == '"' {
-                while skip < rem.len() && rem[skip] != '"' {
-                    skip = skip + 1;
-                }
+            token = Token:Int;
+        } else if first_char == '\'' {
+            skip = skip + 2;
+            token = Token:Character;
+        } else if first_char == '"' {
+            while skip < rem.len() && rem[skip] != '"' {
                 skip = skip + 1;
-                token = Token:String;
-            } else if rem.starts_with("f\"") {
+            }
+            skip = skip + 1;
+            token = Token:String;
+        } else if rem.starts_with("f\"") {
+            skip = skip + 1;
+            while skip < rem.len() && rem[skip] != '"' {
                 skip = skip + 1;
-                while skip < rem.len() && rem[skip] != '"' {
-                    skip = skip + 1;
-                }
+            }
+            skip = skip + 1;
+            token = Token:FString;
+        } else if first_char.is_alphabetic() {
+            while skip < rem.len() && rem[skip].is_alphabetic() {
                 skip = skip + 1;
-                token = Token:FString;
-            } else if first_char.is_alphabetic() {
-                while skip < rem.len() && rem[skip].is_alphabetic() {
-                    skip = skip + 1;
-                }
-                if KEYWORDS.contains(rem[0..skip]) {
-                    token = KEYWORDS.get(rem[0..skip]);
-                } else {
-                    token = Token:Ident;
-                }
+            }
+            if KEYWORDS.contains(rem[0..skip]) {
+                token = KEYWORDS.get(rem[0..skip]);
             } else {
-                println(f"Invalid Symbol: `{first_char}`");
-                exit(1);
+                token = Token:Ident;
             }
-            self.remaining = rem[skip..rem.len()];
-            return token;
-        } 
+        } else {
+            println(f"Invalid Symbol: `{first_char}`");
+            exit(1);
+        }
+        self.remaining = rem[skip..rem.len()];
+        return token;
     }
 }
 
 fn main() {
-    let str = read_file("examples/fizzbuzz.pty").trim();
-    let lexer = Lexer:new(str);
+    let lexer = Lexer:new(read_file("examples/fizzbuzz.pty"));
     while lexer.remaining != "" {
-        lexer.skip_whitespace();
         println(f"{lexer.next()}");
     }
 }
