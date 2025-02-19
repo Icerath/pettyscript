@@ -278,8 +278,7 @@ impl<'a> Stream<'a> {
     fn parse_root(mut self) -> Result<Box<[Spanned<Stmt>]>> {
         let mut stmts = vec![];
         while self.lexer.clone().next().is_some() {
-            if self.peek()? == Token::Semicolon {
-                self.skip();
+            if self.try_token(TokenKind::Semicolon)?.is_some() {
                 continue;
             }
             stmts.push(self.parse()?);
@@ -442,20 +441,16 @@ impl<'a> Stream<'a> {
         self.expect_token(Token::LBracket)?;
 
         let mut values = vec![];
-        while self.peek()? != Token::RBracket {
+        while self.try_token(TokenKind::RBracket)?.is_none() {
             let expr = self.parse_root_expr()?;
             values.push(expr);
-            if self.peek()? == Token::Comma {
-                self.skip();
-            }
+            self.try_token(TokenKind::Comma)?;
         }
-        self.skip();
         Ok(values.into())
     }
 
     fn parse_paren_expr(&mut self) -> Result<Expr> {
-        if self.peek()? == Token::LParen {
-            self.skip();
+        if self.try_token(TokenKind::LParen)?.is_some() {
             let expr = self.parse_root_expr()?;
             self.expect_token(Token::RParen)?;
             return Ok(expr);
@@ -572,6 +567,16 @@ impl<'a> Stream<'a> {
         };
         miette::miette!(labels = vec![span], "Expected: {expect_msg}, Got: '{got}'")
             .with_source_code(self.src())
+    }
+
+    fn try_token(&mut self, expected: TokenKind) -> Result<Option<Token>> {
+        let mut copy = self.clone();
+        let tok = copy.bump()?;
+        if tok.kind() != expected {
+            return Ok(None);
+        }
+        std::mem::swap(&mut copy, self);
+        Ok(Some(tok))
     }
 
     fn bump(&mut self) -> Result<Token> {
@@ -743,8 +748,7 @@ impl Parse for IfChain {
 
         let mut else_ifs = vec![];
         let mut r#else = None;
-        while let Token::Else = stream.peek()? {
-            stream.skip();
+        while stream.try_token(TokenKind::Else)?.is_some() {
             match stream.peek()? {
                 Token::If => else_ifs.push(stream.parse()?),
                 Token::LBrace => {
@@ -777,8 +781,7 @@ impl Parse for Function {
         let ident = stream.parse()?;
 
         let mut generics: Box<[_]> = Box::new([]);
-        if stream.peek()? == Token::LBracket {
-            stream.skip();
+        if stream.try_token(TokenKind::LBracket)?.is_some() {
             generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
         }
 
@@ -786,13 +789,11 @@ impl Parse for Function {
         let params = stream.parse_separated(TokenKind::Comma, TokenKind::RParen)?;
 
         let mut ret_type = None;
-        if stream.peek()? == Token::ThinArrow {
-            stream.skip();
+        if stream.try_token(TokenKind::ThinArrow)?.is_some() {
             ret_type = Some(stream.parse()?);
         }
 
-        let body = if stream.peek()? == Token::Semicolon {
-            stream.skip();
+        let body = if stream.try_token(TokenKind::Semicolon)?.is_some() {
             None
         } else {
             Some(stream.parse()?)
@@ -845,16 +846,13 @@ impl Parse for Block {
     fn parse(stream: &mut Stream) -> Result<Self> {
         stream.expect_token(Token::LBrace)?;
         let mut stmts = vec![];
-        while stream.peek()? != Token::RBrace {
-            if stream.peek()? == Token::Semicolon {
-                stream.skip();
+        while stream.try_token(TokenKind::RBrace)?.is_none() {
+            if stream.try_token(TokenKind::Semicolon)?.is_some() {
                 continue;
             }
             stmts.push(stream.parse()?);
         }
-        let stmts = stmts.into_boxed_slice();
-        stream.expect_token(Token::RBrace)?;
-        Ok(Block { stmts })
+        Ok(Block { stmts: stmts.into() })
     }
 }
 
@@ -870,19 +868,17 @@ impl Parse for Ident {
 impl Parse for ExplicitType {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let ident = stream.parse()?;
-        if stream.peek()? != Token::LBracket {
+        if stream.try_token(TokenKind::LBracket)?.is_none() {
             return Ok(ExplicitType { ident, generics: [].into() });
         }
-        stream.skip();
         let mut generics = vec![];
-        while stream.peek()?.kind() != TokenKind::RBracket {
+        while stream.try_token(TokenKind::RBracket)?.is_none() {
             generics.push(stream.parse()?);
-            if stream.peek()?.kind() == TokenKind::RBracket {
+            if stream.try_token(TokenKind::RBracket)?.is_some() {
                 break;
             }
             stream.expect_token(Token::Comma)?;
         }
-        stream.skip();
         Ok(ExplicitType { ident, generics: generics.into() })
     }
 }
@@ -937,8 +933,7 @@ impl Parse for ImplBlock {
     fn parse(stream: &mut Stream) -> Result<Self> {
         stream.expect_token(Token::Impl)?;
         let mut generics: Box<[Spanned<Ident>]> = Box::new([]);
-        if stream.peek()? == Token::LBracket {
-            stream.skip();
+        if stream.try_token(TokenKind::LBracket)?.is_some() {
             generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
         }
         let sig = stream.parse()?;
@@ -950,10 +945,9 @@ impl Parse for ImplBlock {
 impl Parse for ImplSig {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let ident = Spanned::<ExplicitType>::parse(stream)?;
-        if stream.peek()? != Token::For {
+        if stream.try_token(TokenKind::For)?.is_none() {
             return Ok(Self::Inherent(ident));
         }
-        stream.skip();
         Ok(Self::Trait([ident, stream.parse()?]))
     }
 }
@@ -970,8 +964,7 @@ impl Parse for Param {
 impl Parse for Path {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let mut segments = vec![stream.parse()?];
-        while stream.peek()? == Token::Colon {
-            stream.skip();
+        while stream.try_token(TokenKind::Colon)?.is_some() {
             segments.push(stream.parse()?);
         }
         Ok(Self { segments: segments.into() })
@@ -989,9 +982,7 @@ impl Parse for Generic {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let name = stream.parse()?;
 
-        let bounds = if stream.peek()? == Token::Colon {
-            stream.skip();
-
+        let bounds = if stream.try_token(TokenKind::Comma)?.is_some() {
             // TODO: Parse multiple bounds (Add + Sub)
             let bounds = vec![stream.parse()?];
             Some(bounds.into_boxed_slice())
@@ -1007,8 +998,7 @@ impl Parse for VarDecl {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let pat = stream.parse()?;
         let mut typ = None;
-        if stream.peek()? == Token::Colon {
-            stream.skip();
+        if stream.try_token(TokenKind::Colon)?.is_some() {
             typ = Some(stream.parse()?);
         }
         let expr = match stream.bump()? {
