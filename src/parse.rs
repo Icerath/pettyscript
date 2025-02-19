@@ -4,7 +4,7 @@ use miette::{Error, LabeledSpan, Result};
 use crate::{
     ast::*,
     intern::intern,
-    lexer::{Token, TokenKind},
+    lex::{Token, TokenKind},
 };
 
 pub fn parse(src: &str) -> Result<Box<[Spanned<Stmt>]>> {

@@ -1,4 +1,4 @@
-use crate::{codegen, mir, parser::parse};
+use crate::{codegen, mir, parse::parse};
 
 pub fn compile(src: &str) -> miette::Result<Vec<u8>> {
     let std = parse(include_str!("../lib/std.pty"))?;

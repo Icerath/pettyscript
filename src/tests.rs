@@ -34,7 +34,7 @@ fn fizzbuzz_example() {
 fn lexer_example() {
     use logos::Logos;
 
-    use crate::lexer::Token;
+    use crate::lex::Token;
     let fizzbuzz_src = include_str!("../examples/fizzbuzz.pty");
     let src = include_str!("../examples/lexer.pty");
     let code = compile(src).unwrap();

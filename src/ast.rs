@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use logos::Span;
 
-use crate::lexer::TokenKind;
+use crate::lex::TokenKind;
 
 pub type Ident = &'static str;
 

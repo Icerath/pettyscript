@@ -7,9 +7,9 @@ mod codegen;
 mod compile;
 mod disassemble;
 mod intern;
-mod lexer;
+mod lex;
 mod mir;
-mod parser;
+mod parse;
 #[cfg(test)]
 mod tests;
 mod typck;
