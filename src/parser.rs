@@ -564,9 +564,6 @@ impl Parse for Block {
         stream.expect_token(Token::LBrace)?;
         let mut stmts = vec![];
         while stream.try_token(TokenKind::RBrace)?.is_none() {
-            if stream.try_token(TokenKind::Semicolon)?.is_some() {
-                continue;
-            }
             stmts.push(stream.parse()?);
         }
         Ok(Block { stmts: stmts.into() })
