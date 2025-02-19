@@ -430,21 +430,12 @@ impl<'a> Stream<'a> {
                     expr: Box::new(self.parse_expr(0, allow_struct_init)?),
                 })
             }
-            Token::LBracket => self.parse_list_expr().map(Expr::Array),
+            Token::LBracket => {
+                self.skip();
+                Ok(Expr::Array(self.parse_separated(TokenKind::Comma, TokenKind::RBracket)?))
+            }
             _ => self.parse_paren_expr(),
         }
-    }
-
-    fn parse_list_expr(&mut self) -> Result<Box<[Expr]>> {
-        self.expect_token(Token::LBracket)?;
-
-        let mut values = vec![];
-        while self.try_token(TokenKind::RBracket)?.is_none() {
-            let expr = self.parse_root_expr()?;
-            values.push(expr);
-            self.try_token(TokenKind::Comma)?;
-        }
-        Ok(values.into())
     }
 
     fn parse_paren_expr(&mut self) -> Result<Expr> {
