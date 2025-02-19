@@ -1012,9 +1012,7 @@ impl Parse for VarDecl {
             typ = Some(stream.parse()?);
         }
         let expr = match stream.bump()? {
-            Token::Semicolon => {
-                return Ok(VarDecl { pat, typ, expr: None });
-            }
+            Token::Semicolon => return Ok(VarDecl { pat, typ, expr: None }),
             Token::Eq => stream.parse_root_expr()?,
             got => {
                 return Err(
