@@ -852,18 +852,13 @@ impl Parse for Ident {
 impl Parse for ExplicitType {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let ident = stream.parse()?;
-        if stream.try_token(TokenKind::LBracket)?.is_none() {
-            return Ok(ExplicitType { ident, generics: [].into() });
-        }
-        let mut generics = vec![];
-        while stream.try_token(TokenKind::RBracket)?.is_none() {
-            generics.push(stream.parse()?);
-            if stream.try_token(TokenKind::RBracket)?.is_some() {
-                break;
-            }
-            stream.expect_token(Token::Comma)?;
-        }
-        Ok(ExplicitType { ident, generics: generics.into() })
+
+        let mut generics: Box<[_]> = Box::new([]);
+        if stream.try_token(TokenKind::LBracket)?.is_some() {
+            generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
+        };
+
+        Ok(ExplicitType { ident, generics })
     }
 }
 
