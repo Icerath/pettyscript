@@ -1,5 +1,3 @@
-// Slowly building a lexer using pettyscript.
-
 struct Lexer { str: str, remaining: str }
 
 enum Token {
