@@ -691,7 +691,7 @@ impl Parse for Generic {
     fn parse(stream: &mut Stream) -> Result<Self> {
         let name = stream.parse()?;
 
-        let bounds = if stream.try_token(TokenKind::Comma)?.is_some() {
+        let bounds = if stream.try_token(TokenKind::Colon)?.is_some() {
             // TODO: Parse multiple bounds (Add + Sub)
             let bounds = vec![stream.parse()?];
             Some(bounds.into_boxed_slice())
