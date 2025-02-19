@@ -22,7 +22,8 @@ pub fn disassemble(bytecode: &[u8]) {
     p!("GLOBAL_STACK_SIZE {global_stack_size}");
     p!();
 
-    let instructions = &instructions[sizeof_std()..];
+    let size_std = sizeof_std() as u32;
+    let instructions = &instructions[size_std as usize..];
     let mut head = 0;
 
     while head < instructions.len() {
@@ -48,8 +49,8 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::ArrayIndex => p!("ARRAY_INDEX"),
             Instr::StringIndex => p!("STRING_INDEX"),
             Instr::StringSliceRange => p!("STRING_SLICE_RANGE"),
-            Instr::Jump(label) => p!("JUMP {label}"),
-            Instr::CJump(label) => p!("CJUMP {label}"),
+            Instr::Jump(label) => p!("JUMP {}", label - size_std),
+            Instr::CJump(label) => p!("CJUMP {}", label - size_std),
             Instr::CreateFunction { stack_size } => p!("CREATE_FUNCTION {stack_size}"),
             Instr::CreateStruct { size } => p!("EMPTY_STRUCT {size}"),
             Instr::FnCall => p!("FN_CALL"),
