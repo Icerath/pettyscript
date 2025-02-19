@@ -8,12 +8,12 @@ use miette::Result;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
+    ast::{
+        self, BinOp, ExplicitType, ImplSig, Pat, Path, Spanned, Stmt, StructInitField, UnaryOp,
+        VarDecl,
+    },
     builtints::Builtin,
     intern::intern,
-    parser::{
-        self as ast, BinOp, ExplicitType, ImplSig, Pat, Path, Spanned, Stmt, StructInitField,
-        UnaryOp, VarDecl,
-    },
     typck::{Substitutions, Ty, TyCon, TyKind, TyVar, unify},
 };
 

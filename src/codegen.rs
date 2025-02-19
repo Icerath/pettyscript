@@ -1,10 +1,10 @@
 use miette::Result;
 
 use crate::{
+    ast::{BinOp, UnaryOp},
     builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr},
     mir::*,
-    parser::{BinOp, UnaryOp},
     typck::{Substitutions, Ty, TyCon, TyKind},
 };
 
