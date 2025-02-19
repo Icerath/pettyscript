@@ -528,68 +528,14 @@ impl<'a> Stream<'a> {
         Ok(FString { segments: segments.into(), remaining })
     }
 
-    fn parse_if_stmt(&mut self) -> Result<IfStmt> {
-        self.expect_token(Token::If)?;
-        let condition = self.parse_expr(0, false)?;
-        let body = self.parse()?;
-        Ok(IfStmt { condition, body })
-    }
-
     fn parse_let_decl(&mut self) -> Result<Spanned<VarDecl>> {
         self.expect_token(Token::Let)?;
-        self.parse_var_decl()
+        self.parse()
     }
 
     fn parse_const_decl(&mut self) -> Result<Spanned<VarDecl>> {
         self.expect_token(Token::Const)?;
-        self.parse_var_decl()
-    }
-
-    fn parse_var_decl(&mut self) -> Result<Spanned<VarDecl>> {
-        let start = self.lexer.span().start;
-        let pat = self.parse()?;
-        let mut typ = None;
-        if self.peek()? == Token::Colon {
-            self.skip();
-            typ = Some(self.parse()?);
-        }
-        let expr = match self.bump()? {
-            Token::Semicolon => {
-                return Ok(Spanned {
-                    inner: VarDecl { pat, typ, expr: None },
-                    span: start..self.lexer.span().end,
-                });
-            }
-            Token::Eq => self.parse_root_expr()?,
-            got => {
-                return Err(self.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq]));
-            }
-        };
-        self.expect_semicolon()?;
-        Ok(Spanned {
-            inner: VarDecl { pat, typ, expr: Some(expr) },
-            span: start..self.lexer.span().end,
-        })
-    }
-
-    fn parse_assignment(&mut self) -> Result<Assign> {
-        let root = self.parse()?;
-        let mut segments = vec![];
-        loop {
-            match self.bump()? {
-                Token::Eq => break,
-                Token::Dot => segments.push(AssignSegment::Field(self.parse()?)),
-                Token::LBracket => {
-                    let index = self.parse_root_expr()?;
-                    self.expect_token(Token::RBracket)?;
-                    segments.push(AssignSegment::Index(index));
-                }
-                _ => return Err(miette::miette!("")),
-            }
-        }
-        let expr = self.parse_root_expr()?;
-        self.expect_semicolon()?;
-        Ok(Assign { root, segments: segments.into(), expr })
+        self.parse()
     }
 
     fn expect_token(&mut self, expected: impl Into<TokenKind>) -> Result<Token> {
@@ -740,7 +686,8 @@ impl Parse for Stmt {
                 Token::LBrace => Stmt::Block(Block::parse(stream)?),
                 Token::Ident(_) => {
                     let prev = stream.clone();
-                    let Ok(assign) = stream.parse_assignment() else {
+                    // FIXME:
+                    let Ok(assign) = stream.parse() else {
                         *stream = prev;
                         let expr = stream.parse_root_expr()?;
                         stream.expect_semicolon()?;
@@ -758,6 +705,28 @@ impl Parse for Stmt {
     }
 }
 
+impl Parse for Assign {
+    fn parse(stream: &mut Stream) -> Result<Self> {
+        let root = stream.parse()?;
+        let mut segments = vec![];
+        loop {
+            match stream.bump()? {
+                Token::Eq => break,
+                Token::Dot => segments.push(AssignSegment::Field(stream.parse()?)),
+                Token::LBracket => {
+                    let index = stream.parse_root_expr()?;
+                    stream.expect_token(Token::RBracket)?;
+                    segments.push(AssignSegment::Index(index));
+                }
+                _ => return Err(miette::miette!("")),
+            }
+        }
+        let expr = stream.parse_root_expr()?;
+        stream.expect_semicolon()?;
+        Ok(Assign { root, segments: segments.into(), expr })
+    }
+}
+
 impl Parse for Return {
     fn parse(stream: &mut Stream) -> Result<Self> {
         stream.expect_token(Token::Return)?;
@@ -770,14 +739,14 @@ impl Parse for Return {
 
 impl Parse for IfChain {
     fn parse(stream: &mut Stream) -> Result<Self> {
-        let first = stream.parse_if_stmt()?;
+        let first = stream.parse()?;
 
         let mut else_ifs = vec![];
         let mut r#else = None;
         while let Token::Else = stream.peek()? {
             stream.skip();
             match stream.peek()? {
-                Token::If => else_ifs.push(stream.parse_if_stmt()?),
+                Token::If => else_ifs.push(stream.parse()?),
                 Token::LBrace => {
                     r#else = Some(stream.parse()?);
                     break;
@@ -790,6 +759,15 @@ impl Parse for IfChain {
             }
         }
         Ok(IfChain { first, else_ifs: else_ifs.into(), r#else })
+    }
+}
+
+impl Parse for IfStmt {
+    fn parse(stream: &mut Stream) -> Result<Self> {
+        stream.expect_token(Token::If)?;
+        let condition = stream.parse_expr(0, false)?;
+        let body = stream.parse()?;
+        Ok(IfStmt { condition, body })
     }
 }
 
@@ -1022,6 +1000,30 @@ impl Parse for Generic {
         };
 
         Ok(Self { name, bounds })
+    }
+}
+
+impl Parse for VarDecl {
+    fn parse(stream: &mut Stream) -> Result<Self> {
+        let pat = stream.parse()?;
+        let mut typ = None;
+        if stream.peek()? == Token::Colon {
+            stream.skip();
+            typ = Some(stream.parse()?);
+        }
+        let expr = match stream.bump()? {
+            Token::Semicolon => {
+                return Ok(VarDecl { pat, typ, expr: None });
+            }
+            Token::Eq => stream.parse_root_expr()?,
+            got => {
+                return Err(
+                    stream.expect_failed(got.kind(), &[TokenKind::Semicolon, TokenKind::Eq])
+                );
+            }
+        };
+        stream.expect_semicolon()?;
+        Ok(VarDecl { pat, typ, expr: Some(expr) })
     }
 }
 
