@@ -326,15 +326,14 @@ impl<'a> Stream<'a> {
         T: Parse,
     {
         let mut args = vec![];
-        while self.peek()?.kind() != terminator {
+        while self.try_token(terminator)?.is_none() {
             let expr = self.parse()?;
             args.push(expr);
-            if self.peek()?.kind() == terminator {
+            if self.try_token(terminator)?.is_some() {
                 break;
             }
             self.expect_token(sep)?;
         }
-        self.skip();
         Ok(args.into())
     }
 
@@ -351,11 +350,10 @@ impl<'a> Stream<'a> {
                 Token::Dot => 'block: {
                     self.skip();
                     let field = self.parse()?;
-                    if self.peek()? != Token::LParen {
+                    if self.try_token(TokenKind::LParen)?.is_none() {
                         expr = Expr::FieldAccess { expr: Box::new(expr), field };
                         break 'block;
                     }
-                    self.skip();
                     let args = self.parse_separated(TokenKind::Comma, TokenKind::RParen)?;
                     expr = Expr::MethodCall { expr: Box::new(expr), method: field, args }
                 }
