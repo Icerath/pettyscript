@@ -313,7 +313,11 @@ impl Lowering<'_> {
                     assert!(func.body.is_none());
                     let mut params = vec![];
                     for param in &func.params {
-                        params.push(self.load_param_ty(param.expl_ty.as_ref().unwrap())?);
+                        let param_ty = match &param.expl_ty {
+                            Some(ty) => self.load_param_ty(ty)?,
+                            None => ParamTy::Self_,
+                        };
+                        params.push(param_ty);
                     }
                     let ret = match &func.ret_type {
                         Some(ret) => self.load_param_ty(ret)?,
@@ -483,7 +487,10 @@ impl Lowering<'_> {
             let Stmt::Function(func) = &**stmt else { panic!() };
             assert_eq!(impl_item.name, *func.ident);
             for (expected, param) in impl_item.params.iter().zip(&func.params) {
-                let param_ty = self.load_explicit_type(param.expl_ty.as_ref().unwrap())?;
+                let param_ty = match &param.expl_ty {
+                    Some(ty) => self.load_explicit_type(ty)?,
+                    None => Ty::Con(ty.clone()),
+                };
                 let Ty::Con(param_ty) = param_ty else { panic!() };
                 let expected_ty = match expected {
                     ParamTy::Self_ => &ty,
@@ -580,7 +587,10 @@ impl Lowering<'_> {
         });
         let mut params = vec![];
         for param in &func.params {
-            let ty = self.load_explicit_type(param.expl_ty.as_ref().unwrap())?;
+            let ty = match &param.expl_ty {
+                Some(ty) => self.load_explicit_type(ty)?,
+                None => self.impl_block.as_ref().unwrap().ty.clone(),
+            };
             let ident = self.insert_scope(&param.ident, ty).unwrap();
             params.push(ident);
         }
