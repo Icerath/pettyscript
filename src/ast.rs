@@ -142,7 +142,7 @@ pub struct Function {
 #[derive(Debug, PartialEq)]
 pub struct Param {
     pub ident: Spanned<Ident>,
-    pub expl_ty: Spanned<ExplicitType>,
+    pub expl_ty: Option<Spanned<ExplicitType>>,
 }
 
 #[derive(Debug)]

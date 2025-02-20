@@ -663,9 +663,15 @@ impl Parse for ImplSig {
 
 impl Parse for Param {
     fn parse(stream: &mut Stream) -> Result<Self> {
-        let ident = stream.parse()?;
-        stream.expect_token(Token::Colon)?;
-        let expl_ty = stream.parse()?;
+        let ident: Spanned<Ident> = stream.parse()?;
+        let expl_ty = if stream.try_token(TokenKind::Colon)?.is_some() {
+            Some(stream.parse()?)
+        } else {
+            if *ident != "self" {
+                stream.expect_token(Token::Colon)?;
+            }
+            None
+        };
         Ok(Self { ident, expl_ty })
     }
 }

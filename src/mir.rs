@@ -313,7 +313,7 @@ impl Lowering<'_> {
                     assert!(func.body.is_none());
                     let mut params = vec![];
                     for param in &func.params {
-                        params.push(self.load_param_ty(&param.expl_ty)?);
+                        params.push(self.load_param_ty(param.expl_ty.as_ref().unwrap())?);
                     }
                     let ret = match &func.ret_type {
                         Some(ret) => self.load_param_ty(ret)?,
@@ -483,7 +483,7 @@ impl Lowering<'_> {
             let Stmt::Function(func) = &**stmt else { panic!() };
             assert_eq!(impl_item.name, *func.ident);
             for (expected, param) in impl_item.params.iter().zip(&func.params) {
-                let param_ty = self.load_explicit_type(&param.expl_ty)?;
+                let param_ty = self.load_explicit_type(param.expl_ty.as_ref().unwrap())?;
                 let Ty::Con(param_ty) = param_ty else { panic!() };
                 let expected_ty = match expected {
                     ParamTy::Self_ => &ty,
@@ -513,7 +513,7 @@ impl Lowering<'_> {
     fn struct_(&mut self, struct_: &ast::Struct, out: &mut Vec<Item>) -> Result<()> {
         let mut fields = BTreeMap::new();
         for (field_id, param) in struct_.fields.iter().enumerate() {
-            let ty = self.load_explicit_type(&param.expl_ty)?;
+            let ty = self.load_explicit_type(param.expl_ty.as_ref().unwrap())?;
             fields.insert(*param.ident, (field_id as u32, ty));
         }
         let fields = Rc::new(fields);
@@ -580,7 +580,7 @@ impl Lowering<'_> {
         });
         let mut params = vec![];
         for param in &func.params {
-            let ty = self.load_explicit_type(&param.expl_ty)?;
+            let ty = self.load_explicit_type(param.expl_ty.as_ref().unwrap())?;
             let ident = self.insert_scope(&param.ident, ty).unwrap();
             params.push(ident);
         }
