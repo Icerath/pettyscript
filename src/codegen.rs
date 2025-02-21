@@ -379,7 +379,7 @@ impl Codegen {
         self.builder.insert(Instr::Dup);
         if op == BinOp::Or {
             self.builder.insert(Instr::Not);
-        };
+        }
         self.builder.insert(Instr::CJump(end_label));
         self.builder.insert(Instr::Pop);
         self.expr(rhs)?;

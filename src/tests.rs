@@ -32,6 +32,8 @@ fn fizzbuzz_example() {
 #[test]
 #[cfg(not(miri))]
 fn lexer_example() {
+    use std::fmt::Write;
+
     use logos::Logos;
 
     use crate::lex::Token;
@@ -43,7 +45,7 @@ fn lexer_example() {
     let mut expected = String::new();
     for token in Token::lexer(fizzbuzz_src) {
         let token = token.unwrap();
-        expected.push_str(&format!("{:?}\n", token.kind()));
+        _ = writeln!(&mut expected, "{:?}", token.kind());
     }
     assert_eq!(result, expected.trim());
 }

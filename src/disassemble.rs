@@ -74,7 +74,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::RangeInclusive => p!("RANGE_INCLUSIVE"),
             Instr::Ret => p!("RET"),
             Instr::LoadVariant { tag } => p!("LOAD_VARIANT {tag}"),
-        };
+        }
     }
 }
 

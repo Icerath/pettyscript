@@ -66,7 +66,7 @@ impl<'a> Stream<'a> {
             let Ok(op) = BinOp::try_from(token.kind()) else { break };
             if !ops.contains(&op) {
                 break;
-            };
+            }
             self.skip();
             let expr = self.parse_expr(precedence + 1, allow_struct_init)?;
             root = Expr::Binary { op, exprs: Box::new([root, expr]) }
@@ -147,10 +147,10 @@ impl<'a> Stream<'a> {
                         Token::Comma => self.skip(),
                         Token::RBrace => {}
                         got => {
-                            return Err(self.expect_failed(got.kind(), &[
-                                TokenKind::Comma,
-                                TokenKind::LBrace,
-                            ]));
+                            return Err(self.expect_failed(
+                                got.kind(),
+                                &[TokenKind::Comma, TokenKind::LBrace],
+                            ));
                         }
                     }
                     Some(expr)
@@ -586,7 +586,7 @@ impl Parse for ExplicitType {
         let mut generics: Box<[_]> = Box::new([]);
         if stream.try_token(TokenKind::LBracket)?.is_some() {
             generics = stream.parse_separated(TokenKind::Comma, TokenKind::RBracket)?;
-        };
+        }
 
         Ok(ExplicitType { ident, generics })
     }
@@ -609,12 +609,10 @@ impl Parse for Literal {
                 }
             }?,
             got => {
-                return Err(stream.expect_failed(got.kind(), &[
-                    TokenKind::Int,
-                    TokenKind::Char,
-                    TokenKind::String,
-                    TokenKind::Ident,
-                ]));
+                return Err(stream.expect_failed(
+                    got.kind(),
+                    &[TokenKind::Int, TokenKind::Char, TokenKind::String, TokenKind::Ident],
+                ));
             }
         })
     }
