@@ -68,7 +68,7 @@ pub enum Token {
     #[regex(r"0[xX][\da-fA-F_]+", parse_hex_int)]
     #[regex(r"0[oO][0-7_]+", parse_octal_int)]
     Int(i64),
-    #[regex(r#"""#, lex_string)]
+    #[token(r#"""#, lex_string)]
     String(S),
     #[token(r#"f""#, lex_fstring)]
     FString(S),
