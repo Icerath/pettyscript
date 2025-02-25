@@ -1,7 +1,8 @@
 // ignore
-
-fn print[T: Display](val: T) {
+fn print[T: Display](val: T) -> T {
     println(f"{val}");
+    return val;
 }
 
-print(1);
+let x: int = print(1);
+let y: str = print("Hello");

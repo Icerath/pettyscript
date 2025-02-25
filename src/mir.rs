@@ -574,8 +574,25 @@ impl Lowering<'_> {
     }
 
     fn function(&mut self, func: &ast::Function, out: &mut Vec<Item>) -> Result<()> {
+        let generics: Vec<_> = func
+            .generics
+            .iter()
+            .map(|generic| {
+                let tycon = TyCon::from(TyKind::uniq_generic());
+                for bound in generic.bounds.iter().flatten() {
+                    assert_eq!(bound.segments.len(), 1);
+                    let segment = &bound.segments[0];
+                    self.trait_impls.insert((tycon.clone(), segment));
+                }
+                (*generic.name, Ty::Con(tycon))
+            })
+            .collect();
         let ret = if let Some(ret_ty) = &func.ret_type {
-            self.load_explicit_type(ret_ty)?
+            if let Some((_, generic)) = generics.iter().find(|(name, _)| name == &*ret_ty.ident) {
+                generic.clone()
+            } else {
+                self.load_explicit_type(ret_ty)?
+            }
         } else {
             Ty::from(TyKind::Null)
         };
@@ -588,7 +605,14 @@ impl Lowering<'_> {
         let mut params = vec![];
         for param in &func.params {
             let ty = match &param.expl_ty {
-                Some(ty) => self.load_explicit_type(ty)?,
+                Some(ty) => {
+                    if let Some((_, kind)) = generics.iter().find(|(name, _)| name == &*ty.ident) {
+                        assert!(ty.generics.is_empty());
+                        kind.clone()
+                    } else {
+                        self.load_explicit_type(ty)?
+                    }
+                }
                 None => self.impl_block.as_ref().unwrap().ty.clone(),
             };
             let ident = self.insert_scope(&param.ident, ty).unwrap();
@@ -596,10 +620,13 @@ impl Lowering<'_> {
         }
         let fn_params = params.clone();
 
-        let fn_ty = Ty::Con(TyCon::from(TyKind::Function {
-            params: params.iter().map(|ident| ident.ty.clone()).collect(),
-            ret: Rc::new(ret.clone()),
-        }));
+        let fn_ty = Ty::Con(TyCon {
+            kind: TyKind::Function {
+                params: params.iter().map(|ident| ident.ty.clone()).collect(),
+                ret: Rc::new(ret.clone()),
+            },
+            generics: generics.iter().map(|(_, kind)| kind.clone()).collect(),
+        });
 
         let ident = if self.impl_block.is_none() {
             let scope = self.scopes.pop().unwrap();
@@ -614,6 +641,7 @@ impl Lowering<'_> {
         };
 
         if *func.ident == "main" {
+            assert!(func.generics.is_empty(), "main cannot be generic");
             assert!(params.is_empty());
             // TODO: Assert ret is null
             self.main_fn = Some(ident.offset);
@@ -745,6 +773,11 @@ impl Lowering<'_> {
                 | TyKind::Array
                 | TyKind::Map
                 | TyKind::Tuple => ExprKind::Format(Box::new(expr)),
+
+                TyKind::Generic { id } => {
+                    assert!(self.trait_impls.contains(&(tycon.clone(), "Display")));
+                    ExprKind::Str(intern(&format!("<generic {id}>")))
+                }
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
                 _ => {
                     assert!(self.trait_impls.contains(&(tycon.clone(), "Display")), "{tycon:?}");
@@ -875,23 +908,34 @@ impl Lowering<'_> {
     }
 
     fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {
-        // FIXME: Not entirely sure how to avoid substituting the type here.
-
         let expr = self.expr(func)?;
         let fn_ty = expr.ty.sub(&self.subs);
         let Ty::Con(TyCon { kind, .. }) = fn_ty else { panic!() };
         let TyKind::Function { params, ret } = kind else { panic!("{kind:?}") };
+
+        let mut id_types = FxHashMap::default();
+
         assert_eq!(args.len(), params.len());
         let mut new_args = Vec::with_capacity(args.len());
-        for (arg, param) in args.iter().zip(&*params) {
+        for (arg, param) in args.iter().zip(params.iter()) {
             let arg = self.expr(arg)?;
-            unify(&arg.ty, param, &mut self.subs);
+            let Ty::Con(param_con) = param else { panic!() };
+            if let TyKind::Generic { id } = param_con.kind {
+                id_types.insert(id, arg.ty.clone());
+                // TODO: Validate
+            } else {
+                unify(&arg.ty, param, &mut self.subs);
+            }
             new_args.push(arg);
         }
-        Ok(Expr {
-            ty: (*ret).clone(),
-            kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args },
-        })
+
+        let ret = match &*ret {
+            Ty::Con(TyCon { kind: TyKind::Generic { id }, .. }) => id_types[id].clone(),
+            Ty::Con(_) => ret.as_ref().clone(),
+            Ty::Var(..) => panic!(),
+        };
+
+        Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args } })
     }
 
     fn field_access(&mut self, expr: &ast::Expr, field: &'static str) -> Result<Expr> {

@@ -3,7 +3,7 @@ use std::{
     fmt,
     iter::zip,
     rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU32, AtomicUsize, Ordering},
 };
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -55,6 +55,7 @@ pub enum TyKind {
     Enum { id: u32, name: &'static str, variants: Rc<BTreeMap<&'static str, u16>> },
     Function { params: Rc<[Ty]>, ret: Rc<Ty> },
     Variant { id: u32 },
+    Generic { id: u32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -113,6 +114,14 @@ impl TyVar {
                 generics.iter().any(|generic| self.occurs_in(generic, subs))
             }
         }
+    }
+}
+
+impl TyKind {
+    pub fn uniq_generic() -> Self {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        Self::Generic { id }
     }
 }
 
