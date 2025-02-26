@@ -578,12 +578,14 @@ impl Lowering<'_> {
             .generics
             .iter()
             .map(|generic| {
-                let tycon = TyCon::from(TyKind::uniq_generic());
-                for bound in generic.bounds.iter().flatten() {
-                    assert_eq!(bound.segments.len(), 1);
-                    let segment = &bound.segments[0];
-                    self.trait_impls.insert((tycon.clone(), segment));
-                }
+                let bounds: Rc<[_]> = (generic.bounds.iter().flatten())
+                    .map(|bound| {
+                        assert_eq!(bound.segments.len(), 1);
+                        bound.segments[0]
+                    })
+                    .collect();
+
+                let tycon = TyCon::from(TyKind::uniq_generic(bounds));
                 (*generic.name, Ty::Con(tycon))
             })
             .collect();
@@ -774,8 +776,8 @@ impl Lowering<'_> {
                 | TyKind::Map
                 | TyKind::Tuple => ExprKind::Format(Box::new(expr)),
 
-                TyKind::Generic { id } => {
-                    assert!(self.trait_impls.contains(&(tycon.clone(), "Display")));
+                TyKind::Generic { id, traits } => {
+                    assert!(traits.contains(&"Display"));
                     ExprKind::Str(intern(&format!("<generic {id}>")))
                 }
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
@@ -920,9 +922,10 @@ impl Lowering<'_> {
         for (arg, param) in args.iter().zip(params.iter()) {
             let arg = self.expr(arg)?;
             let Ty::Con(param_con) = param else { panic!() };
-            if let TyKind::Generic { id } = param_con.kind {
+            if let TyKind::Generic { id, traits } = &param_con.kind {
                 id_types.insert(id, arg.ty.clone());
                 // TODO: Validate
+                _ = traits;
             } else {
                 unify(&arg.ty, param, &mut self.subs);
             }
@@ -930,7 +933,7 @@ impl Lowering<'_> {
         }
 
         let ret = match &*ret {
-            Ty::Con(TyCon { kind: TyKind::Generic { id }, .. }) => id_types[id].clone(),
+            Ty::Con(TyCon { kind: TyKind::Generic { id, .. }, .. }) => id_types[id].clone(),
             Ty::Con(_) => ret.as_ref().clone(),
             Ty::Var(..) => panic!(),
         };

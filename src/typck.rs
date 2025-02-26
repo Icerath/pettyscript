@@ -55,7 +55,7 @@ pub enum TyKind {
     Enum { id: u32, name: &'static str, variants: Rc<BTreeMap<&'static str, u16>> },
     Function { params: Rc<[Ty]>, ret: Rc<Ty> },
     Variant { id: u32 },
-    Generic { id: u32 },
+    Generic { id: u32, traits: Rc<[&'static str]> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -118,10 +118,10 @@ impl TyVar {
 }
 
 impl TyKind {
-    pub fn uniq_generic() -> Self {
+    pub fn uniq_generic(traits: Rc<[&'static str]>) -> Self {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-        Self::Generic { id }
+        Self::Generic { id, traits }
     }
 }
 
