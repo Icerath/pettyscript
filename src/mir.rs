@@ -916,10 +916,21 @@ impl Lowering<'_> {
     }
 
     fn vtable_for(&mut self, traits: &[&'static str], ty: &Ty) -> Result<Expr> {
-        _ = self;
-        _ = traits;
-        _ = ty;
-        Ok(Expr { ty: Ty::from(TyKind::Str), kind: ExprKind::Str("TODO") })
+        let Ty::Con(ty) = ty else { panic!() };
+        let mut fields = vec![];
+        let mut offset = 0;
+        for r#trait in traits {
+            let r#trait = &self.traits[r#trait];
+            for func in r#trait.expected_functions.iter() {
+                let method = self.methods.get(&(ty.clone(), func.name)).unwrap();
+                let expr = Expr::ident(method.clone());
+                fields.push((offset, expr));
+                offset += 1;
+            }
+        }
+        let ty = Ty::from(TyKind::Vtable { traits: traits.into() });
+        let kind = ExprKind::StructInit { fields };
+        Ok(Expr { ty, kind })
     }
 
     fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {

@@ -56,6 +56,7 @@ pub enum TyKind {
     Function { params: Rc<[Ty]>, ret: Rc<Ty> },
     Variant { id: u32 },
     Generic { id: u32, traits: Rc<[&'static str]> },
+    Vtable { traits: Rc<[&'static str]> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
