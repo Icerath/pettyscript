@@ -605,6 +605,12 @@ impl Lowering<'_> {
             for_loops: 0,
         });
         let mut params = vec![];
+        for (_name, ty) in &generics {
+            let scope = self.scope();
+            let ident = Ident { ty: ty.clone(), offset: Offset::Local(scope.var_counter as u32) };
+            scope.var_counter += 1;
+            params.push(ident);
+        }
         for param in &func.params {
             let ty = match &param.expl_ty {
                 Some(ty) => {
@@ -656,7 +662,7 @@ impl Lowering<'_> {
         let body = self.block(&func.body.as_ref().unwrap().stmts)?;
 
         let last_scope = self.scopes.pop().unwrap();
-        let stack_size = last_scope.variables.len();
+        let stack_size = last_scope.var_counter;
 
         out.push(Item::Function(Function {
             offset: ident.offset,
@@ -909,36 +915,53 @@ impl Lowering<'_> {
         Ok(Expr { ty, kind: ExprKind::Map(entries) })
     }
 
+    fn vtable_for(&mut self, traits: &[&'static str], ty: &Ty) -> Result<Expr> {
+        _ = self;
+        _ = traits;
+        _ = ty;
+        Ok(Expr { ty: Ty::from(TyKind::Str), kind: ExprKind::Str("TODO") })
+    }
+
     fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {
         let expr = self.expr(func)?;
         let fn_ty = expr.ty.sub(&self.subs);
-        let Ty::Con(TyCon { kind, .. }) = fn_ty else { panic!() };
+        let Ty::Con(TyCon { kind, generics }) = fn_ty else { panic!() };
         let TyKind::Function { params, ret } = kind else { panic!("{kind:?}") };
 
         let mut id_types = FxHashMap::default();
 
-        assert_eq!(args.len(), params.len());
+        let mut generic_args = vec![];
         let mut new_args = Vec::with_capacity(args.len());
-        for (arg, param) in args.iter().zip(params.iter()) {
+
+        for (arg, param) in args.iter().zip(params[generics.len()..].iter()) {
             let arg = self.expr(arg)?;
             let Ty::Con(param_con) = param else { panic!() };
             if let TyKind::Generic { id, traits } = &param_con.kind {
-                id_types.insert(id, arg.ty.clone());
-                // TODO: Validate
-                _ = traits;
+                let new = id_types.insert(id, arg.ty.clone()).is_none();
+                if new {
+                    // TODO: Validate
+                    generic_args.push(self.vtable_for(traits, &arg.ty)?);
+                    _ = traits;
+                }
             } else {
                 unify(&arg.ty, param, &mut self.subs);
             }
             new_args.push(arg);
         }
+        let args = if generic_args.is_empty() {
+            new_args
+        } else {
+            generic_args.append(&mut new_args);
+            generic_args
+        };
+        assert_eq!(args.len(), params.len());
 
         let ret = match &*ret {
             Ty::Con(TyCon { kind: TyKind::Generic { id, .. }, .. }) => id_types[id].clone(),
             Ty::Con(_) => ret.as_ref().clone(),
             Ty::Var(..) => panic!(),
         };
-
-        Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args: new_args } })
+        Ok(Expr { ty: ret, kind: ExprKind::FnCall { expr: Box::new(expr), args } })
     }
 
     fn field_access(&mut self, expr: &ast::Expr, field: &'static str) -> Result<Expr> {
