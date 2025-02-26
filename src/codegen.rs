@@ -253,8 +253,15 @@ impl Codegen {
 
     fn field_access(&mut self, expr: &Expr, field: &'static str) -> Result<()> {
         let ty = self.ty(&expr.ty);
-        let TyKind::Struct { fields, .. } = &ty.kind else { panic!("Expected `struct` {ty:?}") };
-        let field_id = fields.get(field).unwrap().0;
+        // FIXME: NO
+        let field_id = if let TyKind::Vtable { .. } = ty.kind {
+            0
+        } else {
+            let TyKind::Struct { fields, .. } = &ty.kind else {
+                panic!("Expected `struct` {ty:?}")
+            };
+            fields.get(field).unwrap().0
+        };
         self.expr(expr)?;
         self.builder.insert(Instr::LoadField(field_id));
         Ok(())

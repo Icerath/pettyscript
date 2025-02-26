@@ -181,6 +181,7 @@ pub struct FnScope {
     variables: FxHashMap<&'static str, Ident>,
     var_counter: usize,
     for_loops: usize,
+    vtables: FxHashMap<u32, u32>,
 }
 
 impl<'src> Lowering<'src> {
@@ -206,7 +207,8 @@ impl<'src> Lowering<'src> {
 
         let mut scope = FnScope {
             ret_var: Ty::from(TyKind::Null),
-            variables: FxHashMap::default(),
+            variables: HashMap::default(),
+            vtables: HashMap::default(),
             for_loops: 0,
             var_counter: 0,
         };
@@ -600,17 +602,24 @@ impl Lowering<'_> {
         };
         self.scopes.push(FnScope {
             ret_var: ret.clone(),
-            variables: FxHashMap::default(),
+            variables: HashMap::default(),
+            vtables: HashMap::default(),
             var_counter: 0,
             for_loops: 0,
         });
+        let mut vtables = HashMap::default();
         let mut params = vec![];
         for (_name, ty) in &generics {
+            let Ty::Con(tycon) = ty.clone() else { unreachable!() };
+            let TyKind::Generic { id, .. } = tycon.kind else { unreachable!() };
             let scope = self.scope();
-            let ident = Ident { ty: ty.clone(), offset: Offset::Local(scope.var_counter as u32) };
+            let offset = scope.var_counter as u32;
+            let ident = Ident { ty: ty.clone(), offset: Offset::Local(offset) };
             scope.var_counter += 1;
             params.push(ident);
+            vtables.insert(id, offset);
         }
+        self.scope().vtables = vtables;
         for param in &func.params {
             let ty = match &param.expl_ty {
                 Some(ty) => {
@@ -784,7 +793,20 @@ impl Lowering<'_> {
 
                 TyKind::Generic { id, traits } => {
                     assert!(traits.contains(&"Display"));
-                    ExprKind::Str(intern(&format!("<generic {id}>")))
+                    let vtable = self.scope().vtables.get(id).unwrap();
+                    let vtable = ExprKind::LoadIdent { offset: Offset::Local(*vtable) };
+                    // FIXME: Vtable type
+                    let vtable =
+                        Expr { kind: vtable, ty: Ty::from(TyKind::Vtable { traits: Rc::new([]) }) };
+                    let func = ExprKind::FieldAccess { expr: Box::new(vtable), field: "to_str" }; // FIXME: Vtable offset
+                    let func = Expr {
+                        ty: Ty::from(TyKind::Function {
+                            params: Rc::new([expr.ty.clone()]),
+                            ret: Rc::new(Ty::from(TyKind::Str)),
+                        }),
+                        kind: func,
+                    };
+                    ExprKind::FnCall { expr: Box::new(func), args: vec![expr] }
                 }
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
                 _ => {

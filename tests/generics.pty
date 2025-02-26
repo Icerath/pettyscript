@@ -1,5 +1,5 @@
 fn foo[T: Display](val: T, str: str) -> T {
-    assert(f"{val}" == "<generic 0>"); // FIXME: `f"{val}" == str`
+    assert(f"{val}" == str);
     return val;
 }
 
