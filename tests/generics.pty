@@ -7,3 +7,11 @@ let x: int = foo(1, "1");
 let y: str = foo("Boo", "Boo");
 assert(x == 1);
 assert(y == "Boo");
+
+fn double[T: Add](val: T) -> T {
+    // FIXME: Support + operator for any type that impls the Add trait
+    return val.add(val);
+}
+
+assert(double(1) == 2);
+assert(double("1") == "11");

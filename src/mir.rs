@@ -776,6 +776,44 @@ impl Lowering<'_> {
         })
     }
 
+    fn vtable_method(
+        &mut self,
+        id: u32,
+        traits: &Rc<[&'static str]>,
+        method_name: &'static str,
+    ) -> Expr {
+        let mut method = None;
+        'outer: for r#trait in &**traits {
+            let r#trait = &self.traits[r#trait];
+            for func in &*r#trait.expected_functions {
+                if func.name == method_name {
+                    method = Some(func);
+                    break 'outer;
+                }
+            }
+        }
+        let method = method.unwrap();
+        macro_rules! param_ty {
+            ($param_ty:expr) => {
+                match &$param_ty {
+                    ParamTy::Self_ => Ty::from(TyKind::Generic { id, traits: traits.clone() }),
+                    ParamTy::Ty(ty) => ty.clone(),
+                }
+            };
+        }
+
+        let ret = param_ty!(method.ret);
+        let params = method.params.iter().map(|param| param_ty!(*param));
+        let fn_ty = Ty::func(params, ret);
+        let vtable = self.scope().vtables.get(&id).unwrap();
+        let vtable = ExprKind::LoadIdent { offset: Offset::Local(*vtable) };
+        let vtable = Expr { kind: vtable, ty: Ty::from(TyKind::Vtable { traits: traits.clone() }) };
+        Expr {
+            ty: fn_ty,
+            kind: ExprKind::FieldAccess { expr: Box::new(vtable), field: method_name },
+        }
+    }
+
     fn fstr(&mut self, fstring: &ast::FString) -> Result<Expr> {
         let mut segments = vec![];
         for (str, aexpr) in &fstring.segments {
@@ -793,19 +831,7 @@ impl Lowering<'_> {
 
                 TyKind::Generic { id, traits } => {
                     assert!(traits.contains(&"Display"));
-                    let vtable = self.scope().vtables.get(id).unwrap();
-                    let vtable = ExprKind::LoadIdent { offset: Offset::Local(*vtable) };
-                    // FIXME: Vtable type
-                    let vtable =
-                        Expr { kind: vtable, ty: Ty::from(TyKind::Vtable { traits: Rc::new([]) }) };
-                    let func = ExprKind::FieldAccess { expr: Box::new(vtable), field: "to_str" }; // FIXME: Vtable offset
-                    let func = Expr {
-                        ty: Ty::from(TyKind::Function {
-                            params: Rc::new([expr.ty.clone()]),
-                            ret: Rc::new(Ty::from(TyKind::Str)),
-                        }),
-                        kind: func,
-                    };
+                    let func = self.vtable_method(*id, traits, "to_str");
                     ExprKind::FnCall { expr: Box::new(func), args: vec![expr] }
                 }
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
@@ -1035,8 +1061,17 @@ impl Lowering<'_> {
         }
 
         let Ty::Con(expr_ty) = expr.ty.sub(&self.subs) else { panic!() };
-        let ident = self.methods.get(&(expr_ty, method)).expect(method).clone();
-        let Ty::Con(tycon) = ident.ty.sub(&self.subs) else { panic!() };
+        let func = if let TyKind::Generic { id, traits } = &expr_ty.kind {
+            self.vtable_method(*id, traits, method)
+        } else {
+            Expr::ident(
+                self.methods
+                    .get(&(expr_ty.clone(), method))
+                    .unwrap_or_else(|| panic!("{expr_ty:?}: {method}"))
+                    .clone(),
+            )
+        };
+        let Ty::Con(tycon) = func.ty.sub(&self.subs) else { panic!() };
         let TyKind::Function { params, ret } = &tycon.kind else { panic!() };
 
         assert_eq!(args.len() + 1, params.len());
@@ -1050,7 +1085,7 @@ impl Lowering<'_> {
 
         Ok(Expr {
             ty: ret.as_ref().clone(),
-            kind: ExprKind::FnCall { expr: Box::new(Expr::ident(ident)), args: new_args },
+            kind: ExprKind::FnCall { expr: Box::new(func), args: new_args },
         })
     }
 
