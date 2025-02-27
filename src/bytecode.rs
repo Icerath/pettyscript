@@ -17,6 +17,7 @@ pub struct StrIdent {
 pub enum Instr {
     Abort,
     BuildFstr { num_segments: u16 },
+    StrConcat,
     AddInt,
     SubInt,
     MulInt,

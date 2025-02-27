@@ -262,6 +262,12 @@ impl<'src, 'io> VirtualMachine<'src, 'io> {
                     let is_greater = self.cmp() == Ordering::Equal;
                     self.stack.push(Value::Bool(is_greater));
                 }
+                Instr::StrConcat => {
+                    let rhs = self.pop_str();
+                    let lhs = self.pop_str();
+                    let str = (lhs.as_str().to_string() + rhs.as_str()).into_boxed_str();
+                    self.stack.push(Value::String(PettyStr::String(str.into())));
+                }
                 Instr::AddInt => {
                     let rhs = self.pop_int();
                     let lhs = self.pop_int();

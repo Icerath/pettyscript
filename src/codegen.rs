@@ -361,6 +361,9 @@ impl Codegen {
         self.expr(rhs)?;
 
         match op {
+            BinOp::Add if self.ty(&lhs.ty).kind == TyKind::Str => {
+                self.builder.insert(Instr::StrConcat);
+            }
             BinOp::Add => self.builder.insert(Instr::AddInt),
             BinOp::Sub => self.builder.insert(Instr::SubInt),
             BinOp::Mul => self.builder.insert(Instr::MulInt),

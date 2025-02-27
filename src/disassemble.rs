@@ -34,6 +34,7 @@ pub fn disassemble(bytecode: &[u8]) {
             Instr::EnumTag => p!("ENUM_TAG"),
             Instr::Abort => p!("ABORT"),
             Instr::BuildFstr { num_segments } => p!("BUILD_FSTR {num_segments:?}"),
+            Instr::StrConcat => p!("STR_CONCAT"),
             Instr::AddInt => p!("ADD_INT"),
             Instr::SubInt => p!("SUB_INT"),
             Instr::MulInt => p!("MUL_INT"),

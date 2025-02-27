@@ -76,6 +76,12 @@ impl Ord for int {
     }
 }
 
+impl Add for str {
+    fn add(self, other: self) -> self {
+        return self + other;
+    }
+}
+
 trait Display {
     fn to_str(self) -> str;
 }
