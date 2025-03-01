@@ -5,16 +5,21 @@ use crate::{
     builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr},
     mir::*,
-    typck::{Substitutions, Ty, TyCon, TyKind},
+    ty::{TyCtx, TyKind},
 };
 
 pub fn codegen(
     block: &Block,
-    subs: Substitutions,
+    ctx: &mut TyCtx,
     main_fn: Option<Offset>,
     global_scope: u32,
 ) -> Result<Vec<u8>> {
-    let mut codegen = Codegen { subs, ..Default::default() };
+    let mut codegen = Codegen {
+        builder: BytecodeBuilder::default(),
+        continue_label: None,
+        break_label: None,
+        ctx,
+    };
     codegen.block(block)?;
     codegen.builder.set_global_stack_size(global_scope);
     if let Some(offset) = main_fn {
@@ -24,20 +29,15 @@ pub fn codegen(
     Ok(codegen.builder.finish())
 }
 
-#[derive(Default)]
-struct Codegen {
-    subs: Substitutions,
+struct Codegen<'ctx> {
+    // FIXME: Type inference should be done before codegen
+    ctx: &'ctx mut TyCtx,
     builder: BytecodeBuilder,
     continue_label: Option<u32>,
     break_label: Option<u32>,
 }
 
-impl Codegen {
-    fn ty(&mut self, ty: &Ty) -> TyCon {
-        let Ty::Con(tycon) = ty.sub(&self.subs) else { panic!() };
-        tycon
-    }
-
+impl Codegen<'_> {
     fn block(&mut self, block: &Block) -> Result<()> {
         for item in &block.items {
             self.item(item)?;
@@ -57,7 +57,7 @@ impl Codegen {
             Item::Return(ret) => self.return_(ret),
             Item::Expr(expr) => {
                 self.expr(expr)?;
-                if self.ty(&expr.ty).kind != TyKind::Null {
+                if *self.ctx.infer(&expr.ty).kind() != TyKind::Null {
                     self.builder.insert(Instr::Pop);
                 }
                 Ok(())
@@ -84,7 +84,7 @@ impl Codegen {
         // TODO: Remove extra space for ZSTs
         // self.scopes.pop().unwrap();
 
-        if self.ty(&func.ret).kind == TyKind::Null {
+        if *self.ctx.infer(&func.ret).kind() == TyKind::Null {
             self.builder.insert(Instr::Ret);
         } else {
             // FIXME: Instead produce a compile error when this is possible
@@ -147,7 +147,7 @@ impl Codegen {
         self.expr(&for_loop.iter)?;
 
         self.builder.insert_label(start_label);
-        let iter_op = match self.ty(&for_loop.iter.ty).kind {
+        let iter_op = match self.ctx.infer(&for_loop.iter.ty).kind() {
             TyKind::Range | TyKind::RangeInclusive => Instr::IterRange,
             ty => panic!("{ty:?}"),
         };
@@ -252,12 +252,12 @@ impl Codegen {
     }
 
     fn field_access(&mut self, expr: &Expr, field: &'static str) -> Result<()> {
-        let ty = self.ty(&expr.ty);
+        let ty = self.ctx.infer(&expr.ty);
         // FIXME: NO
-        let field_id = if let TyKind::Vtable { .. } = ty.kind {
+        let field_id = if let TyKind::Vtable { .. } = ty.kind() {
             0
         } else {
-            let TyKind::Struct { fields, .. } = &ty.kind else {
+            let TyKind::Struct { fields, .. } = ty.kind() else {
                 panic!("Expected `struct` {ty:?}")
             };
             fields.get(field).unwrap().0
@@ -275,8 +275,8 @@ impl Codegen {
             self.expr(expr)?;
         }
 
-        let ty = self.ty(&expr.ty);
-        let builtin = match (&ty.kind, method) {
+        let ty = self.ctx.infer(&expr.ty);
+        let builtin = match (ty.kind(), method) {
             (TyKind::Int, "abs") => M::IntAbs,
 
             (TyKind::Char, "is_digit") => M::CharIsDigit,
@@ -289,15 +289,17 @@ impl Codegen {
             (TyKind::Str, "len") => M::StrLen,
             (TyKind::Str, "lines") => M::StrLines,
 
-            (TyKind::Array, "push") => M::ArrayPush,
-            (TyKind::Array, "pop") => M::ArrayPop,
-            (TyKind::Array, "sort") if ty.generics[0] == Ty::from(TyKind::Int) => M::ArraySortInt,
-            (TyKind::Array, "len") => M::ArrayLen,
+            (TyKind::Array(_), "push") => M::ArrayPush,
+            (TyKind::Array(_), "pop") => M::ArrayPop,
+            (TyKind::Array(of), "sort") if *self.ctx.infer(of).kind() == TyKind::Int => {
+                M::ArraySortInt
+            }
+            (TyKind::Array(_), "len") => M::ArrayLen,
 
-            (TyKind::Map, "insert") => M::MapInsert,
-            (TyKind::Map, "remove") => M::MapRemove,
-            (TyKind::Map, "get") => M::MapGet,
-            (TyKind::Map, "contains") => M::MapContains,
+            (TyKind::Map(_), "insert") => M::MapInsert,
+            (TyKind::Map(_), "remove") => M::MapRemove,
+            (TyKind::Map(_), "get") => M::MapGet,
+            (TyKind::Map(_), "contains") => M::MapContains,
 
             kind => todo!("{kind:?}"),
         };
@@ -317,17 +319,17 @@ impl Codegen {
     fn index(&mut self, expr: &Expr, index: &Expr) -> Result<()> {
         self.expr(expr)?;
         self.expr(index)?;
-        let ty = self.ty(&expr.ty).kind;
-        let index = self.ty(&index.ty).kind;
-        if ty == TyKind::Str {
-            if index == TyKind::Int {
+        let ty = self.ctx.infer(&expr.ty);
+        let index = self.ctx.infer(&index.ty);
+        if *ty.kind() == TyKind::Str {
+            if *index.kind() == TyKind::Int {
                 self.builder.insert(Instr::StringIndex);
-            } else if index == TyKind::Range {
+            } else if *index.kind() == TyKind::Range {
                 self.builder.insert(Instr::StringSliceRange);
             } else {
                 panic!()
             }
-        } else if let TyKind::Array = ty {
+        } else if let TyKind::Array(_) = ty.kind() {
             self.builder.insert(Instr::ArrayIndex);
         }
         Ok(())
@@ -337,15 +339,15 @@ impl Codegen {
         self.expr(expr)?;
         match op {
             UnaryOp::Neg => {
-                assert_eq!(self.ty(&expr.ty).kind, TyKind::Int);
+                assert_eq!(*self.ctx.infer(&expr.ty).kind(), TyKind::Int);
                 self.builder.insert(Instr::Neg);
             }
             UnaryOp::Not => {
-                assert_eq!(self.ty(&expr.ty).kind, TyKind::Bool);
+                assert_eq!(*self.ctx.infer(&expr.ty).kind(), TyKind::Bool);
                 self.builder.insert(Instr::Not);
             }
             UnaryOp::EnumTag => {
-                let TyKind::Variant { .. } = &self.ty(&expr.ty).kind else { panic!() };
+                let TyKind::Variant { .. } = self.ctx.infer(&expr.ty).kind() else { panic!() };
                 self.builder.insert(Instr::EnumTag);
             }
         }
@@ -361,7 +363,7 @@ impl Codegen {
         self.expr(rhs)?;
 
         match op {
-            BinOp::Add if self.ty(&lhs.ty).kind == TyKind::Str => {
+            BinOp::Add if *self.ctx.infer(&lhs.ty).kind() == TyKind::Str => {
                 self.builder.insert(Instr::StrConcat);
             }
             BinOp::Add => self.builder.insert(Instr::AddInt),

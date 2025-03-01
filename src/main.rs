@@ -12,7 +12,7 @@ mod mir;
 mod parse;
 #[cfg(test)]
 mod tests;
-mod typck;
+mod ty;
 mod vm;
 
 use std::{path::PathBuf, time::Instant};
