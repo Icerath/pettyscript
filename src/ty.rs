@@ -18,12 +18,13 @@ impl Ty {
         &self.kind
     }
 
-    #[expect(clippy::needless_pass_by_value)]
     pub fn with_generics(&self, generics: Vec<Ty>) -> Self {
+        // FIXME: shouln't ignore the existing generics
         match self.kind() {
             _ if generics.is_empty() => self.clone(),
             TyKind::Array(_) => TyKind::Array(generics[0].clone()).into(),
             TyKind::Map([_, _]) => TyKind::Map([generics[0].clone(), generics[1].clone()]).into(),
+            TyKind::Tuple(_) => TyKind::Tuple(generics).into(),
             _ => todo!(),
         }
     }
