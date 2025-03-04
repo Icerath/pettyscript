@@ -1,11 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    rc::Rc,
-    sync::atomic::{AtomicU32, Ordering},
-};
-
-use miette::Result;
-use rustc_hash::{FxHashMap, FxHashSet};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::{
     ast::{
@@ -14,6 +7,7 @@ use crate::{
     },
     builtints::Builtin,
     intern::intern,
+    prelude::*,
     ty::{GenericId, Ty, TyCtx, TyKind},
 };
 
@@ -154,11 +148,11 @@ pub struct Fstr {
 
 pub struct Lowering<'src, 'ctx> {
     pub ctx: &'ctx mut TyCtx,
-    named_types: FxHashMap<&'static str, Ty>,
-    enums: FxHashMap<u32, EnumData>,
-    methods: FxHashMap<(Ty, &'static str), Ident>,
-    traits: FxHashMap<&'static str, Trait>,
-    trait_impls: FxHashSet<(Ty, &'static str)>,
+    named_types: HashMap<&'static str, Ty>,
+    enums: HashMap<u32, EnumData>,
+    methods: HashMap<(Ty, &'static str), Ident>,
+    traits: HashMap<&'static str, Trait>,
+    trait_impls: HashSet<(Ty, &'static str)>,
     pub main_fn: Option<Offset>,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
@@ -178,10 +172,10 @@ pub struct ImplBlock {
 #[derive(Debug)]
 pub struct FnScope {
     ret_var: Ty,
-    variables: FxHashMap<&'static str, Ident>,
+    variables: HashMap<&'static str, Ident>,
     var_counter: usize,
     for_loops: usize,
-    vtables: FxHashMap<GenericId, u32>,
+    vtables: HashMap<GenericId, u32>,
 }
 
 impl<'src, 'ctx> Lowering<'src, 'ctx> {
@@ -953,7 +947,7 @@ impl Lowering<'_, '_> {
         let fn_ty = self.ctx.infer(&expr.ty);
         let TyKind::Function { params, ret, generics } = fn_ty.kind() else { panic!("{fn_ty:?}") };
 
-        let mut id_types = FxHashMap::default();
+        let mut id_types = HashMap::default();
 
         let mut generic_args = vec![];
         let mut new_args = Vec::with_capacity(args.len());

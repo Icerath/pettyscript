@@ -1,10 +1,9 @@
-use miette::Result;
-
 use crate::{
     ast::{BinOp, UnaryOp},
     builtints::MethodBuiltin,
     bytecode::{BytecodeBuilder, Instr},
     mir::*,
+    prelude::*,
     ty::{TyCtx, TyKind},
 };
 

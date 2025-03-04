@@ -15,6 +15,13 @@ mod tests;
 mod ty;
 mod vm;
 
+pub(crate) mod prelude {
+    pub use std::{collections::BTreeMap, fmt, rc::Rc};
+
+    pub use miette::Result;
+    pub use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+}
+
 use std::{path::PathBuf, time::Instant};
 
 use clap::Parser;

@@ -1,6 +1,4 @@
-use std::{self, collections::BTreeMap, fmt, rc::Rc};
-
-use rustc_hash::FxHashMap as HashMap;
+use crate::prelude::*;
 
 #[derive(Default, Debug)]
 pub struct TyCtx {

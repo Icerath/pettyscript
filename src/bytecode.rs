@@ -1,7 +1,9 @@
 use macros::*;
-use rustc_hash::FxHashMap;
 
-use crate::builtints::{Builtin, MethodBuiltin};
+use crate::{
+    builtints::{Builtin, MethodBuiltin},
+    prelude::*,
+};
 
 pub const VERSION: u32 = 0;
 
@@ -159,7 +161,7 @@ impl BcWrite for StrIdent {
 #[derive(Default)]
 pub struct BytecodeBuilder {
     global_scope_size: u32,
-    string_map: FxHashMap<&'static str, u32>,
+    string_map: HashMap<&'static str, u32>,
     string_data: Vec<u8>,
     instruction_data: Vec<u8>,
     labels: Vec<u32>,
