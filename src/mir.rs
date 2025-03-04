@@ -8,7 +8,7 @@ use crate::{
     builtints::Builtin,
     intern::intern,
     prelude::*,
-    ty::{GenericId, Ty, TyCtx, TyKind},
+    ty::{GenericId, TraitId, Ty, TyCtx, TyKind},
 };
 
 #[derive(Debug)]
@@ -112,6 +112,7 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone)]
 struct Trait {
+    //    name: &'static str,
     expected_functions: Rc<[TraitFnSig]>,
 }
 
@@ -151,8 +152,9 @@ pub struct Lowering<'src, 'ctx> {
     named_types: HashMap<&'static str, Ty>,
     enums: HashMap<u32, EnumData>,
     methods: HashMap<(Ty, &'static str), Ident>,
-    traits: HashMap<&'static str, Trait>,
-    trait_impls: HashSet<(Ty, &'static str)>,
+    trait_ids: HashMap<&'static str, TraitId>,
+    traits: HashMap<TraitId, Trait>,
+    trait_impls: HashSet<(Ty, TraitId)>,
     pub main_fn: Option<Offset>,
     impl_block: Option<ImplBlock>,
     scopes: Vec<FnScope>,
@@ -224,6 +226,7 @@ impl<'src, 'ctx> Lowering<'src, 'ctx> {
             src,
             methods: HashMap::default(),
             traits: HashMap::default(),
+            trait_ids: HashMap::default(),
             trait_impls: HashSet::default(),
             scopes: vec![scope],
             named_types,
@@ -295,6 +298,10 @@ impl Lowering<'_, '_> {
 
     fn trait_(&mut self, trait_: &ast::Trait, out: &mut Vec<Item>) -> Result<()> {
         _ = out;
+
+        let id = self.ctx.new_trait_id();
+        self.trait_ids.insert(trait_.name, id);
+
         let mut expected_functions = vec![];
 
         for stmt in &trait_.body.stmts {
@@ -319,7 +326,7 @@ impl Lowering<'_, '_> {
                 _ => panic!("{stmt:?}"),
             }
         }
-        self.traits.insert(trait_.name, Trait { expected_functions: expected_functions.into() });
+        self.traits.insert(id, Trait { expected_functions: expected_functions.into() });
         Ok(())
     }
 
@@ -466,8 +473,8 @@ impl Lowering<'_, '_> {
         let ty = self.load_explicit_type(expl_ty)?;
         self.impl_block = Some(ImplBlock { ty: ty.clone() });
 
-        let trait_ident = *trait_.ident;
-        let trait_ = self.traits.get(trait_ident).unwrap().clone();
+        let trait_id = self.trait_ids[*trait_.ident];
+        let trait_ = self.traits.get(&trait_id).unwrap().clone();
         // TODO: Don't be dependant on order.
         for (impl_item, stmt) in trait_.expected_functions.iter().zip(&body.stmts) {
             let Stmt::Function(func) = &**stmt else { panic!() };
@@ -494,7 +501,7 @@ impl Lowering<'_, '_> {
             assert_eq!(ret_ty, *expected_ty);
             self.function(func, out)?;
         }
-        self.trait_impls.insert((ty, trait_ident));
+        self.trait_impls.insert((ty, trait_id));
         self.impl_block = None;
         Ok(())
     }
@@ -557,7 +564,8 @@ impl Lowering<'_, '_> {
                 let bounds = (generic.bounds.iter().flatten())
                     .map(|bound| {
                         assert_eq!(bound.segments.len(), 1);
-                        bound.segments[0]
+                        let name = bound.segments[0];
+                        self.trait_ids[name]
                     })
                     .collect();
 
@@ -741,7 +749,7 @@ impl Lowering<'_, '_> {
     fn vtable_method(
         &mut self,
         id: GenericId,
-        traits: &[&'static str],
+        traits: &[TraitId],
         method_name: &'static str,
     ) -> Expr {
         let mut method = None;
@@ -793,13 +801,15 @@ impl Lowering<'_, '_> {
                 | TyKind::Tuple(_) => ExprKind::Format(Box::new(expr)),
 
                 TyKind::Generic { id, traits } => {
-                    assert!(traits.contains(&"Display"));
+                    let display_id = self.trait_ids["Display"];
+                    assert!(traits.contains(&display_id));
                     let func = self.vtable_method(*id, traits, "to_str");
                     ExprKind::FnCall { expr: Box::new(func), args: vec![expr] }
                 }
                 TyKind::Variant { id } => self.enum_variant_str(expr, *id),
                 _ => {
-                    assert!(self.trait_impls.contains(&(ty.clone(), "Display")), "{ty:?}");
+                    let display_id = self.trait_ids["Display"];
+                    assert!(self.trait_impls.contains(&(ty.clone(), display_id)), "{ty:?}");
                     let method = self.methods.get(&(ty, "to_str")).unwrap();
                     ExprKind::FnCall {
                         expr: Box::new(Expr::ident(method.clone())),
@@ -925,7 +935,7 @@ impl Lowering<'_, '_> {
         Ok(Expr { ty, kind: ExprKind::Map(entries) })
     }
 
-    fn vtable_for(&mut self, traits: &[&'static str], ty: &Ty) -> Result<Expr> {
+    fn vtable_for(&mut self, traits: &[TraitId], ty: &Ty) -> Result<Expr> {
         let mut fields = vec![];
         let mut offset = 0;
         for r#trait in traits {
@@ -937,7 +947,7 @@ impl Lowering<'_, '_> {
                 offset += 1;
             }
         }
-        let ty = Ty::from(TyKind::Vtable { traits: traits.into() });
+        let ty = Ty::from(TyKind::Vtable { traits: traits.to_vec() });
         let kind = ExprKind::StructInit { fields };
         Ok(Expr { ty, kind })
     }

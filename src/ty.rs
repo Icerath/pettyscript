@@ -5,6 +5,7 @@ pub struct TyCtx {
     subs: HashMap<TyVid, Ty>,
     ty_vid: u32,
     generic_id: u32,
+    trait_id: u32,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -56,6 +57,11 @@ pub struct GenericId {
     index: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct TraitId {
+    index: u32,
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TyKind {
     Null,
@@ -72,8 +78,8 @@ pub enum TyKind {
     Enum { id: u32, name: &'static str, variants: BTreeMap<&'static str, u16> },
     Function { params: Vec<Ty>, ret: Ty, generics: Vec<Ty> },
     Variant { id: u32 },
-    Generic { id: GenericId, traits: Vec<&'static str> },
-    Vtable { traits: Vec<&'static str> },
+    Generic { id: GenericId, traits: Vec<TraitId> },
+    Vtable { traits: Vec<TraitId> },
     Infer(InferTy),
 }
 
@@ -88,13 +94,18 @@ impl TyCtx {
     }
 
     // TODO: Rework generics
-    pub fn new_generic(&mut self, traits: Vec<&'static str>) -> Ty {
+    pub fn new_generic(&mut self, traits: Vec<TraitId>) -> Ty {
         Ty::from(TyKind::Generic { id: self.generic_id(), traits })
     }
 
     pub fn generic_id(&mut self) -> GenericId {
         self.generic_id += 1;
         GenericId { index: self.generic_id }
+    }
+
+    pub fn new_trait_id(&mut self) -> TraitId {
+        self.trait_id += 1;
+        TraitId { index: self.trait_id }
     }
 
     pub fn infer(&self, ty: &Ty) -> Ty {
