@@ -1,11 +1,16 @@
+use std::{
+    cell::{Cell, RefCell},
+    hash::Hash,
+};
+
 use crate::prelude::*;
 
 #[derive(Default, Debug)]
 pub struct TyCtx {
-    subs: HashMap<TyVid, Ty>,
-    ty_vid: u32,
-    generic_id: u32,
-    trait_id: u32,
+    subs: SharedMap<TyVid, Ty>,
+    ty_vid: Cell<u32>,
+    generic_id: Cell<u32>,
+    trait_id: Cell<u32>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -84,38 +89,35 @@ pub enum TyKind {
 }
 
 impl TyCtx {
-    pub fn new_infer(&mut self) -> Ty {
+    pub fn new_infer(&self) -> Ty {
         Ty::from(TyKind::Infer(InferTy::TyVar(self.vid())))
     }
 
-    pub fn vid(&mut self) -> TyVid {
-        self.ty_vid += 1;
-        TyVid { index: self.ty_vid }
+    pub fn vid(&self) -> TyVid {
+        TyVid { index: self.ty_vid.update(|v| v + 1) }
     }
 
     // TODO: Rework generics
-    pub fn new_generic(&mut self, traits: Vec<TraitId>) -> Ty {
+    pub fn new_generic(&self, traits: Vec<TraitId>) -> Ty {
         Ty::from(TyKind::Generic { id: self.generic_id(), traits })
     }
 
-    pub fn generic_id(&mut self) -> GenericId {
-        self.generic_id += 1;
-        GenericId { index: self.generic_id }
+    pub fn generic_id(&self) -> GenericId {
+        GenericId { index: self.generic_id.update(|v| v + 1) }
     }
 
-    pub fn new_trait_id(&mut self) -> TraitId {
-        self.trait_id += 1;
-        TraitId { index: self.trait_id }
+    pub fn new_trait_id(&self) -> TraitId {
+        TraitId { index: self.trait_id.update(|v| v + 1) }
     }
 
     pub fn infer(&self, ty: &Ty) -> Ty {
         match ty.kind() {
-            TyKind::Infer(InferTy::TyVar(var)) => self.infer(&self.subs[var]),
+            TyKind::Infer(InferTy::TyVar(var)) => self.infer(&self.subs.get(var).unwrap()),
             _ => ty.clone(),
         }
     }
 
-    pub fn eq(&mut self, lhs: &Ty, rhs: &Ty) {
+    pub fn eq(&self, lhs: &Ty, rhs: &Ty) {
         match (lhs.kind(), rhs.kind()) {
             // Inference
             (TyKind::Infer(InferTy::TyVar(l)), TyKind::Infer(InferTy::TyVar(r))) if l == r => {}
@@ -132,8 +134,8 @@ impl TyCtx {
         }
     }
 
-    fn insert(&mut self, var: TyVid, ty: &Ty) {
-        if let Some(sub) = self.subs.get(&var).cloned() {
+    fn insert(&self, var: TyVid, ty: &Ty) {
+        if let Some(sub) = self.subs.get(&var) {
             self.eq(ty, &sub);
             return;
         }
@@ -146,7 +148,7 @@ impl TyCtx {
             TyKind::Infer(InferTy::TyVar(var)) => {
                 if let Some(sub) = self.subs.get(var) {
                     if *sub.kind() != TyKind::Infer(InferTy::TyVar(*var)) {
-                        return self.occurs_in(*var, sub);
+                        return self.occurs_in(*var, &sub);
                     }
                 }
                 this == *var
@@ -159,5 +161,39 @@ impl TyCtx {
 impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.kind, f)
+    }
+}
+
+struct SharedMap<K, V> {
+    inner: RefCell<HashMap<K, V>>,
+}
+
+impl<K, V> Default for SharedMap<K, V> {
+    fn default() -> Self {
+        Self { inner: RefCell::default() }
+    }
+}
+
+impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for SharedMap<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&*self.inner.borrow(), f)
+    }
+}
+
+impl<K, V> SharedMap<K, V>
+where
+    K: Hash + Eq,
+{
+    fn insert(&self, key: K, val: V) {
+        self.inner.borrow_mut().insert(key, val);
+    }
+
+    fn get<Q>(&self, key: &Q) -> Option<V>
+    where
+        Q: Hash + Eq,
+        K: std::borrow::Borrow<Q>,
+        V: Clone,
+    {
+        self.inner.borrow().get(key).cloned()
     }
 }

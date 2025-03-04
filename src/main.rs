@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(cell_update)]
 
 mod ast;
 mod builtints;
