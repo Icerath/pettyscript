@@ -14,7 +14,7 @@ use crate::{
     },
     builtints::Builtin,
     intern::intern,
-    ty::{Ty, TyCtx, TyKind},
+    ty::{GenericId, Ty, TyCtx, TyKind},
 };
 
 #[derive(Debug)]
@@ -181,7 +181,7 @@ pub struct FnScope {
     variables: FxHashMap<&'static str, Ident>,
     var_counter: usize,
     for_loops: usize,
-    vtables: FxHashMap<u32, u32>,
+    vtables: FxHashMap<GenericId, u32>,
 }
 
 impl<'src, 'ctx> Lowering<'src, 'ctx> {
@@ -746,7 +746,7 @@ impl Lowering<'_, '_> {
 
     fn vtable_method(
         &mut self,
-        id: u32,
+        id: GenericId,
         traits: &[&'static str],
         method_name: &'static str,
     ) -> Expr {

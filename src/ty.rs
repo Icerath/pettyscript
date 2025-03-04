@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap as HashMap;
 pub struct TyCtx {
     subs: HashMap<TyVid, Ty>,
     counter: u32,
+    generic_id: u32,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -52,6 +53,11 @@ pub struct TyVid {
     index: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GenericId {
+    index: u32,
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TyKind {
     Null,
@@ -68,7 +74,7 @@ pub enum TyKind {
     Enum { id: u32, name: &'static str, variants: BTreeMap<&'static str, u16> },
     Function { params: Vec<Ty>, ret: Ty, generics: Vec<Ty> },
     Variant { id: u32 },
-    Generic { id: u32, traits: Vec<&'static str> },
+    Generic { id: GenericId, traits: Vec<&'static str> },
     Vtable { traits: Vec<&'static str> },
     Infer(InferTy),
 }
@@ -78,14 +84,19 @@ impl TyCtx {
         Ty::from(TyKind::Infer(InferTy::TyVar(self.vid())))
     }
 
-    // TODO: Rework generics
-    pub fn new_generic(&mut self, traits: Vec<&'static str>) -> Ty {
-        Ty::from(TyKind::Generic { id: self.vid().index, traits })
-    }
-
     pub fn vid(&mut self) -> TyVid {
         self.counter += 1;
         TyVid { index: self.counter }
+    }
+
+    // TODO: Rework generics
+    pub fn new_generic(&mut self, traits: Vec<&'static str>) -> Ty {
+        Ty::from(TyKind::Generic { id: self.generic_id(), traits })
+    }
+
+    pub fn generic_id(&mut self) -> GenericId {
+        self.generic_id += 1;
+        GenericId { index: self.generic_id }
     }
 
     pub fn infer(&self, ty: &Ty) -> Ty {
