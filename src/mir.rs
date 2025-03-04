@@ -147,8 +147,8 @@ pub struct Fstr {
     pub remaining: &'static str,
 }
 
-pub struct Lowering<'src, 'ctx> {
-    pub ctx: &'ctx mut TyCtx,
+pub struct Lowering<'src, 'tcx> {
+    pub tcx: &'tcx mut TyCtx,
     named_types: HashMap<&'static str, Ty>,
     enums: HashMap<u32, EnumData>,
     methods: HashMap<(Ty, &'static str), Ident>,
@@ -180,8 +180,8 @@ pub struct FnScope {
     vtables: HashMap<GenericId, u32>,
 }
 
-impl<'src, 'ctx> Lowering<'src, 'ctx> {
-    pub fn new(src: &'src str, ctx: &'ctx mut TyCtx) -> Self {
+impl<'src, 'tcx> Lowering<'src, 'tcx> {
+    pub fn new(src: &'src str, tcx: &'tcx mut TyCtx) -> Self {
         let mut named_types = HashMap::default();
 
         let builtin_types = [
@@ -221,7 +221,7 @@ impl<'src, 'ctx> Lowering<'src, 'ctx> {
         scope.insert("null", Ty::from(TyKind::Null), true);
 
         Self {
-            ctx,
+            tcx,
             main_fn: None,
             src,
             methods: HashMap::default(),
@@ -299,7 +299,7 @@ impl Lowering<'_, '_> {
     fn trait_(&mut self, trait_: &ast::Trait, out: &mut Vec<Item>) -> Result<()> {
         _ = out;
 
-        let id = self.ctx.new_trait_id();
+        let id = self.tcx.new_trait_id();
         self.trait_ids.insert(trait_.name, id);
 
         let mut expected_functions = vec![];
@@ -369,7 +369,7 @@ impl Lowering<'_, '_> {
 
         for if_stmt in [&if_chain.first].into_iter().chain(&if_chain.r#else_ifs) {
             let condition = self.expr(&if_stmt.condition)?;
-            self.ctx.eq(&condition.ty, &Ty::from(TyKind::Bool));
+            self.tcx.eq(&condition.ty, &Ty::from(TyKind::Bool));
             let block = self.block(&if_stmt.body.stmts)?;
             chain.push((condition, block));
         }
@@ -385,7 +385,7 @@ impl Lowering<'_, '_> {
     }
 
     fn iter_item_ty(&mut self, iter: &Ty) -> Ty {
-        match self.ctx.infer(iter).kind() {
+        match self.tcx.infer(iter).kind() {
             TyKind::Range | TyKind::RangeInclusive => TyKind::Int.into(),
             _ => panic!("{iter:?}"),
         }
@@ -405,10 +405,10 @@ impl Lowering<'_, '_> {
         if let Some(expl_ty) = &var_decl.typ {
             ty = Some(self.load_explicit_type(expl_ty)?);
         }
-        let ty = ty.unwrap_or_else(|| self.ctx.new_infer());
+        let ty = ty.unwrap_or_else(|| self.tcx.new_infer());
 
         let expr = self.expr(var_decl.expr.as_ref().unwrap())?;
-        self.ctx.eq(&expr.ty, &ty);
+        self.tcx.eq(&expr.ty, &ty);
         let item = if *ident == "_" {
             Item::Expr(expr)
         } else {
@@ -427,7 +427,7 @@ impl Lowering<'_, '_> {
             match segment {
                 ast::AssignSegment::Index(_) => panic!(),
                 ast::AssignSegment::Field(field) => {
-                    var = self.ctx.infer(&var);
+                    var = self.tcx.infer(&var);
                     let TyKind::Struct { fields, .. } = var.kind() else { panic!() };
                     segments.push(AssignSegment::Field(fields.get(**field).unwrap().0));
                     var = self.field_ty(&var, field);
@@ -435,7 +435,7 @@ impl Lowering<'_, '_> {
             }
         }
         let expr = self.expr(&assign.expr)?;
-        self.ctx.eq(&var, &expr.ty);
+        self.tcx.eq(&var, &expr.ty);
 
         let root = self.load_var(&assign.root).unwrap();
         // TODO: Assignment should pass all segments
@@ -569,7 +569,7 @@ impl Lowering<'_, '_> {
                     })
                     .collect();
 
-                (*generic.name, self.ctx.new_generic(bounds))
+                (*generic.name, self.tcx.new_generic(bounds))
             })
             .collect();
         let ret = if let Some(ret_ty) = &func.ret_type {
@@ -643,7 +643,7 @@ impl Lowering<'_, '_> {
         }
 
         if let Some(impl_block) = &self.impl_block {
-            let ty = self.ctx.infer(&impl_block.ty);
+            let ty = self.tcx.infer(&impl_block.ty);
             self.methods.insert((ty, *func.ident), ident.clone());
         }
         let body = self.block(&func.body.as_ref().unwrap().stmts)?;
@@ -666,10 +666,10 @@ impl Lowering<'_, '_> {
 
         let expr = if let Some(expr) = &ret.0 {
             let expr = self.expr(expr)?;
-            self.ctx.eq(&expr.ty, &ret_var);
+            self.tcx.eq(&expr.ty, &ret_var);
             Some(expr)
         } else {
-            self.ctx.eq(&Ty::from(TyKind::Null), &ret_var);
+            self.tcx.eq(&Ty::from(TyKind::Null), &ret_var);
             None
         };
         let pops = self.scope().for_loops;
@@ -680,7 +680,7 @@ impl Lowering<'_, '_> {
 
     fn load_explicit_type(&mut self, expl_ty: &Spanned<ExplicitType>) -> Result<Ty> {
         if expl_ty.is_inferred() {
-            return Ok(self.ctx.new_infer());
+            return Ok(self.tcx.new_infer());
         } else if expl_ty.is_self() {
             return Ok(self.impl_block.as_ref().unwrap().ty.clone());
         }
@@ -716,7 +716,7 @@ impl Lowering<'_, '_> {
         }
         let root = self.named_types.get(root).unwrap();
         let next = segments.next().unwrap();
-        let ty = self.ctx.infer(root);
+        let ty = self.tcx.infer(root);
         if let TyKind::Variant { id } = ty.kind() {
             let enum_ = self.enums.get(id).unwrap();
             let variant = *enum_.variants.get(next).unwrap();
@@ -789,7 +789,7 @@ impl Lowering<'_, '_> {
         let mut segments = vec![];
         for (str, aexpr) in &fstring.segments {
             let expr = self.expr(aexpr)?;
-            let ty = self.ctx.infer(&expr.ty);
+            let ty = self.tcx.infer(&expr.ty);
             let expr = match ty.kind() {
                 // TODO: Don't support arrays/maps/tuples here.
                 TyKind::Int
@@ -852,18 +852,18 @@ impl Lowering<'_, '_> {
     fn binary(&mut self, op: BinOp, left: &ast::Expr, right: &ast::Expr) -> Result<Expr> {
         let left = self.expr(left)?;
         let right = self.expr(right)?;
-        self.ctx.eq(&left.ty, &right.ty);
+        self.tcx.eq(&left.ty, &right.ty);
         let ty = self.binary_op_out(op, &left.ty);
         Ok(Expr { ty, kind: ExprKind::Binary { exprs: Box::new([left, right]), op } })
     }
 
     fn binary_op_out(&mut self, op: BinOp, ty: &Ty) -> Ty {
-        let ty = self.ctx.infer(ty);
+        let ty = self.tcx.infer(ty);
         macro_rules! ret {
             ($method:literal) => {{
                 // TODO: Keep track of trait methods.
                 let fn_ty = &self.methods.get(&(ty, $method)).unwrap().ty;
-                let fn_ty = self.ctx.infer(fn_ty);
+                let fn_ty = self.tcx.infer(fn_ty);
                 let TyKind::Function { ret, .. } = fn_ty.kind() else { panic!() };
                 ret.clone()
             }};
@@ -877,15 +877,15 @@ impl Lowering<'_, '_> {
             BinOp::Mod => ret!("mod"),
             BinOp::Eq | BinOp::Neq | BinOp::Less | BinOp::Greater => Ty::from(TyKind::Bool),
             BinOp::Range => {
-                self.ctx.eq(&ty, &Ty::from(TyKind::Int));
+                self.tcx.eq(&ty, &Ty::from(TyKind::Int));
                 Ty::from(TyKind::Range)
             }
             BinOp::RangeInclusive => {
-                self.ctx.eq(&ty, &Ty::from(TyKind::Int));
+                self.tcx.eq(&ty, &Ty::from(TyKind::Int));
                 Ty::from(TyKind::RangeInclusive)
             }
             BinOp::And | BinOp::Or => {
-                self.ctx.eq(&ty, &Ty::from(TyKind::Bool));
+                self.tcx.eq(&ty, &Ty::from(TyKind::Bool));
                 Ty::from(TyKind::Bool)
             }
             _ => todo!("{op:?}"),
@@ -893,13 +893,13 @@ impl Lowering<'_, '_> {
     }
 
     fn array(&mut self, aexprs: &[ast::Expr]) -> Result<Expr> {
-        let var = self.ctx.new_infer();
+        let var = self.tcx.new_infer();
         let ty = Ty::from(TyKind::Array(var.clone()));
 
         let mut exprs = vec![];
         for aexpr in aexprs {
             let expr = self.expr(aexpr)?;
-            self.ctx.eq(&var, &expr.ty);
+            self.tcx.eq(&var, &expr.ty);
             exprs.push(expr);
         }
         Ok(Expr { kind: ExprKind::Array(exprs), ty })
@@ -919,15 +919,15 @@ impl Lowering<'_, '_> {
 
     fn map(&mut self, init: &[[ast::Expr; 2]]) -> Result<Expr> {
         let mut entries = Vec::with_capacity(init.len());
-        let key_ty = self.ctx.new_infer();
-        let value_ty = self.ctx.new_infer();
+        let key_ty = self.tcx.new_infer();
+        let value_ty = self.tcx.new_infer();
 
         for [key, value] in init {
             let key = self.expr(key)?;
             let value = self.expr(value)?;
 
-            self.ctx.eq(&key.ty, &key_ty);
-            self.ctx.eq(&value.ty, &value_ty);
+            self.tcx.eq(&key.ty, &key_ty);
+            self.tcx.eq(&value.ty, &value_ty);
 
             entries.push([key, value]);
         }
@@ -954,7 +954,7 @@ impl Lowering<'_, '_> {
 
     fn fn_call(&mut self, func: &ast::Expr, args: &[Spanned<ast::Expr>]) -> Result<Expr> {
         let expr = self.expr(func)?;
-        let fn_ty = self.ctx.infer(&expr.ty);
+        let fn_ty = self.tcx.infer(&expr.ty);
         let TyKind::Function { params, ret, generics } = fn_ty.kind() else { panic!("{fn_ty:?}") };
 
         let mut id_types = HashMap::default();
@@ -972,7 +972,7 @@ impl Lowering<'_, '_> {
                     _ = traits;
                 }
             } else {
-                self.ctx.eq(&arg.ty, param);
+                self.tcx.eq(&arg.ty, param);
             }
             new_args.push(arg);
         }
@@ -998,7 +998,7 @@ impl Lowering<'_, '_> {
     }
 
     fn field_ty(&self, ty: &Ty, field: &'static str) -> Ty {
-        let ty = self.ctx.infer(ty);
+        let ty = self.tcx.infer(ty);
         match ty.kind() {
             TyKind::Struct { fields, .. } => fields.get(field).unwrap().1.clone(),
             kind => todo!("type `{:?}` does not contain field: `{field}`", kind),
@@ -1018,7 +1018,7 @@ impl Lowering<'_, '_> {
             let mut new_args = Vec::with_capacity(args.len());
             for (arg, param) in args.iter().zip(&*params) {
                 let arg = self.expr(arg)?;
-                self.ctx.eq(&arg.ty, param);
+                self.tcx.eq(&arg.ty, param);
                 new_args.push(arg);
             }
             let ret = params.last().unwrap().clone();
@@ -1028,7 +1028,7 @@ impl Lowering<'_, '_> {
             });
         }
 
-        let expr_ty = self.ctx.infer(&expr.ty);
+        let expr_ty = self.tcx.infer(&expr.ty);
         let func = if let TyKind::Generic { id, traits } = expr_ty.kind() {
             self.vtable_method(*id, traits, method)
         } else {
@@ -1039,7 +1039,7 @@ impl Lowering<'_, '_> {
                     .clone(),
             )
         };
-        let func_ty = self.ctx.infer(&func.ty);
+        let func_ty = self.tcx.infer(&func.ty);
         let TyKind::Function { params, ret, .. } = func_ty.kind() else { panic!() };
 
         assert_eq!(args.len() + 1, params.len());
@@ -1047,7 +1047,7 @@ impl Lowering<'_, '_> {
         new_args.push(expr);
         for (arg, param) in args.iter().zip(&**params) {
             let arg = self.expr(arg)?;
-            self.ctx.eq(&arg.ty, param);
+            self.tcx.eq(&arg.ty, param);
             new_args.push(arg);
         }
 
@@ -1059,7 +1059,7 @@ impl Lowering<'_, '_> {
 
     #[expect(clippy::match_same_arms)]
     fn method_params(&mut self, ty: &Ty, method: &'static str) -> Option<Rc<[Ty]>> {
-        let ty = self.ctx.infer(ty);
+        let ty = self.tcx.infer(ty);
         Some(match ty.kind() {
             TyKind::Int => match method {
                 "abs" => Rc::new([Ty::from(TyKind::Int)]),
@@ -1106,8 +1106,8 @@ impl Lowering<'_, '_> {
     }
 
     fn index_ty(&mut self, ty: &Ty, index: &Ty) -> Ty {
-        let index = self.ctx.infer(index);
-        let ty = self.ctx.infer(ty);
+        let index = self.tcx.infer(index);
+        let ty = self.tcx.infer(ty);
 
         match (ty.kind(), index.kind()) {
             (TyKind::Array(of), TyKind::Int) => of.clone(),
@@ -1128,7 +1128,7 @@ impl Lowering<'_, '_> {
             let init_expr = match init.expr.as_ref() {
                 Some(expr) => {
                     let expr = self.expr(expr)?;
-                    self.ctx.eq(ty, &expr.ty);
+                    self.tcx.eq(ty, &expr.ty);
                     expr
                 }
                 None => Expr::ident(self.load_var(&init.ident).expect(&init.ident)),
