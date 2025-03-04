@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Default, Debug)]
 pub struct TyCtx {
     subs: HashMap<TyVid, Ty>,
-    counter: u32,
+    ty_vid: u32,
     generic_id: u32,
 }
 
@@ -83,8 +83,8 @@ impl TyCtx {
     }
 
     pub fn vid(&mut self) -> TyVid {
-        self.counter += 1;
-        TyVid { index: self.counter }
+        self.ty_vid += 1;
+        TyVid { index: self.ty_vid }
     }
 
     // TODO: Rework generics
